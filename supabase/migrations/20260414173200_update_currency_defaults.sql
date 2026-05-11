@@ -1,0 +1,6 @@
+ALTER TABLE public.stays ALTER COLUMN currency SET DEFAULT 'INR';
+ALTER TABLE public.cars ALTER COLUMN currency SET DEFAULT 'INR';
+ALTER TABLE public.bikes ALTER COLUMN currency SET DEFAULT 'INR';
+ALTER TABLE public.experiences ALTER COLUMN currency SET DEFAULT 'INR';
+ALTER TABLE public.hotels ALTER COLUMN currency SET DEFAULT 'INR';
+ALTER TABLE public.resorts ALTER COLUMN currency SET DEFAULT 'INR';

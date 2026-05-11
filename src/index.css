@@ -1,0 +1,210 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Xplorwing Light Mode - Clean White & Dark Forest Green */
+    --background: 0 0% 100%;
+    --foreground: 158 100% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 158 100% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 158 100% 10%;
+
+    --primary: 68 90% 70%;
+    --primary-foreground: 158 100% 10%;
+
+    --secondary: 158 20% 90%;
+    --secondary-foreground: 158 100% 10%;
+
+    --muted: 158 15% 88%;
+    --muted-foreground: 158 25% 35%;
+
+    --accent: 158 80% 25%;
+    --accent-foreground: 48 100% 99%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 48 100% 99%;
+
+    --border: 158 20% 85%;
+    --input: 158 20% 85%;
+    --ring: 68 90% 70%;
+
+    --radius: 0.75rem;
+
+    /* Primary text color - dark forest green for readability on white */
+    --primary-text: 158 80% 25%;
+
+    /* Green gradient */
+    --gradient-primary: linear-gradient(135deg, hsl(68 80% 55%), hsl(68 90% 70%));
+
+    /* Glassmorphism effects */
+    --glass-bg: 48 100% 99% / 0.7;
+    --glass-border: 158 20% 85% / 0.3;
+
+    /* Shadows */
+    --shadow-subtle: 0 2px 8px hsl(158 100% 10% / 0.08);
+    --shadow-medium: 0 4px 16px hsl(158 100% 10% / 0.12);
+    --shadow-strong: 0 8px 32px hsl(158 100% 10% / 0.16);
+
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark {
+    /* Xplorwing Dark Mode - Forest at Night */
+    --background: 158 40% 8%;
+    --foreground: 48 100% 96%;
+
+    --card: 158 35% 12%;
+    --card-foreground: 48 100% 96%;
+
+    --popover: 158 35% 12%;
+    --popover-foreground: 48 100% 96%;
+
+    --primary: 68 90% 70%;
+    --primary-foreground: 158 100% 10%;
+
+    --secondary: 158 30% 18%;
+    --secondary-foreground: 48 100% 96%;
+
+    --muted: 158 25% 20%;
+    --muted-foreground: 158 15% 65%;
+
+    --accent: 158 50% 35%;
+    --accent-foreground: 48 100% 96%;
+
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 48 100% 96%;
+
+    --border: 158 25% 20%;
+    --input: 158 25% 20%;
+    --ring: 68 90% 70%;
+
+    /* Primary text color - lime green is fine on dark backgrounds */
+    --primary-text: 68 90% 70%;
+
+    /* Dark lime-green gradient */
+    --gradient-primary: linear-gradient(135deg, hsl(68 80% 55%), hsl(68 90% 70%));
+
+    /* Dark mode glassmorphism */
+    --glass-bg: 158 35% 12% / 0.7;
+    --glass-border: 158 25% 20% / 0.3;
+
+    /* Dark mode shadows with glow */
+    --shadow-subtle: 0 2px 8px hsl(0 0% 0% / 0.3), 0 0 20px hsl(68 90% 70% / 0.1);
+    --shadow-medium: 0 4px 16px hsl(0 0% 0% / 0.4), 0 0 30px hsl(68 90% 70% / 0.15);
+    --shadow-strong: 0 8px 32px hsl(0 0% 0% / 0.5), 0 0 40px hsl(68 90% 70% / 0.2);
+
+    /* Element glow */
+    --glow-subtle: 0 0 15px hsl(68 90% 70% / 0.15);
+    --glow-medium: 0 0 25px hsl(68 90% 70% / 0.2);
+    --glow-strong: 0 0 40px hsl(68 90% 70% / 0.3);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+
+  /* Glassmorphism utility */
+  .glass-effect {
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(12px) saturate(150%);
+    border: 1px solid hsl(var(--glass-border));
+  }
+
+  /* Smooth hover scale */
+  .hover-lift {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-medium);
+  }
+
+  /* Card styles */
+  .card-gradient {
+    background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--muted)) 100%);
+  }
+
+  /* Dark mode glow effects */
+  .dark .glow-element {
+    box-shadow: var(--glow-subtle);
+  }
+
+  .dark .glow-element:hover {
+    box-shadow: var(--glow-medium);
+  }
+
+  /* Custom navigation link hover animation */
+  .nav-link-hover {
+    text-decoration: none;
+    transition: all 0.4s;
+  }
+
+  .nav-link-hover:hover {
+    text-shadow: 0 0 5px #e5f76e, 0 0 20px #e5f76e, 0 0 30px #e5f76e;
+  }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Dark mode automatic glow on cards and interactive elements */
+.dark [data-slot="card"],
+.dark .rounded-2xl,
+.dark .rounded-xl,
+.dark .rounded-lg {
+  box-shadow: 0 0 20px hsl(68 90% 70% / 0.08);
+  transition: box-shadow 0.3s ease;
+}
+
+.dark [data-slot="card"]:hover,
+.dark .hover-lift:hover {
+  box-shadow: 0 0 30px hsl(68 90% 70% / 0.15), 0 4px 16px hsl(0 0% 0% / 0.4);
+}
+
+/* Buttons glow in dark mode */
+.dark button[class*="bg-primary"],
+.dark .bg-primary {
+  box-shadow: 0 0 20px hsl(68 90% 70% / 0.25);
+}
+
+.dark button[class*="bg-primary"]:hover,
+.dark .bg-primary:hover {
+  box-shadow: 0 0 30px hsl(68 90% 70% / 0.4);
+}
+
+/* Leaflet custom marker reset */
+.custom-map-marker {
+  background: transparent !important;
+  border: none !important;
+}

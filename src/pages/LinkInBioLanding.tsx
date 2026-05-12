@@ -494,8 +494,8 @@ html { scroll-behavior: smooth; }
   .hero-left h1 { font-size: 28px; }
   .hero-ctas { flex-direction: column; width: 100%; gap: 10px; }
   .hero-ctas .cta-primary, .hero-ctas .cta-secondary { width: 100%; justify-content: center; }
-  .hero-right { min-height: 280px; padding: 0; margin-top: -20px; }
-  .phone-mockup { transform: scale(0.68); margin-bottom: -160px; }
+  .hero-right { min-height: 380px; padding: 0; margin-top: -20px; }
+  .phone-mockup { transform: scale(0.68); margin-bottom: -60px; }
   .section-top h2 { font-size: 22px; }
   .p-price { font-size: 26px; }
   .num-n { font-size: 32px; }

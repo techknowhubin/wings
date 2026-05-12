@@ -8,6 +8,7 @@ interface LogoProps {
   className?: string;
   lightHeightClass?: string;
   darkHeightClass?: string;
+  forceTheme?: "light" | "dark";
 }
 
 /**
@@ -17,9 +18,11 @@ interface LogoProps {
 export const DynamicLogo = ({ 
   className, 
   lightHeightClass = "h-8", 
-  darkHeightClass = "h-[42px]" 
+  darkHeightClass = "h-[42px]",
+  forceTheme
 }: LogoProps) => {
-  const { theme } = useTheme();
+  const { theme: globalTheme } = useTheme();
+  const theme = forceTheme || globalTheme;
   const isDark = theme === "dark";
 
   return (

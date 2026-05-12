@@ -1,412 +1,868 @@
-import React, { useState } from "react";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { motion } from "framer-motion";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  ArrowRight,
-  CheckCircle2,
-  QrCode,
-  LineChart,
-  Link as LinkIcon,
-  Store,
-  CalendarCheck,
-  CreditCard,
-  MapPin,
-  Car,
-  Home,
-  User,
-  ShieldCheck,
-  Medal,
-  LayoutGrid
-} from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { DynamicLogo } from "@/components/DynamicLogo";
+
+const globalStyles = `
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --g: #1a3d2b; --gm: #2a5c40; --g-light: #e8f2ec;
+  --lime: #c8e64c; --lime-d: #a8c230; --lime-p: #f0f8d0; --lime-glow: rgba(200,230,76,.3);
+  --bg: #f8f6f0; --white: #fff;
+  --border: #e5e1d4; --muted: #6b7c72; --text: #1a3d2b;
+  --radius-card: 22px;
+  --shadow-sm: 0 2px 12px rgba(26,61,43,.07);
+  --shadow-md: 0 8px 36px rgba(26,61,43,.13);
+  --shadow-lg: 0 20px 72px rgba(26,61,43,.2);
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); overflow-x: hidden; }
+#prog { position: fixed; top: 0; left: 0; height: 3px; background: linear-gradient(90deg, var(--lime), var(--gm)); width: 0; z-index: 300; transition: width .1s linear; }
+
+/* NAV */
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 200; height: 66px; padding: 0 40px; display: flex; align-items: center; justify-content: space-between; background: transparent; transition: background .4s, backdrop-filter .4s, box-shadow .4s; }
+.nav.solid { background: rgba(248,246,240,.95); backdrop-filter: blur(14px); box-shadow: 0 1px 0 var(--border); }
+.logo { font-size: 22px; font-weight: 800; color: #fff; text-decoration: none; display: flex; align-items: center; opacity: 0; animation: fadeD .6s .1s ease forwards; transition: color 0.4s; }
+.nav.solid .logo { color: var(--g); }
+.logo-o { color: var(--lime-d); }
+.nav-links { display: flex; gap: 28px; list-style: none; opacity: 0; animation: fadeD .6s .2s ease forwards; }
+.nav-links a { font-size: 14px; color: rgba(255,255,255,0.8); font-weight: 500; text-decoration: none; transition: color .2s; position: relative; }
+.nav.solid .nav-links a { color: var(--muted); }
+.nav-links a::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 0; height: 1.5px; background: var(--lime); transition: width .25s; }
+.nav-links a:hover { color: #fff; }
+.nav.solid .nav-links a:hover { color: var(--g); }
+.nav-links a:hover::after { width: 100%; }
+.nav-r { display: flex; gap: 10px; align-items: center; opacity: 0; animation: fadeD .6s .3s ease forwards; }
+.btn-ghost { font-size: 13.5px; font-weight: 500; color: #fff; padding: 8px 18px; border: 1.5px solid rgba(255,255,255,0.4); border-radius: 100px; text-decoration: none; transition: all .22s; }
+.btn-ghost:hover { background: #fff; color: var(--g); }
+.nav.solid .btn-ghost { color: var(--g); border-color: var(--g); }
+.nav.solid .btn-ghost:hover { background: var(--g); color: #fff; }
+.btn-lime { font-size: 13.5px; font-weight: 700; color: var(--g); background: var(--lime); padding: 9px 20px; border-radius: 100px; text-decoration: none; border: none; cursor: pointer; transition: all .22s; }
+.btn-lime:hover { background: var(--lime-d); transform: translateY(-1px); box-shadow: 0 6px 20px var(--lime-glow); }
+.hamburger { display: none; flex-direction: column; gap: 5px; background: none; border: none; cursor: pointer; padding: 4px; }
+.hamburger span { display: block; width: 22px; height: 2px; background: #fff; border-radius: 2px; transition: all .3s; }
+.nav.solid .hamburger span { background: var(--g); }
+.hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+.mobile-menu { display: none; position: fixed; top: 66px; left: 0; right: 0; background: rgba(248,246,240,.98); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); padding: 20px 24px 28px; z-index: 190; transform: translateY(-10px); opacity: 0; transition: transform .3s ease, opacity .3s ease; pointer-events: none; }
+.mobile-menu.open { transform: translateY(0); opacity: 1; pointer-events: auto; display: block; }
+.mobile-menu ul { list-style: none; display: flex; flex-direction: column; gap: 2px; margin-bottom: 16px; }
+.mobile-menu ul li a { display: block; padding: 11px 4px; font-size: 16px; font-weight: 500; color: var(--text); text-decoration: none; border-bottom: 1px solid var(--border); transition: color .2s, padding-left .2s; }
+.mobile-menu ul li a:hover { color: var(--g); padding-left: 8px; }
+.mobile-menu-btns { display: flex; gap: 10px; margin-top: 12px; }
+.mobile-menu-btns a { flex: 1; text-align: center; padding: 12px; border-radius: 100px; font-weight: 600; font-size: 14px; text-decoration: none; transition: all .2s; }
+.mb-ghost { border: 1.5px solid var(--g); color: var(--g); }
+.mb-lime { background: var(--lime); color: var(--g); }
+
+/* HERO OVERHAUL */
+.hero-section {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  background: #F7F7F2;
+}
+
+/* Animated Mesh Gradient Background */
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-color: #0B3D2E;
+  overflow: hidden;
+}
+
+.mesh-blob {
+  position: absolute;
+  filter: blur(80px);
+  opacity: 0.6;
+  border-radius: 50%;
+  animation: moveBlob 20s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+}
+.blob-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: #D9F24C; animation-delay: 0s; }
+.blob-2 { bottom: -20%; right: -10%; width: 60vw; height: 60vw; background: #DDE5D7; animation-delay: -5s; opacity: 0.4;}
+.blob-3 { top: 40%; left: 50%; width: 40vw; height: 40vw; background: #2A5C40; animation-delay: -10s; }
+
+@keyframes moveBlob {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(10vw, 5vh) scale(1.1); }
+  100% { transform: translate(-5vw, 10vh) scale(0.9); }
+}
+
+/* Mountains */
+.hero-mountains {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 30vh;
+  z-index: 1;
+  pointer-events: none;
+}
+.mt-layer {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background-size: cover;
+  background-position: bottom center;
+  background-repeat: repeat-x;
+}
+.mt-back { height: 100%; background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 1440 320' xmlns='http://www.w3.org/2000/svg'><path fill='%232A5C40' fill-opacity='0.3' d='M0,224L48,213.3C96,203,192,181,288,181.3C384,181,480,203,576,213.3C672,224,768,224,864,208C960,192,1056,160,1152,149.3C1248,139,1344,149,1392,154.7L1440,160L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'></path></svg>"); animation: pxBack 30s linear infinite alternate; }
+.mt-front { height: 70%; background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 1440 320' xmlns='http://www.w3.org/2000/svg'><path fill='%230B3D2E' d='M0,288L48,272C96,256,192,224,288,213.3C384,203,480,213,576,224C672,235,768,245,864,234.7C960,224,1056,192,1152,181.3C1248,171,1344,181,1392,186.7L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'></path></svg>"); animation: pxFront 20s linear infinite alternate; }
+
+@keyframes pxBack { from { transform: translateX(0); } to { transform: translateX(-5%); } }
+@keyframes pxFront { from { transform: translateX(0); } to { transform: translateX(-2%); } }
+
+/* Dots and Routes */
+.hero-particles {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.route-line {
+  position: absolute;
+  width: 300px;
+  height: 150px;
+  border-top: 2px dashed rgba(255,255,255,0.2);
+  border-radius: 50%;
+  top: 30%;
+  left: 20%;
+  transform: rotate(-15deg);
+  animation: dashAnim 20s linear infinite;
+}
+@keyframes dashAnim {
+  to { border-top-color: rgba(217,242,76,0.5); transform: rotate(-15deg) scale(1.05); }
+}
+
+/* Hero inner layout */
+.hero-inner {
+  position: relative;
+  z-index: 10;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 130px 40px 90px;
+  display: grid;
+  grid-template-columns: 1fr 480px;
+  gap: 60px;
+  align-items: center;
+  width: 100%;
+}
+.hero-left h1 {
+ 
+  font-size: clamp(42px, 5.5vw, 68px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: #fff;
+  margin-bottom: 24px;
+}
+.hero-left h1 em {
+  font-style: normal;
+  color: #D9F24C;
+  position: relative;
+  display: inline-block;
+}
+.hero-left p {
+  font-size: 18px;
+  color: rgba(255,255,255,0.8);
+  line-height: 1.6;
+  max-width: 500px;
+  margin-bottom: 40px;
+}
+.hero-ctas {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.cta-primary {
+  background: #D9F24C;
+  color: #0B3D2E;
+ 
+  font-size: 16px;
+  font-weight: 800;
+  padding: 16px 32px;
+  border-radius: 100px;
+  text-decoration: none;
+  box-shadow: 0 8px 32px rgba(217,242,76,0.3);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.cta-primary:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 40px rgba(217,242,76,0.5);
+  background: #C8E64C;
+}
+.cta-secondary {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.2);
+  backdrop-filter: blur(12px);
+  font-size: 16px;
+  font-weight: 600;
+  padding: 15px 32px;
+  border-radius: 100px;
+  text-decoration: none;
+  transition: all 0.3s;
+}
+.cta-secondary:hover {
+  background: rgba(255,255,255,0.2);
+  transform: translateY(-2px);
+}
+
+/* Floating Mockup */
+.hero-right {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 600px;
+}
+.phone-mockup {
+  position: relative;
+  width: 300px;
+  height: 620px;
+  background: #fff;
+  border-radius: 44px;
+  padding: 12px;
+  box-shadow: 0 30px 80px rgba(11,61,46,0.5), inset 0 0 0 2px rgba(255,255,255,0.5);
+  animation: floatPhone 6s ease-in-out infinite;
+  z-index: 5;
+  will-change: transform;
+  -webkit-font-smoothing: antialiased;
+}
+.phone-screen {
+  background: #F8F6F0;
+  width: 100%;
+  height: 100%;
+  border-radius: 32px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.phone-notch {
+  position: absolute;
+  top: 0; left: 50%; transform: translateX(-50%);
+  width: 120px; height: 28px;
+  background: #fff;
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 18px;
+  z-index: 10;
+}
+.mockup-inner {
+  padding: 40px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.mockup-inner::-webkit-scrollbar { display: none; }
+.m-profile { text-align: center; margin-bottom: 8px; }
+.m-avatar { width: 72px; height: 72px; background: #DDE5D7; border-radius: 50%; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; font-size: 32px; border: 3px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+.m-name { font-size: 18px; font-weight: 800; color: #1a3d2b; }
+.m-bio { font-size: 12px; color: #6b7c72; margin-top: 4px; }
+.m-card { background: #fff; border-radius: 16px; padding: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.04); display: flex; align-items: center; gap: 12px; transition: transform 0.2s; cursor: pointer; }
+.m-card:hover { transform: scale(1.02); }
+.m-card-icon { width: 44px; height: 44px; border-radius: 12px; background: #f0f8d0; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+.m-card-info h5 { font-size: 14px; font-weight: 700; color: #1a3d2b; margin-bottom: 2px; }
+.m-card-info p { font-size: 11px; color: #6b7c72; }
+
+@keyframes floatPhone {
+  0%, 100% { transform: translateZ(0) translateY(0) rotate(0deg); }
+  50% { transform: translateZ(0) translateY(-15px) rotate(-1deg); }
+}
+
+/* Floating Glass Cards */
+.glass-badge {
+  position: absolute;
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.3);
+  padding: 12px 18px;
+  border-radius: 100px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+  z-index: 6;
+  white-space: nowrap;
+}
+.badge-1 { top: 15%; left: -10%; animation: floatBadge 5s ease-in-out infinite 0.5s; }
+.badge-2 { bottom: 25%; left: -25%; animation: floatBadge 6s ease-in-out infinite 1s; }
+.badge-3 { top: 35%; right: -25%; animation: floatBadge 5.5s ease-in-out infinite 1.5s; background: rgba(217,242,76,0.9); color: #0B3D2E; border-color: #D9F24C; }
+.badge-4 { bottom: 10%; right: -15%; animation: floatBadge 4.5s ease-in-out infinite 2s; }
+
+@keyframes floatBadge {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+
+
+/* MARQUEE */
+.marquee-section { background: var(--g); overflow: hidden; padding: 14px 0; }
+.marquee-track { display: flex; gap: 0; width: max-content; animation: marquee 28s linear infinite; }
+.marquee-track:hover { animation-play-state: paused; }
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.marquee-item { display: flex; align-items: center; gap: 10px; padding: 0 36px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.7); white-space: nowrap; border-right: 1px solid rgba(255,255,255,.1); }
+.marquee-item span { color: var(--lime); font-size: 16px; }
+
+/* SECTIONS */
+.section { max-width: 1200px; margin: 0 auto; padding: 90px 40px; }
+.section-top { text-align: center; margin-bottom: 56px; }
+.eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 12px; }
+.eyebrow::before, .eyebrow::after { content: ''; flex: 0 0 28px; height: 1px; background: var(--border); }
+.section-top h2 { font-size: clamp(26px, 3.8vw, 44px); font-weight: 800; color: var(--g); line-height: 1.1; letter-spacing: -.02em; margin-bottom: 12px; }
+.section-top p { font-size: 16px; color: var(--muted); max-width: 500px; margin: 0 auto; line-height: 1.7; }
+.rv { opacity: 0; transform: translateY(26px); transition: opacity .7s ease, transform .7s ease; }
+.rv.on { opacity: 1; transform: translateY(0); }
+.rv-delay-1 { transition-delay: .1s; } .rv-delay-2 { transition-delay: .2s; } .rv-delay-3 { transition-delay: .3s; } .rv-delay-4 { transition-delay: .4s; }
+.rv-scale { opacity: 0; transform: scale(.93); transition: opacity .65s ease, transform .65s ease; }
+.rv-scale.on { opacity: 1; transform: scale(1); }
+
+/* FEATURES */
+.feats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.feat { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius-card); padding: 28px 24px; transition: transform .3s, box-shadow .3s, border-color .3s; position: relative; overflow: hidden; }
+.feat::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--lime), var(--gm)); transform: scaleX(0); transform-origin: left; transition: transform .35s; }
+.feat:hover::after { transform: scaleX(1); }
+.feat:hover { transform: translateY(-5px); box-shadow: var(--shadow-md); border-color: var(--lime); }
+.feat-ic { width: 52px; height: 52px; border-radius: 14px; background: var(--lime-p); border: 1.5px solid var(--lime); display: flex; align-items: center; justify-content: center; font-size: 24px; margin-bottom: 16px; transition: transform .3s; }
+.feat:hover .feat-ic { transform: rotate(-6deg) scale(1.1); }
+.feat h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+.feat p { font-size: 14px; color: var(--muted); line-height: 1.65; }
+
+/* HOW IT WORKS */
+.how-wrap { background: #fff; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); position: relative; overflow: hidden; }
+.how-wrap::before { content: ''; position: absolute; right: -80px; top: -80px; width: 360px; height: 360px; border-radius: 50%; background: radial-gradient(circle, rgba(200,230,76,.06), transparent 70%); pointer-events: none; }
+.how-inner { max-width: 1200px; margin: 0 auto; padding: 90px 40px; }
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; position: relative; }
+.steps-line { position: absolute; top: 25px; left: 12%; right: 12%; height: 2px; background: var(--border); overflow: hidden; }
+.steps-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--lime), var(--gm)); transition: width 1.4s .3s ease; }
+.steps-fill.go { width: 100%; }
+.step { text-align: center; position: relative; z-index: 1; }
+.step-n { width: 50px; height: 50px; border-radius: 50%; background: var(--g); color: var(--lime); font-size: 19px; font-weight: 800; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px; border: 3px solid var(--bg); box-shadow: 0 0 0 2.5px var(--lime), var(--shadow-md); transition: transform .3s, box-shadow .3s; }
+.step:hover .step-n { transform: scale(1.15) rotate(-5deg); box-shadow: 0 0 0 2.5px var(--lime), 0 8px 28px var(--lime-glow); }
+.step h4 { font-size: 15px; font-weight: 700; margin-bottom: 7px; }
+.step p { font-size: 13px; color: var(--muted); padding: 0 10px; line-height: 1.65; }
+
+/* WHO FOR */
+.tabs { display: flex; gap: 10px; margin-bottom: 26px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { white-space: nowrap; padding: 10px 22px; border-radius: 100px; border: 1.5px solid var(--border); background: #fff; font-size: 14px; font-weight: 500; color: var(--muted); cursor: pointer; transition: all .25s; flex-shrink: 0; }
+.tab.on { background: var(--g); color: #fff; border-color: var(--g); }
+.tab:hover:not(.on) { border-color: var(--g); color: var(--g); }
+.panel { display: none; background: #fff; border: 1.5px solid var(--border); border-radius: 28px; padding: 36px; }
+.panel.on { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; align-items: start; animation: panelIn .4s ease both; }
+@keyframes panelIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.panel-left h3 { font-size: 26px; font-weight: 800; margin-bottom: 8px; }
+.panel-desc { font-size: 15px; color: var(--muted); line-height: 1.75; margin-bottom: 20px; }
+.wlist { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.wlist li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.55; }
+.wck { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; background: var(--lime-p); border: 1.5px solid var(--lime); display: flex; align-items: center; justify-content: center; margin-top: 1px; transition: background .2s, transform .2s; }
+.wlist li:hover .wck { background: var(--lime); transform: scale(1.15); }
+.wck svg { width: 10px; height: 10px; stroke: var(--g); stroke-width: 2.5; fill: none; }
+.earn-box { background: var(--bg); border: 1.5px solid var(--border); border-radius: 18px; padding: 22px; position: relative; overflow: hidden; }
+.earn-box::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--lime), var(--gm)); }
+.earn-box h4 { font-size: 12.5px; font-weight: 700; color: var(--muted); margin-bottom: 14px; }
+.earn-row { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.earn-row:last-child { border: none; }
+.earn-row .l { color: var(--muted); } .earn-row .v { font-weight: 600; }
+.earn-row .v.big { font-size: 21px; font-weight: 800; color: var(--g); }
+
+/* PRICING */
+.pricing-wrap { background: var(--g); position: relative; overflow: hidden; }
+.pricing-wrap::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-size: 56px 56px; }
+.pricing-wrap::after { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 800px; height: 400px; background: radial-gradient(ellipse, rgba(200,230,76,.07) 0%, transparent 65%); pointer-events: none; }
+.pricing-inner { max-width: 1200px; margin: 0 auto; padding: 90px 40px; position: relative; z-index: 1; }
+.pricing-inner .section-top h2 { color: #fff; }
+.pricing-inner .section-top p { color: rgba(255,255,255,.55); }
+.pricing-inner .eyebrow { color: var(--lime); }
+.pricing-inner .eyebrow::before, .pricing-inner .eyebrow::after { background: rgba(255,255,255,.1); }
+.p-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.pc { background: rgba(255,255,255,.05); border: 1.5px solid rgba(255,255,255,.1); border-radius: 26px; padding: 30px 24px; position: relative; transition: transform .3s, box-shadow .3s, border-color .3s; backdrop-filter: blur(4px); }
+.pc:hover { transform: translateY(-7px); box-shadow: 0 28px 72px rgba(0,0,0,.3); }
+.pc.hot { background: rgba(200,230,76,.07); border-color: rgba(200,230,76,.35); }
+.pc.hot:hover { border-color: var(--lime); box-shadow: 0 28px 72px rgba(200,230,76,.12); }
+.hot-badge { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); background: var(--lime); color: var(--g); font-size: 10px; font-weight: 800; letter-spacing: .1em; padding: 4px 14px; border-radius: 100px; white-space: nowrap; }
+.p-tier { font-size: 10px; font-weight: 800; letter-spacing: .12em; color: rgba(255,255,255,.38); text-transform: uppercase; margin-bottom: 8px; }
+.p-tier.hi { color: var(--lime); }
+.p-price { font-size: 38px; font-weight: 800; color: #fff; line-height: 1; margin-bottom: 5px; }
+.p-cycle { font-size: 12.5px; color: rgba(255,255,255,.4); margin-bottom: 22px; }
+.p-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.p-list li { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: rgba(255,255,255,.7); transition: color .2s, transform .2s; }
+.p-list li:hover { color: #fff; transform: translateX(3px); }
+.p-list li::before { content: '✓'; flex-shrink: 0; width: 19px; height: 19px; border-radius: 50%; background: rgba(200,230,76,.12); display: inline-flex; align-items: center; justify-content: center; font-size: 9px; color: var(--lime); font-weight: 900; }
+.p-btn { display: block; margin-top: 26px; border-radius: 100px; padding: 12px; text-align: center; text-decoration: none; font-weight: 700; font-size: 14px; transition: all .25s; }
+.pc:not(.hot) .p-btn { background: rgba(255,255,255,.08); color: #fff; border: 1.5px solid rgba(255,255,255,.15); }
+.pc:not(.hot) .p-btn:hover { background: rgba(255,255,255,.16); }
+.pc.hot .p-btn { background: var(--lime); color: var(--g); border: none; }
+.pc.hot .p-btn:hover { background: var(--lime-d); transform: translateY(-2px); box-shadow: 0 8px 24px var(--lime-glow); }
+.nums { border-top: 1px solid rgba(255,255,255,.07); display: grid; grid-template-columns: repeat(3, 1fr); position: relative; z-index: 1; }
+.num-i { padding: 44px; border-right: 1px solid rgba(255,255,255,.07); text-align: center; transition: background .3s; }
+.num-i:last-child { border: none; }
+.num-i:hover { background: rgba(255,255,255,.02); }
+.num-n { font-size: 50px; font-weight: 800; color: var(--lime); display: block; line-height: 1; margin-bottom: 6px; transition: transform .3s; }
+.num-i:hover .num-n { transform: scale(1.07); }
+.num-l { font-size: 13.5px; color: rgba(255,255,255,.42); }
+.final { max-width: 1200px; margin: 0 auto; padding: 90px 40px; text-align: center; position: relative; }
+.final-orb { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 600px; height: 300px; background: radial-gradient(ellipse, rgba(200,230,76,.13) 0%, transparent 65%); pointer-events: none; }
+.final h2 { font-size: clamp(28px, 4.2vw, 52px); font-weight: 800; color: var(--g); letter-spacing: -.02em; line-height: 1.1; margin-bottom: 14px; }
+.final p { font-size: 17px; color: var(--muted); margin-bottom: 34px; line-height: 1.7; }
+.final-btns { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.fcta { display: inline-flex; align-items: center; gap: 10px; background: var(--lime); color: var(--g); font-size: 16px; font-weight: 800; border-radius: 100px; padding: 18px 36px; text-decoration: none; transition: all .28s; position: relative; overflow: hidden; }
+.fcta::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.3), transparent); transform: translateX(-100%); animation: shim 2.5s ease-in-out infinite 1s; }
+.fcta:hover { background: var(--lime-d); transform: translateY(-3px) scale(1.02); box-shadow: 0 18px 56px rgba(200,230,76,.38); }
+.fcta-arrow { width: 26px; height: 26px; border-radius: 50%; background: var(--g); display: flex; align-items: center; justify-content: center; font-size: 13px; transition: transform .25s; }
+.fcta:hover .fcta-arrow { transform: translateX(5px); }
+.fcta-wa { display: inline-flex; align-items: center; gap: 10px; background: #fff; color: var(--g); border: 1.5px solid var(--border); font-size: 15px; font-weight: 600; border-radius: 100px; padding: 16px 28px; text-decoration: none; transition: all .25s; }
+.fcta-wa:hover { border-color: var(--g); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+footer { background: #fff; border-top: 1px solid var(--border); padding: 52px 40px 36px; }
+.foot-grid { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 44px; }
+.foot-brand-name { font-size: 22px; font-weight: 800; color: var(--g); margin-bottom: 10px; }
+.foot-brand-name span { color: var(--lime-d); }
+.foot-tagline { font-size: 13.5px; color: var(--muted); line-height: 1.7; margin-bottom: 16px; }
+.foot-contact { font-size: 13.5px; color: var(--muted); line-height: 1.85; }
+.foot-contact a { color: var(--g); text-decoration: none; font-weight: 500; }
+.foot-contact a:hover { text-decoration: underline; }
+.foot-col h4 { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+.foot-col ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.foot-col ul li a { font-size: 14px; color: var(--muted); text-decoration: none; transition: color .2s, padding-left .2s; display: inline-block; }
+.foot-col ul li a:hover { color: var(--g); padding-left: 4px; }
+.foot-bottom { max-width: 1200px; margin: 24px auto 0; padding-top: 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; gap: 8px; }
+.foot-bottom a { color: var(--muted); text-decoration: none; }
+.foot-bottom a:hover { color: var(--g); }
+.wa { position: fixed; bottom: 28px; right: 28px; z-index: 90; background: #25d366; color: #fff; border-radius: 100px; padding: 13px 20px; display: flex; align-items: center; gap: 9px; font-size: 13.5px; font-weight: 700; text-decoration: none; box-shadow: 0 6px 28px rgba(37,211,102,.45); transition: transform .25s, box-shadow .25s; animation: fadeU .7s 2.5s ease both; }
+.wa:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 14px 44px rgba(37,211,102,.5); }
+.wa-ic { font-size: 18px; }
+@keyframes fadeU { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeD { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes shim { to { transform: translateX(200%); } }
+@media(max-width: 1024px) {
+  .hero-inner { grid-template-columns: 1fr; gap: 44px; padding: 110px 32px 70px; text-align: center; }
+  .hero-left p { margin-left: auto; margin-right: auto; }
+  .hero-ctas { justify-content: center; }
+  .hero-right { height: 500px; }
+  .badge-1, .badge-2, .badge-3, .badge-4 { display: none; }
+  .feats-grid { grid-template-columns: 1fr 1fr; }
+  .steps { grid-template-columns: 1fr 1fr; gap: 28px; }
+  .steps-line { display: none; }
+  .panel.on { grid-template-columns: 1fr; }
+  .p-grid { grid-template-columns: 1fr; }
+  .nums { grid-template-columns: 1fr; }
+  .num-i { border-right: none; border-bottom: 1px solid rgba(255,255,255,.07); padding: 32px; }
+  .foot-grid { grid-template-columns: 1fr 1fr; }
+  .section, .how-inner, .pricing-inner, .final { padding: 72px 32px; }
+  footer { padding: 48px 32px 32px; }
+  .nav { padding: 0 28px; }
+}
+@media(max-width: 768px) {
+  .nav-links, .nav-r .btn-ghost { display: none; }
+  .hamburger { display: flex; }
+  .nav-r .btn-lime { display: block; }
+  .feats-grid { grid-template-columns: 1fr; }
+  .steps { grid-template-columns: 1fr; }
+  .section, .how-inner, .pricing-inner, .final { padding: 56px 20px; }
+  footer { padding: 40px 20px 28px; }
+  .foot-grid { grid-template-columns: 1fr; }
+  .final-btns { flex-direction: column; align-items: center; }
+  .nav { padding: 0 20px; }
+  .wa { bottom: 20px; right: 20px; padding: 11px 16px; font-size: 13px; }
+  .live-popup { left: 10px; bottom: 20px; transform: scale(0.85); }
+}
+@media(max-width: 480px) {
+  .hero-inner { padding: 96px 18px 52px; }
+  .section, .how-inner, .pricing-inner, .final { padding: 48px 18px; }
+  footer { padding: 36px 18px 24px; }
+}
+`;
 
 export default function LinkInBioLanding() {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState("hs");
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSolid, setIsSolid] = useState(false);
+
+
+
+  useEffect(() => {
+    // SCROLL EVENTS
+    const prog = document.getElementById('prog');
+    const nav = document.getElementById('nav');
+
+    const handleScroll = () => {
+      if (prog) {
+        const h = document.body.scrollHeight - window.innerHeight;
+        prog.style.width = (window.scrollY / h * 100) + '%';
+      }
+      setIsSolid(window.scrollY > 50);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    // OBSERVERS
+    const io = new IntersectionObserver(es => {
+      es.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('on');
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.rv, .rv-scale').forEach(el => io.observe(el));
+
+    const stO = new IntersectionObserver(es => {
+      es.forEach(e => {
+        if (e.isIntersecting) {
+          const stFill = document.getElementById('stFill');
+          if (stFill) stFill.classList.add('go');
+          stO.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.3 });
+    const sw = document.getElementById('stepsWrap');
+    if (sw) stO.observe(sw);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      io.disconnect();
+      stO.disconnect();
+    };
+  }, []);
+
+
+
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
-      <Header />
+    <>
+      <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
+      <div id="prog"></div>
 
-      {/* ═══ HERO SECTION ═══ */}
-      <section className="pt-32 pb-20 px-4 max-w-4xl mx-auto text-center">
-        <Badge variant="outline" className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 mb-8 py-1.5 px-4 rounded-full text-sm font-medium">
-          <LinkIcon className="w-4 h-4 mr-2" /> Wing Link
-        </Badge>
-        <motion.h1 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-4xl md:text-6xl font-bold tracking-tight mb-6 leading-[1.1]"
-        >
-          Your travel business,<br className="hidden md:block" /> one link away
-        </motion.h1>
-        <motion.p 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-10"
-        >
-          Wing Link is your free digital storefront on Xplorwing — share all your services, take direct bookings, and grow without paying commissions on every sale.
-        </motion.p>
-      </section>
-
-      {/* ═══ WHAT YOU GET ═══ */}
-      <section className="py-20 px-4 border-t border-border bg-background">
-        <div className="max-w-6xl mx-auto">
-          <div className="mb-12">
-            <p className="text-xs font-bold tracking-widest text-muted-foreground uppercase mb-3">What You Get</p>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Everything a service provider needs</h2>
-            <p className="text-muted-foreground">No code. No website. Just fill in your details and your Wing Link goes live in minutes.</p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              {
-                icon: User,
-                title: "Branded profile page",
-                desc: "Your name, photo, bio, and location... instantly professional."
-              },
-              {
-                icon: LayoutGrid,
-                title: "Up to 10 listings free",
-                desc: "Add homestays, cab routes, tours, or any service you offer."
-              },
-              {
-                icon: CalendarCheck,
-                title: "Direct booking engine",
-                desc: "Guests book and pay directly — no middleman, just 10% platform fee."
-              },
-              {
-                icon: QrCode,
-                title: "Wing Pass QR",
-                desc: "One QR code guests scan at check-in. KYC-verified, no paperwork."
-              },
-              {
-                icon: Medal,
-                title: "WingPoints rewards",
-                desc: "Guests earn points on every booking — keeps them coming back to you."
-              },
-              {
-                icon: LineChart,
-                title: "Booking analytics",
-                desc: "See views, clicks, and conversions on your link in real time."
-              }
-            ].map((feature, i) => (
-              <Card key={i} className="bg-card/50 border-border hover:border-primary/50 transition-colors">
-                <CardContent className="p-6">
-                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mb-6">
-                    <feature.icon className="w-6 h-6 text-primary" />
-                  </div>
-                  <h3 className="text-lg font-bold text-foreground mb-2">{feature.title}</h3>
-                  <p className="text-muted-foreground text-sm leading-relaxed">{feature.desc}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+      <nav className={`nav ${isSolid ? 'solid' : ''}`} id="nav">
+        <Link to="/" className="flex items-center">
+          <DynamicLogo
+            forceTheme={isSolid ? "light" : "dark"}
+            lightHeightClass="h-7"
+            darkHeightClass="h-10"
+          />
+        </Link>
+        <ul className="nav-links">
+          <li><Link to="/stays">Explore</Link></li>
+          <li><Link to="/stays">Stays</Link></li>
+          <li><Link to="/hotels">Hotels</Link></li>
+          <li><Link to="/resorts">Resorts</Link></li>
+          <li><Link to="/bikes">Bikes</Link></li>
+          <li><Link to="/cars">Cars</Link></li>
+          <li><Link to="/experiences">Experiences</Link></li>
+        </ul>
+        <div className="nav-r">
+          {!user && <Link to="/auth" className="btn-ghost">Login</Link>}
+          {user && <Link to="/host" className="btn-ghost">Dashboard</Link>}
+          <Link to={user ? "/host" : "/auth"} className="btn-lime">Get started free</Link>
+          <button className={`hamburger ${isMenuOpen ? 'open' : ''}`} onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Menu">
+            <span></span><span></span><span></span>
+          </button>
         </div>
-      </section>
+      </nav>
 
-      {/* ═══ LIVE PREVIEW ═══ */}
-      <section className="py-24 px-4 bg-muted/30 border-t border-border">
-        <div className="max-w-6xl mx-auto">
-          <div className="mb-16">
-            <p className="text-xs font-bold tracking-widest text-muted-foreground uppercase mb-3">Live Preview</p>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">This is what your Wing Link looks like</h2>
-            <p className="text-muted-foreground">Share this URL anywhere — WhatsApp, Instagram bio, Google Maps, business card.</p>
+      <div className={`mobile-menu ${isMenuOpen ? 'open' : ''}`} id="mobileMenu">
+        <ul>
+          <li><Link to="/stays" onClick={() => setIsMenuOpen(false)}>Explore</Link></li>
+          <li><Link to="/stays" onClick={() => setIsMenuOpen(false)}>Stays</Link></li>
+          <li><Link to="/hotels" onClick={() => setIsMenuOpen(false)}>Hotels</Link></li>
+          <li><Link to="/resorts" onClick={() => setIsMenuOpen(false)}>Resorts</Link></li>
+          <li><Link to="/bikes" onClick={() => setIsMenuOpen(false)}>Bikes</Link></li>
+          <li><Link to="/cars" onClick={() => setIsMenuOpen(false)}>Cars</Link></li>
+          <li><Link to="/experiences" onClick={() => setIsMenuOpen(false)}>Experiences</Link></li>
+        </ul>
+        <div className="mobile-menu-btns">
+          {!user && <Link to="/auth" className="mb-ghost" onClick={() => setIsMenuOpen(false)}>Login</Link>}
+          {user && <Link to="/host" className="mb-ghost" onClick={() => setIsMenuOpen(false)}>Dashboard</Link>}
+          <Link to={user ? "/host" : "/auth"} className="mb-lime" onClick={() => setIsMenuOpen(false)}>Get started free</Link>
+        </div>
+      </div>
+
+      <section className="hero-section">
+        <div className="hero-bg">
+          <div className="mesh-blob blob-1"></div>
+          <div className="mesh-blob blob-2"></div>
+          <div className="mesh-blob blob-3"></div>
+        </div>
+        <div className="hero-particles">
+          <div className="route-line"></div>
+          <div style={{ position: 'absolute', top: '20%', left: '15%', width: '6px', height: '6px', background: '#D9F24C', borderRadius: '50%', boxShadow: '0 0 12px #D9F24C', animation: 'pulseRing 2s infinite' }}></div>
+          <div style={{ position: 'absolute', top: '60%', left: '45%', width: '4px', height: '4px', background: '#fff', borderRadius: '50%', opacity: 0.5 }}></div>
+          <div style={{ position: 'absolute', top: '80%', left: '80%', width: '8px', height: '8px', background: '#DDE5D7', borderRadius: '50%', boxShadow: '0 0 20px #DDE5D7', animation: 'pulseRing 3s infinite' }}></div>
+        </div>
+        <div className="hero-mountains">
+          <div className="mt-layer mt-back"></div>
+          <div className="mt-layer mt-front"></div>
+        </div>
+
+        <div className="hero-inner">
+          <div className="hero-left">
+            <div className="wing-pill" style={{ background: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.2)', color: '#fff' }}><span className="pill-dot"></span>🔗 India's smart travel storefront</div>
+            <h1>
+              <span className="line"><span>Your travel business,</span></span>
+              <span className="line"><span><em>one beautiful link</em> away.</span></span>
+            </h1>
+            <p>Bookings, stays, rentals and experiences — all inside one smart travel storefront. Live in minutes. Zero coding required.</p>
+            <div className="hero-ctas">
+              <Link to={user ? "/host" : "/auth"} className="cta-primary">Create Your Wing Bio<span style={{ fontSize: '18px' }}>→</span></Link>
+              <Link to="/p/suresh-reddy" className="cta-secondary">View Demo</Link>
+            </div>
+            <div className="trust-row" style={{ color: 'rgba(255,255,255,0.7)', marginTop: '32px' }}>
+              <span>✅ No website needed</span>
+              <span>⚡ Connects to UPI</span>
+              <span>💸 Lowest 10% fee</span>
+            </div>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            {/* Phone Mockup */}
-            <div className="relative mx-auto w-full max-w-[320px]">
-              <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full"></div>
-              <div className="relative rounded-[2.5rem] border-[8px] border-border bg-background overflow-hidden shadow-2xl h-[650px] flex flex-col">
-                <div className="bg-primary/10 p-6 pt-10 text-center border-b border-primary/10">
-                  <div className="w-16 h-16 rounded-full bg-card mx-auto mb-3 flex items-center justify-center border-2 border-primary/50">
-                    <Home className="w-8 h-8 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-bold text-foreground">Suresh Reddy Stays</h3>
-                  <p className="text-sm text-muted-foreground flex items-center justify-center gap-1 mt-1">
-                    <MapPin className="w-3 h-3" /> Araku Valley
-                  </p>
-                </div>
-                
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  <div className="bg-primary/10 rounded-xl p-4 flex items-center gap-3 border border-primary/20">
-                    <QrCode className="w-8 h-8 text-primary" />
-                    <div>
-                      <p className="font-semibold text-sm text-foreground">Wing Pass QR</p>
-                      <p className="text-xs text-muted-foreground">Scan for KYC verified check-in</p>
-                    </div>
+          <div className="hero-right">
+            <div className="glass-badge badge-1">⭐ 4.9 Rating</div>
+            <div className="glass-badge badge-2">🔥 120+ Guests Hosted</div>
+            <div className="glass-badge badge-3">💬 WhatsApp Bookings</div>
+            <div className="glass-badge badge-4">🏕 Stay curators</div>
+
+
+
+            <div className="phone-mockup">
+              <div className="phone-notch"></div>
+              <div className="phone-screen">
+                <div className="mockup-inner">
+                  <div className="m-profile">
+                    <div className="m-avatar">🧑🏽</div>
+                    <div className="m-name">Chandra's Escapes</div>
+                    <div className="m-bio">📍 Coorg, Karnataka</div>
                   </div>
 
-                  <div className="bg-card rounded-xl p-4 border border-border flex items-center gap-4 shadow-sm">
-                    <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                      <Home className="w-6 h-6 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-sm text-foreground">Ayaka Forest Cottage</p>
-                      <p className="text-xs text-muted-foreground">Homestay • 3 guests</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-primary text-sm">₹1,500<span className="text-[10px] text-muted-foreground font-normal">/night</span></p>
+                  <div className="m-card">
+                    <div className="m-card-icon">🏡</div>
+                    <div className="m-card-info">
+                      <h5>Riverside Cabin</h5>
+                      <p>₹4,500 / night · 2 Guests</p>
                     </div>
                   </div>
-
-                  <div className="bg-card rounded-xl p-4 border border-border flex items-center gap-4 shadow-sm">
-                    <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                      <Car className="w-6 h-6 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-sm text-foreground">Wing 3 Ayaka Cab</p>
-                      <p className="text-xs text-muted-foreground">Cab • Station drop</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-primary text-sm">₹2,400</p>
+                  <div className="m-card">
+                    <div className="m-card-icon">🚙</div>
+                    <div className="m-card-info">
+                      <h5>Airport Drop</h5>
+                      <p>₹1,200 · Innova Crysta</p>
                     </div>
                   </div>
-                </div>
-
-                <div className="p-4 bg-card border-t border-border">
-                  <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold">
-                    Book Now • Pay Securely
-                  </Button>
+                  <div className="m-card" style={{ background: '#25D366', color: '#fff' }}>
+                    <div className="m-card-icon" style={{ background: 'transparent' }}>💬</div>
+                    <div className="m-card-info">
+                      <h5 style={{ color: '#fff' }}>Chat on WhatsApp</h5>
+                      <p style={{ color: 'rgba(255,255,255,0.8)' }}>Instant replies</p>
+                    </div>
+                  </div>
+                  <div className="m-card">
+                    <div className="m-card-icon">☕</div>
+                    <div className="m-card-info">
+                      <h5>Plantation Tour</h5>
+                      <p>₹800 / person · 3 Hours</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
 
-            {/* Steps */}
-            <div className="space-y-10">
-              {[
-                {
-                  num: "1",
-                  title: "Share your Wing Link",
-                  desc: "Post it in your WhatsApp status, Instagram bio, or Google Maps listing. One link for everything."
-                },
-                {
-                  num: "2",
-                  title: "Guest browses your listings",
-                  desc: "They see all your services — stays, cabs, tours — with photos, prices, and availability."
-                },
-                {
-                  num: "3",
-                  title: "Guest books and pays",
-                  desc: "Razorpay handles UPI, card, and wallet payments. Money reaches you directly, minus a 10% fee."
-                },
-                {
-                  num: "4",
-                  title: "Wing Pass QR at check-in",
-                  desc: "Guest scans your QR on arrival. KYC verified, no manual ID checks — smooth every time."
-                }
-              ].map((step, i) => (
-                <div key={i} className="flex gap-6">
-                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0 border border-border">
-                    <span className="font-bold text-foreground">{step.num}</span>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-foreground mb-2">{step.title}</h3>
-                    <p className="text-muted-foreground leading-relaxed">{step.desc}</p>
-                  </div>
-                </div>
-              ))}
+      <div className="marquee-section">
+        <div className="marquee-track">
+          <div className="marquee-item"><span>🏡</span> Homestay Hosts</div>
+          <div className="marquee-item"><span>🚗</span> Cab Operators</div>
+          <div className="marquee-item"><span>🏨</span> Resorts & Hotels</div>
+          <div className="marquee-item"><span>🌿</span> Tour Guides</div>
+          <div className="marquee-item"><span>💳</span> Direct Bookings</div>
+          <div className="marquee-item"><span>🎫</span> Wing Pass QR</div>
+          <div className="marquee-item"><span>⭐</span> WingPoints Rewards</div>
+          <div className="marquee-item"><span>📊</span> Live Analytics</div>
+          <div className="marquee-item"><span>💸</span> UPI Payouts in 24h</div>
+          <div className="marquee-item"><span>🔗</span> One Link for Everything</div>
+          <div className="marquee-item"><span>🏡</span> Homestay Hosts</div>
+          <div className="marquee-item"><span>🚗</span> Cab Operators</div>
+          <div className="marquee-item"><span>🏨</span> Resorts & Hotels</div>
+          <div className="marquee-item"><span>🌿</span> Tour Guides</div>
+          <div className="marquee-item"><span>💳</span> Direct Bookings</div>
+          <div className="marquee-item"><span>🎫</span> Wing Pass QR</div>
+          <div className="marquee-item"><span>⭐</span> WingPoints Rewards</div>
+          <div className="marquee-item"><span>📊</span> Live Analytics</div>
+          <div className="marquee-item"><span>💸</span> UPI Payouts in 24h</div>
+          <div className="marquee-item"><span>🔗</span> One Link for Everything</div>
+        </div>
+      </div>
+
+      <section className="section">
+        <div className="section-top rv"><div className="eyebrow">What you get</div><h2>Everything a service provider needs</h2><p>No code. No website. Just fill in your details and your Wing Bio goes live in minutes.</p></div>
+        <div className="feats-grid">
+          <div className="feat rv rv-delay-1"><div className="feat-ic">👤</div><h3>Branded profile page</h3><p>Your name, photo, bio, and location — instantly professional. Share it anywhere as a single URL.</p></div>
+          <div className="feat rv rv-delay-2"><div className="feat-ic">📋</div><h3>Up to 10 listings free</h3><p>Add homestays, cab routes, tours, or any service you offer — with photos, pricing, and availability.</p></div>
+          <div className="feat rv rv-delay-3"><div className="feat-ic">💳</div><h3>Direct booking engine</h3><p>Guests book and pay directly — no middleman, no OTA. Just 10% platform fee on every direct booking.</p></div>
+          <div className="feat rv rv-delay-1"><div className="feat-ic">🎫</div><h3>Wing Pass QR</h3><p>One QR code guests scan at check-in. KYC-verified, no paperwork, no manual ID checks — smooth every time.</p></div>
+          <div className="feat rv rv-delay-2"><div className="feat-ic">⭐</div><h3>WingPoints rewards</h3><p>Guests earn points on every booking — keeps them coming back to you instead of the competition.</p></div>
+          <div className="feat rv rv-delay-3"><div className="feat-ic">📊</div><h3>Booking analytics</h3><p>See views, clicks, and conversions on your Wing Bio in real time. Know exactly where your bookings come from.</p></div>
+        </div>
+      </section>
+
+      <div className="how-wrap">
+        <div className="how-inner">
+          <div className="section-top rv"><div className="eyebrow">How it works</div><h2>Live in 4 steps</h2><p>From signup to your first booking — under 10 minutes.</p></div>
+          <div className="steps" id="stepsWrap">
+            <div className="steps-line"><div className="steps-fill" id="stFill"></div></div>
+            <div className="step rv rv-delay-1"><div className="step-n">1</div><h4>Create your Wing Bio</h4><p>Sign up free, add your name, photo, and location. Your link is live instantly at xplorwing.com/your-name.</p></div>
+            <div className="step rv rv-delay-2"><div className="step-n">2</div><h4>Add your services</h4><p>List stays, cabs, experiences — with photos, prices, and availability. Up to 10 listings free.</p></div>
+            <div className="step rv rv-delay-3"><div className="step-n">3</div><h4>Share your link</h4><p>Post on WhatsApp Status, Instagram bio, Google Maps, or print it on your visiting card.</p></div>
+            <div className="step rv rv-delay-4"><div className="step-n">4</div><h4>Get paid to UPI</h4><p>Razorpay handles payment. Money hits your UPI ID within 24 hours of check-out. Every time.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <section className="section">
+        <div className="section-top rv"><div className="eyebrow">Who is this for</div><h2>Built for every kind of travel provider</h2><p>Pick your role to see exactly how Wing Bio works for you.</p></div>
+        <div className="tabs rv">
+          <button className={`tab ${activeTab === 'hs' ? 'on' : ''}`} onClick={() => setActiveTab('hs')}>🏡 Homestay host</button>
+          <button className={`tab ${activeTab === 'cb' ? 'on' : ''}`} onClick={() => setActiveTab('cb')}>🚗 Cab operator</button>
+          <button className={`tab ${activeTab === 'rs' ? 'on' : ''}`} onClick={() => setActiveTab('rs')}>🏨 Resort / Hotel</button>
+          <button className={`tab ${activeTab === 'tg' ? 'on' : ''}`} onClick={() => setActiveTab('tg')}>🌿 Tour guide</button>
+        </div>
+        <div className={`panel ${activeTab === 'hs' ? 'on' : ''}`}>
+          <div className="panel-left"><h3>Homestay host</h3><p className="panel-desc">You rent out your home, a room, or a farm stay. Wing Bio replaces the need to list on MakeMyTrip or Airbnb — list for free and keep more of what you earn.</p>
+            <ul className="wlist">
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>List up to 10 rooms or properties</li>
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>Show per-night pricing, amenities, and photos</li>
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>Collect advance via UPI — no cash uncertainty</li>
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>Wing Pass QR handles check-in ID verification</li>
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>Opt into the marketplace (20% only on marketplace bookings)</li>
+            </ul>
+          </div>
+          <div className="earn-box"><h4>What you actually earn — ₹3,000/night example</h4>
+            <div className="earn-row"><span className="l">Booking value</span><span className="v">₹3,000</span></div>
+            <div className="earn-row"><span className="l">Xplorwing commission (10%)</span><span className="v">− ₹300</span></div>
+            <div className="earn-row"><span className="l">Payment gateway (~2%)</span><span className="v">− ₹60</span></div>
+            <div className="earn-row"><span className="l">You receive via UPI</span><span className="v big">₹2,640</span></div>
+          </div>
+        </div>
+        <div className={`panel ${activeTab === 'cb' ? 'on' : ''}`}>
+          <div className="panel-left"><h3>Cab operator</h3><p className="panel-desc">Share a single Wing Bio instead of negotiating prices on WhatsApp groups.</p>
+            <ul className="wlist">
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>List multiple cab routes with flat pricing</li>
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>Advance UPI payment — no last-minute cancellations</li>
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>Share on WhatsApp Status, Instagram, Google Maps</li>
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>Just 10% fee — lowest in the market</li>
+            </ul>
+          </div>
+          <div className="earn-box"><h4>What you actually earn — ₹2,400 cab route</h4>
+            <div className="earn-row"><span className="l">Booking value</span><span className="v">₹2,400</span></div>
+            <div className="earn-row"><span className="l">Xplorwing commission (10%)</span><span className="v">− ₹240</span></div>
+            <div className="earn-row"><span className="l">Payment gateway (~2%)</span><span className="v">− ₹48</span></div>
+            <div className="earn-row"><span className="l">You receive via UPI</span><span className="v big">₹2,112</span></div>
+          </div>
+        </div>
+        <div className={`panel ${activeTab === 'rs' ? 'on' : ''}`}>
+          <div className="panel-left"><h3>Resort / Hotel</h3><p className="panel-desc">A branded Wing Bio showing all your room types. Guests book without calling your front desk.</p>
+            <ul className="wlist">
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>Unlimited listings on Wing Pro (₹499/mo)</li>
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>Real-time booking analytics dashboard</li>
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>Priority support + dedicated onboarding</li>
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>WingPoints keeps guests returning to your property</li>
+            </ul>
+          </div>
+          <div className="earn-box"><h4>What you actually earn — ₹6,000/night resort room</h4>
+            <div className="earn-row"><span className="l">Booking value</span><span className="v">₹6,000</span></div>
+            <div className="earn-row"><span className="l">Xplorwing commission (10%)</span><span className="v">− ₹600</span></div>
+            <div className="earn-row"><span className="l">Payment gateway (~2%)</span><span className="v">− ₹120</span></div>
+            <div className="earn-row"><span className="l">You receive via UPI</span><span className="v big">₹5,280</span></div>
+          </div>
+        </div>
+        <div className={`panel ${activeTab === 'tg' ? 'on' : ''}`}>
+          <div className="panel-left"><h3>Tour guide</h3><p className="panel-desc">Your expertise, one shareable link. List treks, experiences, and day tours.</p>
+            <ul className="wlist">
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>List experiences with per-person pricing</li>
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>Set group size limits and availability windows</li>
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>WingPoints encourages repeat bookings</li>
+              <li><span className="wck"><svg viewBox="0 0 10 10"><path d="M2 5l2.5 2.5 3.5-3.5" /></svg></span>KYC-verified guests only — safe, verified groups</li>
+            </ul>
+          </div>
+          <div className="earn-box"><h4>What you actually earn — ₹800/person, 8 guests</h4>
+            <div className="earn-row"><span className="l">Booking value</span><span className="v">₹6,400</span></div>
+            <div className="earn-row"><span className="l">Xplorwing commission (10%)</span><span className="v">− ₹640</span></div>
+            <div className="earn-row"><span className="l">Payment gateway (~2%)</span><span className="v">− ₹128</span></div>
+            <div className="earn-row"><span className="l">You receive via UPI</span><span className="v big">₹5,632</span></div>
+          </div>
+        </div>
+      </section>
+
+      <div className="pricing-wrap">
+        <div className="pricing-inner">
+          <div className="section-top rv"><div className="eyebrow">Pricing</div><h2>Simple, transparent pricing</h2><p>Start free. Pay only when you earn — no subscriptions, no hidden fees.</p></div>
+          <div className="p-grid">
+            <div className="pc rv rv-delay-1">
+              <div className="p-tier">Wing Starter</div><div className="p-price">Free</div><div className="p-cycle">Forever, no card required</div>
+              <ul className="p-list"><li>Up to 10 listings</li><li>Wing Bio Public page</li><li>Wing Pass QR code</li><li>10% fee on direct bookings</li><li>Marketplace not included</li></ul>
+              <Link to={user ? "/host" : "/auth"} className="p-btn">Get started free</Link>
+            </div>
+            <div className="pc hot rv rv-delay-2">
+              <div className="hot-badge">MOST POPULAR</div>
+              <div className="p-tier hi">Wing Pro</div><div className="p-price">₹499<span style={{ fontSize: '17px', fontWeight: 400 }}>/mo</span></div><div className="p-cycle">Best for active hosts</div>
+              <ul className="p-list"><li>Unlimited listings</li><li>Marketplace opt-in (20% on marketplace)</li><li>Analytics dashboard</li><li>Priority support</li><li>10% fee on direct bookings</li></ul>
+              <Link to={user ? "/host" : "/auth"} className="p-btn">Start Wing Pro</Link>
+            </div>
+            <div className="pc rv rv-delay-3">
+              <div className="p-tier">Wing Franchise</div><div className="p-price">Custom</div><div className="p-cycle">For large operators</div>
+              <ul className="p-list"><li>Manage multiple provider accounts</li><li>Offline hub branding</li><li>Revenue share model</li><li>Dedicated onboarding</li><li>Whiteglove KYC support</li></ul>
+              <a href="mailto:sales@xplorwing.com" className="p-btn">Talk to sales</a>
             </div>
           </div>
         </div>
-      </section>
+        <div className="nums">
+          <div className="num-i rv"><span className="num-n">₹0*</span><span className="num-l">to set up Wing Bio</span></div>
+          <div className="num-i rv rv-delay-2"><span className="num-n">10 min</span><span className="num-l">average onboarding time</span></div>
+          <div className="num-i rv rv-delay-4"><span className="num-n">10%</span><span className="num-l">only on direct bookings earned</span></div>
+        </div>
+      </div>
 
-      {/* ═══ WHO IS THIS FOR ═══ */}
-      <section className="py-24 px-4 border-t border-border bg-background">
-        <div className="max-w-6xl mx-auto">
-          <div className="mb-12">
-            <p className="text-xs font-bold tracking-widest text-muted-foreground uppercase mb-3">Who is this for</p>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Built for every kind of travel provider</h2>
-            <p className="text-muted-foreground">Pick your role to see exactly how Wing Link works for you.</p>
-          </div>
-
-          <Tabs defaultValue="homestay" className="w-full">
-            <TabsList className="bg-muted/50 border border-border p-1 flex-wrap h-auto mb-8 justify-start">
-              <TabsTrigger value="homestay" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-muted-foreground">Homestay host</TabsTrigger>
-              <TabsTrigger value="cab" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-muted-foreground">Cab operator</TabsTrigger>
-              <TabsTrigger value="resort" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-muted-foreground">Resort/Hotel</TabsTrigger>
-              <TabsTrigger value="tour" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-muted-foreground">Tour guide</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="homestay" className="mt-0">
-              <Card className="bg-card/50 border-border p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-3 bg-orange-500/10 rounded-lg">
-                    <Home className="w-6 h-6 text-orange-500" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-foreground">Homestay host</h3>
-                </div>
-                <p className="text-muted-foreground mb-8 max-w-3xl leading-relaxed">
-                  You rent out your home, a room, or a farm stay. Wing Link replaces the need to leave MakeMyTrip or Airbnb — list for free and keep more of what you earn.
-                </p>
-                <ul className="space-y-4">
-                  {[
-                    "List up to 10 rooms or properties",
-                    "Show per-night pricing, amenities, and photos",
-                    "Collect advance via UPI — no cash uncertainty",
-                    "Wing Pass QR handles check-in ID verification",
-                    "Opt into the Xplorwing marketplace for extra discovery (20% commission only on marketplace bookings)"
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                      <span className="text-foreground/80">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            </TabsContent>
-            {/* Additional TabsContent for Cab, Resort, Tour can be added similarly */}
-            <TabsContent value="cab" className="mt-0 text-muted-foreground">Cab operator details...</TabsContent>
-            <TabsContent value="resort" className="mt-0 text-muted-foreground">Resort/Hotel details...</TabsContent>
-            <TabsContent value="tour" className="mt-0 text-muted-foreground">Tour guide details...</TabsContent>
-          </Tabs>
+      <section className="final">
+        <div className="final-orb"></div>
+        <h2 className="rv">Ready to create your Wing Bio?</h2>
+        <p className="rv rv-delay-1">Join Xplorwing as a host — your storefront goes live in minutes, for free.</p>
+        <div className="final-btns rv rv-delay-2">
+          <Link to={user ? "/host" : "/auth"} className="fcta">Get started as a host<span className="fcta-arrow">→</span></Link>
+          <a href="https://wa.me/919422799420?text=Hi%2C%20I%20want%20to%20create%20my%20Wing%20Link" className="fcta-wa" target="_blank" rel="noreferrer">💬 Chat on WhatsApp</a>
         </div>
       </section>
 
-      {/* ═══ PRICING ═══ */}
-      <section className="py-24 px-4 bg-muted/30 border-t border-border">
-        <div className="max-w-6xl mx-auto">
-          <div className="mb-16">
-            <p className="text-xs font-bold tracking-widest text-muted-foreground uppercase mb-3">Pricing</p>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Simple, transparent pricing</h2>
-            <p className="text-muted-foreground">Start free. Pay only when you earn — no subscriptions, no hidden fees.</p>
+      <footer>
+        <div className="foot-grid">
+          <div>
+            <Link to="/" className="block mb-4">
+              <DynamicLogo lightHeightClass="h-8" darkHeightClass="h-10" forceTheme="light" />
+            </Link>
+            <div className="foot-tagline">India's first experience-focused integrated travel platform. Explore · Discover · Experience.</div>
+            <div className="foot-contact">Serving across India<br /><a href="tel:+919422799420">+91 9422799420</a><br /><a href="mailto:hello@xplorwing.com">hello@xplorwing.com</a></div>
           </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Free Tier */}
-            <Card className="bg-card border-border shadow-sm">
-              <CardContent className="p-8">
-                <p className="text-primary font-bold text-sm tracking-wider uppercase mb-2">Wing Starter</p>
-                <div className="mb-2">
-                  <span className="text-4xl font-bold text-foreground">Free</span>
-                </div>
-                <p className="text-sm text-muted-foreground mb-8">Forever, no card required</p>
-                <ul className="space-y-4">
-                  {["Up to 10 listings", "Wing Link public page", "Wing Pass QR code", "10% fee on direct bookings", "Marketplace not included"].map((item, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                      <span className="text-foreground/80 text-sm">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* Pro Tier */}
-            <Card className="bg-blue-950/20 dark:bg-[#0f172a] border-blue-200 dark:border-blue-900/50 relative overflow-hidden shadow-sm">
-              <div className="absolute top-0 right-0 bg-blue-600 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">POPULAR</div>
-              <CardContent className="p-8">
-                <p className="text-blue-600 dark:text-blue-400 font-bold text-sm tracking-wider uppercase mb-2">Wing Pro</p>
-                <div className="mb-2 flex items-baseline gap-1">
-                  <span className="text-4xl font-bold text-foreground">₹499</span>
-                  <span className="text-muted-foreground">/mo</span>
-                </div>
-                <p className="text-sm text-blue-600/70 dark:text-blue-200/60 mb-8">Best for active hosts</p>
-                <ul className="space-y-4">
-                  {["Unlimited listings", "Marketplace opt-in (20% only on marketplace bookings)", "Analytics dashboard", "Priority support", "10% fee on direct bookings"].map((item, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                      <span className="text-foreground/80 text-sm">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* Custom Tier */}
-            <Card className="bg-orange-50 dark:bg-[#3f2b1a]/20 border-orange-200 dark:border-orange-900/30 shadow-sm">
-              <CardContent className="p-8">
-                <p className="text-orange-600 dark:text-orange-400 font-bold text-sm tracking-wider uppercase mb-2">Wing Franchise</p>
-                <div className="mb-2">
-                  <span className="text-4xl font-bold text-foreground">Custom</span>
-                </div>
-                <p className="text-sm text-orange-600/70 dark:text-orange-200/60 mb-8">For large operators</p>
-                <ul className="space-y-4">
-                  {["Manage multiple provider accounts", "Offline hub branding", "Revenue share model", "Dedicated onboarding", "Whiteglove KYC support"].map((item, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
-                      <span className="text-foreground/80 text-sm">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
+          <div className="foot-col"><h4>Quick Links</h4><ul><li><Link to="/">Home</Link></li><li><Link to="/about">About Us</Link></li><li><Link to="/stays">Homestays</Link></li><li><Link to="/experiences">Experiences</Link></li><li><Link to="/help">Help Center</Link></li></ul></div>
+          <div className="foot-col"><h4>Service Providers</h4><ul><li><Link to="/link-in-bio">Wing Bio</Link></li><li><Link to={user ? "/host" : "/auth"}>Become a Host</Link></li><li><Link to="/auth">Wing Pro</Link></li><li><Link to="/host">Partner Dashboard</Link></li></ul></div>
+          <div className="foot-col"><h4>Follow Us</h4><ul><li><a href="https://instagram.com/xplorwing" target="_blank" rel="noreferrer">Instagram</a></li><li><a href="https://facebook.com/xplorwing" target="_blank" rel="noreferrer">Facebook</a></li><li><a href="https://twitter.com/xplorwing" target="_blank" rel="noreferrer">Twitter / X</a></li><li><a href="https://linkedin.com/company/xplorwing" target="_blank" rel="noreferrer">LinkedIn</a></li></ul></div>
         </div>
-      </section>
-
-      {/* ═══ LINK VS MARKETPLACE ═══ */}
-      <section className="py-24 px-4 border-t border-border bg-background">
-        <div className="max-w-6xl mx-auto">
-          <div className="mb-12">
-            <p className="text-xs font-bold tracking-widest text-muted-foreground uppercase mb-3">Link vs Marketplace</p>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Wing Link and the Marketplace are different things</h2>
-            <p className="text-muted-foreground">A common question — here's the clearest way to think about it.</p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            <Card className="bg-card border-border shadow-sm">
-              <CardContent className="p-8">
-                <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center mb-6">
-                  <LinkIcon className="w-6 h-6 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold text-foreground mb-4">Wing Link (always yours)</h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  Your personal storefront. You control what's listed, the prices, and who sees it. You share the link — guests come directly to you. <span className="text-foreground font-semibold">Always free, always 10%.</span>
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-card border-border shadow-sm">
-              <CardContent className="p-8">
-                <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center mb-6">
-                  <Store className="w-6 h-6 text-blue-500" />
-                </div>
-                <h3 className="text-xl font-bold text-foreground mb-4">Xplorwing Marketplace (opt-in)</h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  Like a travel OTA — your listing appears to thousands of explorers browsing the platform. Requires admin approval. <span className="text-foreground font-semibold">20% commission applies only on marketplace-originated bookings.</span>
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+        <div className="foot-bottom">
+          <span>© {new Date().getFullYear()} WINGSNNESTS ECO SOLUTIONS PVT LTD. All rights reserved.</span>
+          <span><Link to="/privacy">Privacy Policy</Link> · <Link to="/terms">Terms of Service</Link></span>
         </div>
-      </section>
+      </footer>
 
-      {/* ═══ KEY NUMBERS ═══ */}
-      <section className="py-20 px-4 border-y border-border bg-muted/50">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-12 divide-y md:divide-y-0 md:divide-x divide-border">
-          <div className="pt-8 md:pt-0 md:px-8 text-center md:text-left">
-            <p className="text-xs font-bold tracking-widest text-muted-foreground uppercase mb-3">Key Numbers</p>
-            <h3 className="text-5xl font-bold text-foreground mb-2">₹0</h3>
-            <p className="text-muted-foreground">to set up Wing Link</p>
-          </div>
-          <div className="pt-8 md:pt-0 md:px-8 text-center md:text-left">
-            <h3 className="text-5xl font-bold text-foreground mb-2 mt-7">10 min</h3>
-            <p className="text-muted-foreground">average onboarding time</p>
-          </div>
-          <div className="pt-8 md:pt-0 md:px-8 text-center md:text-left">
-            <h3 className="text-5xl font-bold text-foreground mb-2 mt-7">10%</h3>
-            <p className="text-muted-foreground">only on direct bookings earned</p>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ FOOTER CTA ═══ */}
-      <section className="py-24 px-4 bg-background text-center">
-        <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Ready to create your Wing Link?</h2>
-        <p className="text-muted-foreground mb-8 max-w-xl mx-auto">Join Xplorwing as a host — your storefront goes live in minutes, for free.</p>
-        <Link to="/signup">
-          <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-8 gap-2">
-            Get started as a host <ArrowRight className="w-4 h-4" />
-          </Button>
-        </Link>
-      </section>
-
-      <Footer />
-    </div>
+      <a href="https://wa.me/919422799420?text=Hi%2C%20I%20want%20to%20create%20my%20Wing%20Link" className="wa" target="_blank" rel="noreferrer"><span className="wa-ic">💬</span><span>Chat with us</span></a>
+    </>
   );
 }

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { DynamicLogo } from "@/components/DynamicLogo";
+import Footer from "@/components/Footer";
+import { Home, Building, Palmtree, Compass, Bike, Car, MapPin, User, LayoutDashboard } from "lucide-react";
 
 const globalStyles = `
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -15,18 +17,27 @@ const globalStyles = `
   --shadow-md: 0 8px 36px rgba(26,61,43,.13);
   --shadow-lg: 0 20px 72px rgba(26,61,43,.2);
 }
+html, body, #root { 
+  background: var(--bg); 
+  color: var(--text); 
+  overflow-x: hidden; 
+  width: 100%; 
+  max-width: 100vw;
+  margin: 0; 
+  padding: 0; 
+  position: relative;
+}
 html { scroll-behavior: smooth; }
-body { background: var(--bg); color: var(--text); overflow-x: hidden; }
 #prog { position: fixed; top: 0; left: 0; height: 3px; background: linear-gradient(90deg, var(--lime), var(--gm)); width: 0; z-index: 300; transition: width .1s linear; }
 
 /* NAV */
-.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 200; height: 66px; padding: 0 40px; display: flex; align-items: center; justify-content: space-between; background: transparent; transition: background .4s, backdrop-filter .4s, box-shadow .4s; }
+.nav { position: fixed; top: 0; left: 0; width: 100%; z-index: 200; height: 66px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; background: transparent; transition: background .4s, backdrop-filter .4s, box-shadow .4s; }
 .nav.solid { background: rgba(248,246,240,.95); backdrop-filter: blur(14px); box-shadow: 0 1px 0 var(--border); }
 .logo { font-size: 22px; font-weight: 800; color: #fff; text-decoration: none; display: flex; align-items: center; opacity: 0; animation: fadeD .6s .1s ease forwards; transition: color 0.4s; }
 .nav.solid .logo { color: var(--g); }
 .logo-o { color: var(--lime-d); }
 .nav-links { display: flex; gap: 28px; list-style: none; opacity: 0; animation: fadeD .6s .2s ease forwards; }
-.nav-links a { font-size: 14px; color: rgba(255,255,255,0.8); font-weight: 500; text-decoration: none; transition: color .2s; position: relative; }
+.nav-links a { font-size: 14px; color: rgba(255,255,255,0.8); font-weight: 500; text-decoration: none; transition: color .2s; position: relative; display: flex; align-items: center; gap: 6px; }
 .nav.solid .nav-links a { color: var(--muted); }
 .nav-links a::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 0; height: 1.5px; background: var(--lime); transition: width .25s; }
 .nav-links a:hover { color: #fff; }
@@ -48,12 +59,17 @@ body { background: var(--bg); color: var(--text); overflow-x: hidden; }
 .mobile-menu { display: none; position: fixed; top: 66px; left: 0; right: 0; background: rgba(248,246,240,.98); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); padding: 20px 24px 28px; z-index: 190; transform: translateY(-10px); opacity: 0; transition: transform .3s ease, opacity .3s ease; pointer-events: none; }
 .mobile-menu.open { transform: translateY(0); opacity: 1; pointer-events: auto; display: block; }
 .mobile-menu ul { list-style: none; display: flex; flex-direction: column; gap: 2px; margin-bottom: 16px; }
-.mobile-menu ul li a { display: block; padding: 11px 4px; font-size: 16px; font-weight: 500; color: var(--text); text-decoration: none; border-bottom: 1px solid var(--border); transition: color .2s, padding-left .2s; }
+.mobile-menu ul li a { display: flex; align-items: center; gap: 12px; padding: 12px 4px; font-size: 16px; font-weight: 500; color: var(--text); text-decoration: none; border-bottom: 1px solid var(--border); transition: color .2s, padding-left .2s; }
+.m-nav-ic { width: 36px; height: 36px; border-radius: 10px; background: var(--g-light); color: var(--g); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .mobile-menu ul li a:hover { color: var(--g); padding-left: 8px; }
+.mobile-menu ul li a:hover .m-nav-ic { background: var(--g); color: #fff; }
 .mobile-menu-btns { display: flex; gap: 10px; margin-top: 12px; }
-.mobile-menu-btns a { flex: 1; text-align: center; padding: 12px; border-radius: 100px; font-weight: 600; font-size: 14px; text-decoration: none; transition: all .2s; }
+.mobile-menu-btns a { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; border-radius: 100px; font-weight: 600; font-size: 14px; text-decoration: none; transition: all .2s; }
 .mb-ghost { border: 1.5px solid var(--g); color: var(--g); }
 .mb-lime { background: var(--lime); color: var(--g); }
+.marquee-section { width: 100%; overflow: hidden; background: var(--g); padding: 14px 0; }
+.trust-row { display: flex; gap: 24px; font-size: 14px; font-weight: 500; flex-wrap: wrap; }
+@media(max-width: 768px) { .trust-row { justify-content: center; gap: 16px; } }
 
 /* HERO OVERHAUL */
 .hero-section {
@@ -63,6 +79,7 @@ body { background: var(--bg); color: var(--text); overflow-x: hidden; }
   align-items: center;
   overflow: hidden;
   background: #F7F7F2;
+  width: 100%;
 }
 
 /* Animated Mesh Gradient Background */
@@ -151,12 +168,16 @@ body { background: var(--bg); color: var(--text); overflow-x: hidden; }
 }
 .hero-left h1 {
  
-  font-size: clamp(42px, 5.5vw, 68px);
+  font-size: clamp(32px, 5.5vw, 68px);
   font-weight: 800;
   line-height: 1.05;
   letter-spacing: -0.03em;
   color: #fff;
   margin-bottom: 24px;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
 }
 .hero-left h1 em {
   font-style: normal;
@@ -255,7 +276,7 @@ body { background: var(--bg); color: var(--text); overflow-x: hidden; }
   z-index: 10;
 }
 .mockup-inner {
-  padding: 40px 16px 20px;
+  padding: 24px 16px 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -426,21 +447,6 @@ body { background: var(--bg); color: var(--text); overflow-x: hidden; }
 .fcta:hover .fcta-arrow { transform: translateX(5px); }
 .fcta-wa { display: inline-flex; align-items: center; gap: 10px; background: #fff; color: var(--g); border: 1.5px solid var(--border); font-size: 15px; font-weight: 600; border-radius: 100px; padding: 16px 28px; text-decoration: none; transition: all .25s; }
 .fcta-wa:hover { border-color: var(--g); transform: translateY(-2px); box-shadow: var(--shadow-md); }
-footer { background: #fff; border-top: 1px solid var(--border); padding: 52px 40px 36px; }
-.foot-grid { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 44px; }
-.foot-brand-name { font-size: 22px; font-weight: 800; color: var(--g); margin-bottom: 10px; }
-.foot-brand-name span { color: var(--lime-d); }
-.foot-tagline { font-size: 13.5px; color: var(--muted); line-height: 1.7; margin-bottom: 16px; }
-.foot-contact { font-size: 13.5px; color: var(--muted); line-height: 1.85; }
-.foot-contact a { color: var(--g); text-decoration: none; font-weight: 500; }
-.foot-contact a:hover { text-decoration: underline; }
-.foot-col h4 { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
-.foot-col ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
-.foot-col ul li a { font-size: 14px; color: var(--muted); text-decoration: none; transition: color .2s, padding-left .2s; display: inline-block; }
-.foot-col ul li a:hover { color: var(--g); padding-left: 4px; }
-.foot-bottom { max-width: 1200px; margin: 24px auto 0; padding-top: 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; gap: 8px; }
-.foot-bottom a { color: var(--muted); text-decoration: none; }
-.foot-bottom a:hover { color: var(--g); }
 .wa { position: fixed; bottom: 28px; right: 28px; z-index: 90; background: #25d366; color: #fff; border-radius: 100px; padding: 13px 20px; display: flex; align-items: center; gap: 9px; font-size: 13.5px; font-weight: 700; text-decoration: none; box-shadow: 0 6px 28px rgba(37,211,102,.45); transition: transform .25s, box-shadow .25s; animation: fadeU .7s 2.5s ease both; }
 .wa:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 14px 44px rgba(37,211,102,.5); }
 .wa-ic { font-size: 18px; }
@@ -448,41 +454,52 @@ footer { background: #fff; border-top: 1px solid var(--border); padding: 52px 40
 @keyframes fadeD { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes shim { to { transform: translateX(200%); } }
 @media(max-width: 1024px) {
-  .hero-inner { grid-template-columns: 1fr; gap: 44px; padding: 110px 32px 70px; text-align: center; }
-  .hero-left p { margin-left: auto; margin-right: auto; }
+  .hero-inner { grid-template-columns: 1fr; gap: 40px; padding: 100px 20px 60px; text-align: center; min-height: auto; width: 100%; max-width: 100%; overflow: hidden; }
+  .hero-left h1 { margin: 0 auto; max-width: 800px; }
+  .hero-left p { margin-left: auto; margin-right: auto; max-width: 600px; }
   .hero-ctas { justify-content: center; }
-  .hero-right { height: 500px; }
+  .hero-right { height: auto; min-height: 320px; padding: 10px 0; }
   .badge-1, .badge-2, .badge-3, .badge-4 { display: none; }
-  .feats-grid { grid-template-columns: 1fr 1fr; }
+  .feats-grid { grid-template-columns: 1fr 1fr; gap: 20px; }
   .steps { grid-template-columns: 1fr 1fr; gap: 28px; }
   .steps-line { display: none; }
   .panel.on { grid-template-columns: 1fr; }
-  .p-grid { grid-template-columns: 1fr; }
+  .p-grid { grid-template-columns: 1fr; gap: 24px; }
   .nums { grid-template-columns: 1fr; }
-  .num-i { border-right: none; border-bottom: 1px solid rgba(255,255,255,.07); padding: 32px; }
-  .foot-grid { grid-template-columns: 1fr 1fr; }
-  .section, .how-inner, .pricing-inner, .final { padding: 72px 32px; }
-  footer { padding: 48px 32px 32px; }
-  .nav { padding: 0 28px; }
+  .num-i { border-right: none; border-bottom: 1px solid rgba(255,255,255,.07); padding: 24px; }
+  .nav { padding: 0 20px; }
+  .section, .how-inner, .pricing-inner, .final { padding: 50px 20px; }
+
 }
 @media(max-width: 768px) {
-  .nav-links, .nav-r .btn-ghost { display: none; }
-  .hamburger { display: flex; }
-  .nav-r .btn-lime { display: block; }
+  .nav-links { display: none; }
+  .nav-r .btn-ghost { display: none; }
+  .nav-r { gap: 8px; }
+  .hamburger { display: flex; margin-left: 4px; }
+  .nav-r .btn-lime { font-size: 11px; padding: 7px 12px; white-space: nowrap; flex-shrink: 0; }
   .feats-grid { grid-template-columns: 1fr; }
   .steps { grid-template-columns: 1fr; }
-  .section, .how-inner, .pricing-inner, .final { padding: 56px 20px; }
-  footer { padding: 40px 20px 28px; }
-  .foot-grid { grid-template-columns: 1fr; }
-  .final-btns { flex-direction: column; align-items: center; }
-  .nav { padding: 0 20px; }
-  .wa { bottom: 20px; right: 20px; padding: 11px 16px; font-size: 13px; }
-  .live-popup { left: 10px; bottom: 20px; transform: scale(0.85); }
+  .section, .how-inner, .pricing-inner, .final { padding: 48px 20px; }
+
+  .final-btns { flex-direction: column; align-items: center; width: 100%; }
+  .final-btns .fcta, .final-btns .fcta-wa { width: 100%; justify-content: center; }
+  .hero-left h1 { font-size: clamp(28px, 8vw, 40px); line-height: 1.1; letter-spacing: -0.01em; }
+  .hero-left p { font-size: 15px; margin-bottom: 24px; }
+  .phone-mockup { transform: scale(0.85); transform-origin: center top; margin-bottom: -40px; max-width: 270px; }
 }
 @media(max-width: 480px) {
-  .hero-inner { padding: 96px 18px 52px; }
-  .section, .how-inner, .pricing-inner, .final { padding: 48px 18px; }
-  footer { padding: 36px 18px 24px; }
+  .nav-r .btn-lime { display: none; }
+  .nav { padding: 0 16px; }
+  .hero-inner { padding: 70px 12px 30px; }
+  .hero-left h1 { font-size: 28px; }
+  .hero-ctas { flex-direction: column; width: 100%; gap: 10px; }
+  .hero-ctas .cta-primary, .hero-ctas .cta-secondary { width: 100%; justify-content: center; }
+  .hero-right { min-height: 280px; padding: 0; margin-top: -20px; }
+  .phone-mockup { transform: scale(0.68); margin-bottom: -160px; }
+  .section-top h2 { font-size: 22px; }
+  .p-price { font-size: 26px; }
+  .num-n { font-size: 32px; }
+  .marquee-item { padding: 0 12px; font-size: 10px; }
 }
 `;
 
@@ -555,13 +572,13 @@ export default function LinkInBioLanding() {
           />
         </Link>
         <ul className="nav-links">
-          <li><Link to="/stays">Explore</Link></li>
-          <li><Link to="/stays">Stays</Link></li>
-          <li><Link to="/hotels">Hotels</Link></li>
-          <li><Link to="/resorts">Resorts</Link></li>
-          <li><Link to="/bikes">Bikes</Link></li>
-          <li><Link to="/cars">Cars</Link></li>
-          <li><Link to="/experiences">Experiences</Link></li>
+          <li><Link to="/destinations"><MapPin size={16} /> Destinations</Link></li>
+          <li><Link to="/stays"><Home size={16} /> Stays</Link></li>
+          <li><Link to="/hotels"><Building size={16} /> Hotels</Link></li>
+          <li><Link to="/resorts"><Palmtree size={16} /> Resorts</Link></li>
+          <li><Link to="/bikes"><Bike size={16} /> Bikes</Link></li>
+          <li><Link to="/cars"><Car size={16} /> Cars</Link></li>
+          <li><Link to="/experiences"><Compass size={16} /> Experiences</Link></li>
         </ul>
         <div className="nav-r">
           {!user && <Link to="/auth" className="btn-ghost">Login</Link>}
@@ -575,17 +592,17 @@ export default function LinkInBioLanding() {
 
       <div className={`mobile-menu ${isMenuOpen ? 'open' : ''}`} id="mobileMenu">
         <ul>
-          <li><Link to="/stays" onClick={() => setIsMenuOpen(false)}>Explore</Link></li>
-          <li><Link to="/stays" onClick={() => setIsMenuOpen(false)}>Stays</Link></li>
-          <li><Link to="/hotels" onClick={() => setIsMenuOpen(false)}>Hotels</Link></li>
-          <li><Link to="/resorts" onClick={() => setIsMenuOpen(false)}>Resorts</Link></li>
-          <li><Link to="/bikes" onClick={() => setIsMenuOpen(false)}>Bikes</Link></li>
-          <li><Link to="/cars" onClick={() => setIsMenuOpen(false)}>Cars</Link></li>
-          <li><Link to="/experiences" onClick={() => setIsMenuOpen(false)}>Experiences</Link></li>
+          <li><Link to="/destinations" onClick={() => setIsMenuOpen(false)}><span className="m-nav-ic"><MapPin size={18} /></span> Destinations</Link></li>
+          <li><Link to="/stays" onClick={() => setIsMenuOpen(false)}><span className="m-nav-ic"><Home size={18} /></span> Stays</Link></li>
+          <li><Link to="/hotels" onClick={() => setIsMenuOpen(false)}><span className="m-nav-ic"><Building size={18} /></span> Hotels</Link></li>
+          <li><Link to="/resorts" onClick={() => setIsMenuOpen(false)}><span className="m-nav-ic"><Palmtree size={18} /></span> Resorts</Link></li>
+          <li><Link to="/bikes" onClick={() => setIsMenuOpen(false)}><span className="m-nav-ic"><Bike size={18} /></span> Bikes</Link></li>
+          <li><Link to="/cars" onClick={() => setIsMenuOpen(false)}><span className="m-nav-ic"><Car size={18} /></span> Cars</Link></li>
+          <li><Link to="/experiences" onClick={() => setIsMenuOpen(false)}><span className="m-nav-ic"><Compass size={18} /></span> Experiences</Link></li>
         </ul>
         <div className="mobile-menu-btns">
-          {!user && <Link to="/auth" className="mb-ghost" onClick={() => setIsMenuOpen(false)}>Login</Link>}
-          {user && <Link to="/host" className="mb-ghost" onClick={() => setIsMenuOpen(false)}>Dashboard</Link>}
+          {!user && <Link to="/auth" className="mb-ghost" onClick={() => setIsMenuOpen(false)}><User size={18} /> Login</Link>}
+          {user && <Link to="/host" className="mb-ghost" onClick={() => setIsMenuOpen(false)}><LayoutDashboard size={18} /> Dashboard</Link>}
           <Link to={user ? "/host" : "/auth"} className="mb-lime" onClick={() => setIsMenuOpen(false)}>Get started free</Link>
         </div>
       </div>
@@ -843,24 +860,7 @@ export default function LinkInBioLanding() {
         </div>
       </section>
 
-      <footer>
-        <div className="foot-grid">
-          <div>
-            <Link to="/" className="block mb-4">
-              <DynamicLogo lightHeightClass="h-8" darkHeightClass="h-10" forceTheme="light" />
-            </Link>
-            <div className="foot-tagline">India's first experience-focused integrated travel platform. Explore · Discover · Experience.</div>
-            <div className="foot-contact">Serving across India<br /><a href="tel:+919422799420">+91 9422799420</a><br /><a href="mailto:hello@xplorwing.com">hello@xplorwing.com</a></div>
-          </div>
-          <div className="foot-col"><h4>Quick Links</h4><ul><li><Link to="/">Home</Link></li><li><Link to="/about">About Us</Link></li><li><Link to="/stays">Homestays</Link></li><li><Link to="/experiences">Experiences</Link></li><li><Link to="/help">Help Center</Link></li></ul></div>
-          <div className="foot-col"><h4>Service Providers</h4><ul><li><Link to="/link-in-bio">Wing Bio</Link></li><li><Link to={user ? "/host" : "/auth"}>Become a Host</Link></li><li><Link to="/auth">Wing Pro</Link></li><li><Link to="/host">Partner Dashboard</Link></li></ul></div>
-          <div className="foot-col"><h4>Follow Us</h4><ul><li><a href="https://instagram.com/xplorwing" target="_blank" rel="noreferrer">Instagram</a></li><li><a href="https://facebook.com/xplorwing" target="_blank" rel="noreferrer">Facebook</a></li><li><a href="https://twitter.com/xplorwing" target="_blank" rel="noreferrer">Twitter / X</a></li><li><a href="https://linkedin.com/company/xplorwing" target="_blank" rel="noreferrer">LinkedIn</a></li></ul></div>
-        </div>
-        <div className="foot-bottom">
-          <span>© {new Date().getFullYear()} WINGSNNESTS ECO SOLUTIONS PVT LTD. All rights reserved.</span>
-          <span><Link to="/privacy">Privacy Policy</Link> · <Link to="/terms">Terms of Service</Link></span>
-        </div>
-      </footer>
+      <Footer />
 
       <a href="https://wa.me/919422799420?text=Hi%2C%20I%20want%20to%20create%20my%20Wing%20Link" className="wa" target="_blank" rel="noreferrer"><span className="wa-ic">💬</span><span>Chat with us</span></a>
     </>

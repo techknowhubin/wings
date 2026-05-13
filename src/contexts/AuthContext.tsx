@@ -48,6 +48,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           hasInitialized.current = true;
           setLoading(false);
         }
+
+        // Close the popup window automatically after a successful login
+        if (newSession && typeof window !== 'undefined' && window.opener && window.opener !== window) {
+          setTimeout(() => { window.close(); }, 500); // 500ms buffer to ensure localStorage is flushed
+        }
       }
     );
 

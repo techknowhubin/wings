@@ -213,17 +213,24 @@ const Header = () => {
               ) : (
                 <>
                   <Link to="/auth">
-                    <Button
-                      variant="outline"
+                    <motion.button
                       className={cn(
-                        "rounded-full px-5 transition-all font-semibold",
+                        "relative px-5 py-2 text-sm font-medium rounded-full cursor-pointer",
+                        "bg-transparent border-none outline-none",
+                        "transition-colors duration-200",
                         isDarkHeader
-                          ? "bg-transparent text-black border-black hover:bg-black/5 hover:text-black"
-                          : "border-border text-foreground hover:bg-muted/50"
+                          ? "text-black/80 hover:text-black"
+                          : "text-foreground/70 hover:text-foreground"
                       )}
                     >
                       Login/Signup
-                    </Button>
+                      <motion.span
+                        className="absolute bottom-1 left-1/2 -translate-x-1/2 h-[2px] rounded-full bg-primary"
+                        initial={{ width: 0 }}
+                        whileHover={{ width: "60%" }}
+                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                      />
+                    </motion.button>
                   </Link>
                   <div className="hidden md:flex ml-2">
                     <Link to={user ? "/onboarding/host" : "/host/signup"}>

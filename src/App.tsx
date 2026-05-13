@@ -40,6 +40,7 @@ import Terms from "./pages/Terms";
 // Host Dashboard
 import HostLayout from "./pages/HostLayout";
 import HostSection from "./pages/HostSection";
+import { ProtectedHostRoute } from "./components/ProtectedHostRoute";
 
 // Admin Dashboard
 import AdminLayout from "./components/admin/AdminLayout";
@@ -70,6 +71,8 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/host/signup" element={<Auth />} />
+            <Route path="/host/signin" element={<Auth />} />
             <Route path="/login" element={<Navigate to="/auth" replace />} />
             <Route path="/signup" element={<Navigate to="/auth" replace />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -105,7 +108,14 @@ const App = () => (
             <Route path="/terms" element={<Terms />} />
             
             {/* Host Dashboard — shared layout, only content transitions */}
-            <Route path="/host" element={<HostLayout />}>
+            <Route 
+              path="/host" 
+              element={
+                <ProtectedHostRoute>
+                  <HostLayout />
+                </ProtectedHostRoute>
+              }
+            >
               <Route index element={<HostSection />} />
               <Route path="stays/add" element={<Navigate to="/host/stays?mode=add" replace />} />
               <Route path="hotels/add" element={<Navigate to="/host/hotels?mode=add" replace />} />

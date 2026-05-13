@@ -44,43 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(newSession?.user ?? null);
 
         // Unblock the UI after the very first auth event.
-        // Use a ref (not the loading state) to avoid stale closure.
         if (!hasInitialized.current) {
           hasInitialized.current = true;
           setLoading(false);
-        }
-
-        // Background task: assign a default role to new sign-ins
-        // Uses setTimeout to defer DB work off the synchronous React render path
-        if (newSession?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
-          setTimeout(async () => {
-            try {
-              const { data: existingRole, error } = await supabase
-                .from('user_roles')
-                .select('role')
-                .eq('user_id', newSession.user.id)
-                .limit(1)
-                .maybeSingle();
-
-              if (error) {
-                console.error('[AuthContext] Error fetching role:', error);
-                return;
-              }
-
-              if (!existingRole) {
-                const role = (localStorage.getItem('pending_role') as 'user' | 'host') || 'user';
-                console.log(`[AuthContext] Assigning default role '${role}'`);
-                const { error: insertError } = await supabase.from('user_roles').insert({
-                  user_id: newSession.user.id,
-                  role,
-                });
-                if (insertError) console.error('[AuthContext] Error assigning role:', insertError);
-                localStorage.removeItem('pending_role');
-              }
-            } catch (err) {
-              console.error('[AuthContext] Background role check error:', err);
-            }
-          }, 0);
         }
       }
     );
@@ -99,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fullName: string,
     role: 'user' | 'host' = 'user',
   ) => {
-    const redirectUrl = `${window.location.origin}/`;
+    const redirectUrl = `${window.location.origin}/auth`;
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -125,11 +91,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     provider: 'google' | 'apple' | 'facebook' | 'linkedin_oidc',
     role: 'user' | 'host' = 'user',
   ) => {
-    localStorage.setItem('pending_role', role);
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: `${window.location.origin}/auth`,
         queryParams: { prompt: 'select_account' },
       },
     });
@@ -140,12 +105,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     provider: 'google' | 'apple' | 'facebook' | 'linkedin_oidc',
     role: 'user' | 'host' = 'user',
   ) => {
-    localStorage.setItem('pending_role', role);
-
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: `${window.location.origin}/auth`,
         skipBrowserRedirect: true,
         queryParams: { prompt: 'select_account' },
       },

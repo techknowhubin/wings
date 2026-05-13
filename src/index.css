@@ -163,6 +163,39 @@ All colors MUST be HSL.
   .nav-link-hover:hover {
     text-shadow: 0 0 5px #e5f76e, 0 0 20px #e5f76e, 0 0 30px #e5f76e;
   }
+
+  /* Custom Visible Scrollbar */
+  ::-webkit-scrollbar {
+    width: 12px !important;
+    height: 12px !important;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-radius: 10px !important;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #c8e64c !important;
+    border-radius: 10px !important;
+    border: 3px solid transparent !important;
+    background-clip: padding-box !important;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #a8c230 !important;
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-width: auto !important;
+    scrollbar-color: #c8e64c rgba(255, 255, 255, 0.05) !important;
+  }
+}
+
+html {
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
 }
 
 /* Respect reduced motion preferences */
@@ -195,6 +228,21 @@ All colors MUST be HSL.
 /* Buttons glow in dark mode */
 .dark button[class*="bg-primary"],
 .dark .bg-primary {
+  box-shadow: 0 0 20px hsl(68 90% 70% / 0.25);
+}
+
+.dark button[class*="bg-primary"]:hover,
+.dark .bg-primary:hover {
+  box-shadow: 0 0 30px hsl(68 90% 70% / 0.4);
+}
+
+/* Leaflet custom marker reset */
+.custom-map-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+dark .bg-primary {
   box-shadow: 0 0 20px hsl(68 90% 70% / 0.25);
 }
 

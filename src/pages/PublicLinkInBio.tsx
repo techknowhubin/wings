@@ -19,6 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import Header from "@/components/Header";
+import Marquee from "@/components/Marquee";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -392,11 +394,10 @@ function DetailScreen({
                 <button
                   key={opt}
                   onClick={() => setPricingOption(opt)}
-                  className={`py-1.5 px-1 border rounded-lg text-center transition-all relative ${
-                    pricingOption === opt
-                      ? "border-accent bg-accent/10 scale-[1.03]"
-                      : "border-border hover:border-muted-foreground"
-                  }`}
+                  className={`py-1.5 px-1 border rounded-lg text-center transition-all relative ${pricingOption === opt
+                    ? "border-accent bg-accent/10 scale-[1.03]"
+                    : "border-border hover:border-muted-foreground"
+                    }`}
                 >
                   {pricingOption === opt && opt === "weekly" && (
                     <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-accent text-accent-foreground text-[8px] font-bold px-1 py-0.5 rounded-full">POPULAR</span>
@@ -502,36 +503,36 @@ export default function PublicLinkInBio() {
   const { data: listings = [] } = useQuery<Listing[]>({
     queryKey: ["link-in-bio-public-listings", featuredIds, hostUserId],
     queryFn: async () => {
-      const staysCols   = "id,title,location,price_per_night,images,availability_status,discounts,description,rating,total_reviews,amenities,currency,host_id,max_guests,bedrooms,bathrooms,property_type";
-      const carsCols    = "id,title,location,price_per_day,images,availability_status,discounts,description,rating,total_reviews,amenities,currency,host_id,seating_capacity,brand,model";
-      const bikesCols   = "id,title,location,price_per_day,images,availability_status,discounts,description,rating,total_reviews,currency,host_id,brand,model";
-      const expCols     = "id,title,location,price_per_person,images,availability_status,discounts,description,rating,total_reviews,currency,host_id,group_size";
-      const hotelCols   = "id,title,location,price_per_night,images,availability_status,discounts,description,rating,total_reviews,currency,host_id";
+      const staysCols = "id,title,location,price_per_night,images,availability_status,discounts,description,rating,total_reviews,amenities,currency,host_id,max_guests,bedrooms,bathrooms,property_type";
+      const carsCols = "id,title,location,price_per_day,images,availability_status,discounts,description,rating,total_reviews,amenities,currency,host_id,seating_capacity,brand,model";
+      const bikesCols = "id,title,location,price_per_day,images,availability_status,discounts,description,rating,total_reviews,currency,host_id,brand,model";
+      const expCols = "id,title,location,price_per_person,images,availability_status,discounts,description,rating,total_reviews,currency,host_id,group_size";
+      const hotelCols = "id,title,location,price_per_night,images,availability_status,discounts,description,rating,total_reviews,currency,host_id";
 
       const byId = featuredIds.length > 0;
 
       const [stays, hotels, resorts, cars, bikes, experiences] = await Promise.all([
         byId ? supabase.from("stays").select(staysCols).in("id", featuredIds)
-              : supabase.from("stays").select(staysCols).eq("host_id", hostUserId!).eq("availability_status", true),
+          : supabase.from("stays").select(staysCols).eq("host_id", hostUserId!).eq("availability_status", true),
         byId ? (supabase as any).from("hotels").select(hotelCols).in("id", featuredIds)
-              : (supabase as any).from("hotels").select(hotelCols).eq("host_id", hostUserId!).eq("availability_status", true),
+          : (supabase as any).from("hotels").select(hotelCols).eq("host_id", hostUserId!).eq("availability_status", true),
         byId ? (supabase as any).from("resorts").select(hotelCols).in("id", featuredIds)
-              : (supabase as any).from("resorts").select(hotelCols).eq("host_id", hostUserId!).eq("availability_status", true),
+          : (supabase as any).from("resorts").select(hotelCols).eq("host_id", hostUserId!).eq("availability_status", true),
         byId ? supabase.from("cars").select(carsCols).in("id", featuredIds)
-              : supabase.from("cars").select(carsCols).eq("host_id", hostUserId!).eq("availability_status", true),
+          : supabase.from("cars").select(carsCols).eq("host_id", hostUserId!).eq("availability_status", true),
         byId ? supabase.from("bikes").select(bikesCols).in("id", featuredIds)
-              : supabase.from("bikes").select(bikesCols).eq("host_id", hostUserId!).eq("availability_status", true),
+          : supabase.from("bikes").select(bikesCols).eq("host_id", hostUserId!).eq("availability_status", true),
         byId ? supabase.from("experiences").select(expCols).in("id", featuredIds)
-              : supabase.from("experiences").select(expCols).eq("host_id", hostUserId!).eq("availability_status", true),
+          : supabase.from("experiences").select(expCols).eq("host_id", hostUserId!).eq("availability_status", true),
       ]);
 
       return [
-        ...(stays.data ?? []).map((i: any) => ({ ...i, type: "stay",       unit: "/night",  ...withDiscount(Number(i.price_per_night),  i.discounts) })),
-        ...((hotels.data ?? []) as any[]).map((i) =>  ({ ...i, type: "hotel",      unit: "/night",  ...withDiscount(Number(i.price_per_night),  i.discounts) })),
-        ...((resorts.data ?? []) as any[]).map((i) => ({ ...i, type: "resort",     unit: "/night",  ...withDiscount(Number(i.price_per_night),  i.discounts) })),
-        ...(cars.data ?? []).map((i: any) =>         ({ ...i, type: "car",        unit: "/day",    ...withDiscount(Number(i.price_per_day),    i.discounts) })),
-        ...(bikes.data ?? []).map((i: any) =>        ({ ...i, type: "bike",       unit: "/day",    ...withDiscount(Number(i.price_per_day),    i.discounts) })),
-        ...(experiences.data ?? []).map((i: any) =>  ({ ...i, type: "experience", unit: "/person", ...withDiscount(Number(i.price_per_person), i.discounts) })),
+        ...(stays.data ?? []).map((i: any) => ({ ...i, type: "stay", unit: "/night", ...withDiscount(Number(i.price_per_night), i.discounts) })),
+        ...((hotels.data ?? []) as any[]).map((i) => ({ ...i, type: "hotel", unit: "/night", ...withDiscount(Number(i.price_per_night), i.discounts) })),
+        ...((resorts.data ?? []) as any[]).map((i) => ({ ...i, type: "resort", unit: "/night", ...withDiscount(Number(i.price_per_night), i.discounts) })),
+        ...(cars.data ?? []).map((i: any) => ({ ...i, type: "car", unit: "/day", ...withDiscount(Number(i.price_per_day), i.discounts) })),
+        ...(bikes.data ?? []).map((i: any) => ({ ...i, type: "bike", unit: "/day", ...withDiscount(Number(i.price_per_day), i.discounts) })),
+        ...(experiences.data ?? []).map((i: any) => ({ ...i, type: "experience", unit: "/person", ...withDiscount(Number(i.price_per_person), i.discounts) })),
       ] as Listing[];
     },
     enabled: !!hostUserId,
@@ -539,13 +540,23 @@ export default function PublicLinkInBio() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
-      </div>
+      <>
+        <Marquee />
+        <Header />
+        <div className="min-h-[calc(100vh-100px)] flex items-center justify-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
+        </div>
+      </>
     );
   }
   if (!page || !settings) {
-    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Link not found.</div>;
+    return (
+      <>
+        <Marquee />
+        <Header />
+        <div className="min-h-[calc(100vh-100px)] flex items-center justify-center text-muted-foreground">Link not found.</div>
+      </>
+    );
   }
 
   const T = themes[settings.theme] ?? themes.forest;
@@ -563,130 +574,134 @@ export default function PublicLinkInBio() {
   };
 
   return (
-    <div className="sm:min-h-screen sm:bg-stone-100 sm:dark:bg-stone-900 sm:flex sm:items-center sm:justify-center sm:p-6">
-      <div className="w-full h-screen sm:h-[667px] sm:max-w-[375px] sm:rounded-3xl sm:border-[8px] sm:border-gray-900/90 overflow-hidden sm:shadow-2xl shadow-none relative bg-background">
-        <div className={`w-full h-full flex flex-col ${T.bg} ${T.text} relative`}>
+    <>
+      <Marquee />
+      <Header />
+      <div className="sm:min-h-[calc(100vh-100px)] sm:bg-stone-100 sm:dark:bg-stone-900 sm:flex sm:items-center sm:justify-center sm:p-6">
+        <div className="w-full h-screen sm:h-[667px] sm:max-w-[375px] sm:rounded-3xl sm:border-[8px] sm:border-gray-900/90 overflow-hidden sm:shadow-2xl shadow-none relative bg-background">
+          <div className={`w-full h-full flex flex-col ${T.bg} ${T.text} relative`}>
 
-          {/* ── Detail screen overlaid ── */}
-          {selectedListing && (
-            <DetailScreen
-              listing={selectedListing}
-              onBack={() => setSelectedListing(null)}
-              goToConfirm={(booking) => navigate("/confirm-and-pay", { state: { booking } })}
-            />
-          )}
+            {/* ── Detail screen overlaid ── */}
+            {selectedListing && (
+              <DetailScreen
+                listing={selectedListing}
+                onBack={() => setSelectedListing(null)}
+                goToConfirm={(booking) => navigate("/confirm-and-pay", { state: { booking } })}
+              />
+            )}
 
-          {/* ── Scrollable list area ── */}
-          <div className={`flex-1 ${selectedListing ? "overflow-hidden" : "overflow-y-auto"}`}>
-            <div className="px-3 py-5">
-            {/* Profile */}
-            <div className="text-center mb-5">
-              <div className="w-24 h-24 mx-auto rounded-full bg-white/20 border-4 border-white/30 overflow-hidden mb-4 flex items-center justify-center text-3xl font-bold">
-                {hostProfile?.profile_image
-                  ? <img src={hostProfile.profile_image} alt={settings.businessName} className="w-full h-full object-cover" />
-                  : settings.businessName?.charAt(0)?.toUpperCase() || "X"}
-              </div>
-              <h1 className="text-3xl font-bold">{settings.businessName}</h1>
-              <p className={`mt-1 text-sm ${T.muted}`}>{settings.tagline}</p>
-              <p className={`mt-3 text-xs ${T.muted} px-4`}>{settings.bio}</p>
-              <div className="flex items-center justify-center gap-1.5 mt-3">
-                <p className={`text-[10px] flex items-center gap-1.5 ${T.muted}`}>
-                  <Phone className="h-3 w-3" />
-                  Phone available after booking
-                </p>
-              </div>
-              <div className="flex items-center justify-center gap-3 mt-3">
-                {settings.instagram && (
-                  <a href={formatSocialLink(settings.instagram, "ig")} target="_blank" rel="noopener noreferrer" className={`p-2 rounded-full border ${T.socialChip} hover:opacity-80 transition-opacity`}>
-                    <Instagram className="h-4 w-4" />
-                  </a>
-                )}
-                {settings.facebook && (
-                  <a href={formatSocialLink(settings.facebook, "fb")} target="_blank" rel="noopener noreferrer" className={`p-2 rounded-full border ${T.socialChip} hover:opacity-80 transition-opacity`}>
-                    <Facebook className="h-4 w-4" />
-                  </a>
-                )}
-                {settings.twitter && (
-                  <a href={formatSocialLink(settings.twitter, "tw")} target="_blank" rel="noopener noreferrer" className={`p-2 rounded-full border ${T.socialChip} hover:opacity-80 transition-opacity`}>
-                    <Twitter className="h-4 w-4" />
-                  </a>
-                )}
-                {settings.youtube && (
-                  <a href={formatSocialLink(settings.youtube, "yt")} target="_blank" rel="noopener noreferrer" className={`p-2 rounded-full border ${T.socialChip} hover:opacity-80 transition-opacity`}>
-                    <Youtube className="h-4 w-4" />
-                  </a>
-                )}
-                {settings.email && (
-                  <a href={formatSocialLink(settings.email, "email")} className={`p-2 rounded-full border ${T.socialChip} hover:opacity-80 transition-opacity`}>
-                    <Mail className="h-4 w-4" />
-                  </a>
-                )}
-                {settings.website && (
-                  <a href={formatSocialLink(settings.website, "web")} target="_blank" rel="noopener noreferrer" className={`p-2 rounded-full border ${T.socialChip} hover:opacity-80 transition-opacity`}>
-                    <Globe className="h-4 w-4" />
-                  </a>
-                )}
-              </div>
-            </div>
+            {/* ── Scrollable list area ── */}
+            <div className={`flex-1 ${selectedListing ? "overflow-hidden" : "overflow-y-auto"}`}>
+              <div className="px-3 py-5">
+                {/* Profile */}
+                <div className="text-center mb-5">
+                  <div className="w-24 h-24 mx-auto rounded-full bg-white/20 border-4 border-white/30 overflow-hidden mb-4 flex items-center justify-center text-3xl font-bold">
+                    {hostProfile?.profile_image
+                      ? <img src={hostProfile.profile_image} alt={settings.businessName} className="w-full h-full object-cover" />
+                      : settings.businessName?.charAt(0)?.toUpperCase() || "X"}
+                  </div>
+                  <h1 className="text-3xl font-bold">{settings.businessName}</h1>
+                  <p className={`mt-1 text-sm ${T.muted}`}>{settings.tagline}</p>
+                  <p className={`mt-3 text-xs ${T.muted} px-4`}>{settings.bio}</p>
+                  <div className="flex items-center justify-center gap-1.5 mt-3">
+                    <p className={`text-[10px] flex items-center gap-1.5 ${T.muted}`}>
+                      <Phone className="h-3 w-3" />
+                      Phone available after booking
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center gap-3 mt-3">
+                    {settings.instagram && (
+                      <a href={formatSocialLink(settings.instagram, "ig")} target="_blank" rel="noopener noreferrer" className={`p-2 rounded-full border ${T.socialChip} hover:opacity-80 transition-opacity`}>
+                        <Instagram className="h-4 w-4" />
+                      </a>
+                    )}
+                    {settings.facebook && (
+                      <a href={formatSocialLink(settings.facebook, "fb")} target="_blank" rel="noopener noreferrer" className={`p-2 rounded-full border ${T.socialChip} hover:opacity-80 transition-opacity`}>
+                        <Facebook className="h-4 w-4" />
+                      </a>
+                    )}
+                    {settings.twitter && (
+                      <a href={formatSocialLink(settings.twitter, "tw")} target="_blank" rel="noopener noreferrer" className={`p-2 rounded-full border ${T.socialChip} hover:opacity-80 transition-opacity`}>
+                        <Twitter className="h-4 w-4" />
+                      </a>
+                    )}
+                    {settings.youtube && (
+                      <a href={formatSocialLink(settings.youtube, "yt")} target="_blank" rel="noopener noreferrer" className={`p-2 rounded-full border ${T.socialChip} hover:opacity-80 transition-opacity`}>
+                        <Youtube className="h-4 w-4" />
+                      </a>
+                    )}
+                    {settings.email && (
+                      <a href={formatSocialLink(settings.email, "email")} className={`p-2 rounded-full border ${T.socialChip} hover:opacity-80 transition-opacity`}>
+                        <Mail className="h-4 w-4" />
+                      </a>
+                    )}
+                    {settings.website && (
+                      <a href={formatSocialLink(settings.website, "web")} target="_blank" rel="noopener noreferrer" className={`p-2 rounded-full border ${T.socialChip} hover:opacity-80 transition-opacity`}>
+                        <Globe className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
+                </div>
 
-            {/* Listings */}
-            <div className="space-y-2">
-              {listings.map((listing) => (
-                <button
-                  key={`${listing.type}-${listing.id}`}
-                  onClick={() => setSelectedListing(listing)}
-                  className="w-full text-left"
-                >
-                  <div className={`p-2 border rounded-2xl relative cursor-pointer transition-all active:scale-[0.98] hover:opacity-95 ${T.card}`}>
-                    <span 
-                      className="absolute top-2 right-2 inline-flex items-center justify-center rounded-full border-none p-1.5 shadow-sm"
-                      style={{ backgroundColor: "#e5f76e", color: "#000" }}
+                {/* Listings */}
+                <div className="space-y-2">
+                  {listings.map((listing) => (
+                    <button
+                      key={`${listing.type}-${listing.id}`}
+                      onClick={() => setSelectedListing(listing)}
+                      className="w-full text-left"
                     >
-                      <ArrowUpRight className="h-3.5 w-3.5" />
-                    </span>
-                    <div className="flex gap-2 pr-8">
-                      <div className="h-16 w-16 rounded-xl overflow-hidden bg-white/10 shrink-0">
-                        {listing.images?.[0] && <img src={listing.images[0]} alt={listing.title} className="h-full w-full object-cover" />}
-                      </div>
-                      <div className="flex-1 min-w-0 flex flex-col justify-center">
-                        <p className="font-semibold text-sm leading-snug truncate">{listing.title}</p>
-                        <p className={`text-[10px] truncate ${T.muted}`}>{listing.location}</p>
-                        <div className="mt-1 flex flex-col">
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-sm font-bold">{formatPrice(listing.discountedPrice)}</p>
-                            {listing.hostDiscountPercent > 0 && (
-                               <p className={`text-[10px] font-bold ${T.discount}`}>−{listing.hostDiscountPercent}%</p>
-                            )}
+                      <div className={`p-2 border rounded-2xl relative cursor-pointer transition-all active:scale-[0.98] hover:opacity-95 ${T.card}`}>
+                        <span
+                          className="absolute top-2 right-2 inline-flex items-center justify-center rounded-full border-none p-1.5 shadow-sm"
+                          style={{ backgroundColor: "#e5f76e", color: "#000" }}
+                        >
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </span>
+                        <div className="flex gap-2 pr-8">
+                          <div className="h-16 w-16 rounded-xl overflow-hidden bg-white/10 shrink-0">
+                            {listing.images?.[0] && <img src={listing.images[0]} alt={listing.title} className="h-full w-full object-cover" />}
                           </div>
-                          {listing.hostDiscountPercent > 0 && (
-                            <p className={`text-[10px] line-through ${T.muted}`}>{formatPrice(listing.price)}</p>
-                          )}
+                          <div className="flex-1 min-w-0 flex flex-col justify-center">
+                            <p className="font-semibold text-sm leading-snug truncate">{listing.title}</p>
+                            <p className={`text-[10px] truncate ${T.muted}`}>{listing.location}</p>
+                            <div className="mt-1 flex flex-col">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-sm font-bold">{formatPrice(listing.discountedPrice)}</p>
+                                {listing.hostDiscountPercent > 0 && (
+                                  <p className={`text-[10px] font-bold ${T.discount}`}>−{listing.hostDiscountPercent}%</p>
+                                )}
+                              </div>
+                              {listing.hostDiscountPercent > 0 && (
+                                <p className={`text-[10px] line-through ${T.muted}`}>{formatPrice(listing.price)}</p>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </button>
-              ))}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-          {/* ── Fixed Footer at the absolute bottom ── */}
-          <div className={`pt-2 pb-4 text-center border-t ${T.footer} ${T.bg} z-0 shrink-0`}>
-            <div className="flex items-center justify-center gap-1.5">
-              <span className="text-xs">Powered by</span>
-              <a href="/" className="hover:opacity-80 transition-opacity">
-                <img src={logo}      alt="Xplorwing" className="h-4 dark:hidden" />
-                <img src={logoLight} alt="Xplorwing" className="h-4 hidden dark:block" />
-              </a>
+            {/* ── Fixed Footer at the absolute bottom ── */}
+            <div className={`pt-2 pb-4 text-center border-t ${T.footer} ${T.bg} z-0 shrink-0`}>
+              <div className="flex items-center justify-center gap-1.5">
+                <span className="text-xs">Powered by</span>
+                <a href="/" className="hover:opacity-80 transition-opacity">
+                  <img src={logo} alt="Xplorwing" className="h-4 dark:hidden" />
+                  <img src={logoLight} alt="Xplorwing" className="h-4 hidden dark:block" />
+                </a>
+              </div>
+              <p className="text-[10px] opacity-60">
+                &copy; {new Date().getFullYear()} WINGSNNESTS ECO SOLUTIONS PVT LTD. All rights reserved.
+              </p>
             </div>
-            <p className="text-[10px] opacity-60">
-              &copy; {new Date().getFullYear()} WINGSNNESTS ECO SOLUTIONS PVT LTD. All rights reserved.
-            </p>
-          </div>
 
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

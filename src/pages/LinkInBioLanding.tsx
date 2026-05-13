@@ -2,14 +2,16 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { DynamicLogo } from "@/components/DynamicLogo";
+import Header from "@/components/Header";
+import Marquee from "@/components/Marquee";
 import Footer from "@/components/Footer";
 import { Home, Building, Palmtree, Compass, Bike, Car, MapPin, User, LayoutDashboard } from "lucide-react";
 
 const globalStyles = `
-* { margin:0; padding:0; box-sizing:border-box; }
+* { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', system-ui, sans-serif; }
 :root {
   --g: #1a3d2b; --gm: #2a5c40; --g-light: #e8f2ec;
-  --lime: #c8e64c; --lime-d: #a8c230; --lime-p: #f0f8d0; --lime-glow: rgba(200,230,76,.3);
+  --lime: #c8e64c; --lime-d: #1e2013ff; --lime-p: #f0f8d0; --lime-glow: rgba(200,230,76,.3);
   --bg: #f8f6f0; --white: #fff;
   --border: #e5e1d4; --muted: #6b7c72; --text: #1a3d2b;
   --radius-card: 22px;
@@ -20,53 +22,15 @@ const globalStyles = `
 html, body, #root { 
   background: var(--bg); 
   color: var(--text); 
-  overflow-x: hidden; 
   width: 100%; 
   max-width: 100vw;
   margin: 0; 
   padding: 0; 
-  position: relative;
 }
 html { scroll-behavior: smooth; }
 #prog { position: fixed; top: 0; left: 0; height: 3px; background: linear-gradient(90deg, var(--lime), var(--gm)); width: 0; z-index: 300; transition: width .1s linear; }
 
-/* NAV */
-.nav { position: fixed; top: 0; left: 0; width: 100%; z-index: 200; height: 66px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; background: transparent; transition: background .4s, backdrop-filter .4s, box-shadow .4s; }
-.nav.solid { background: rgba(248,246,240,.95); backdrop-filter: blur(14px); box-shadow: 0 1px 0 var(--border); }
-.logo { font-size: 22px; font-weight: 800; color: #fff; text-decoration: none; display: flex; align-items: center; opacity: 0; animation: fadeD .6s .1s ease forwards; transition: color 0.4s; }
-.nav.solid .logo { color: var(--g); }
-.logo-o { color: var(--lime-d); }
-.nav-links { display: flex; gap: 28px; list-style: none; opacity: 0; animation: fadeD .6s .2s ease forwards; }
-.nav-links a { font-size: 14px; color: rgba(255,255,255,0.8); font-weight: 500; text-decoration: none; transition: color .2s; position: relative; display: flex; align-items: center; gap: 6px; }
-.nav.solid .nav-links a { color: var(--muted); }
-.nav-links a::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 0; height: 1.5px; background: var(--lime); transition: width .25s; }
-.nav-links a:hover { color: #fff; }
-.nav.solid .nav-links a:hover { color: var(--g); }
-.nav-links a:hover::after { width: 100%; }
-.nav-r { display: flex; gap: 10px; align-items: center; opacity: 0; animation: fadeD .6s .3s ease forwards; }
-.btn-ghost { font-size: 13.5px; font-weight: 500; color: #fff; padding: 8px 18px; border: 1.5px solid rgba(255,255,255,0.4); border-radius: 100px; text-decoration: none; transition: all .22s; }
-.btn-ghost:hover { background: #fff; color: var(--g); }
-.nav.solid .btn-ghost { color: var(--g); border-color: var(--g); }
-.nav.solid .btn-ghost:hover { background: var(--g); color: #fff; }
-.btn-lime { font-size: 13.5px; font-weight: 700; color: var(--g); background: var(--lime); padding: 9px 20px; border-radius: 100px; text-decoration: none; border: none; cursor: pointer; transition: all .22s; }
-.btn-lime:hover { background: var(--lime-d); transform: translateY(-1px); box-shadow: 0 6px 20px var(--lime-glow); }
-.hamburger { display: none; flex-direction: column; gap: 5px; background: none; border: none; cursor: pointer; padding: 4px; }
-.hamburger span { display: block; width: 22px; height: 2px; background: #fff; border-radius: 2px; transition: all .3s; }
-.nav.solid .hamburger span { background: var(--g); }
-.hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-.hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
-.hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-.mobile-menu { display: none; position: fixed; top: 66px; left: 0; right: 0; background: rgba(248,246,240,.98); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); padding: 20px 24px 28px; z-index: 190; transform: translateY(-10px); opacity: 0; transition: transform .3s ease, opacity .3s ease; pointer-events: none; }
-.mobile-menu.open { transform: translateY(0); opacity: 1; pointer-events: auto; display: block; }
-.mobile-menu ul { list-style: none; display: flex; flex-direction: column; gap: 2px; margin-bottom: 16px; }
-.mobile-menu ul li a { display: flex; align-items: center; gap: 12px; padding: 12px 4px; font-size: 16px; font-weight: 500; color: var(--text); text-decoration: none; border-bottom: 1px solid var(--border); transition: color .2s, padding-left .2s; }
-.m-nav-ic { width: 36px; height: 36px; border-radius: 10px; background: var(--g-light); color: var(--g); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.mobile-menu ul li a:hover { color: var(--g); padding-left: 8px; }
-.mobile-menu ul li a:hover .m-nav-ic { background: var(--g); color: #fff; }
-.mobile-menu-btns { display: flex; gap: 10px; margin-top: 12px; }
-.mobile-menu-btns a { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; border-radius: 100px; font-weight: 600; font-size: 14px; text-decoration: none; transition: all .2s; }
-.mb-ghost { border: 1.5px solid var(--g); color: var(--g); }
-.mb-lime { background: var(--lime); color: var(--g); }
+/* NAV removed - using standard Header */
 .marquee-section { width: 100%; overflow: hidden; background: var(--g); padding: 14px 0; }
 .trust-row { display: flex; gap: 24px; font-size: 14px; font-weight: 500; flex-wrap: wrap; }
 @media(max-width: 768px) { .trust-row { justify-content: center; gap: 16px; } }
@@ -159,7 +123,7 @@ html { scroll-behavior: smooth; }
   z-index: 10;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 130px 40px 90px;
+  padding: 60px 40px 90px;
   display: grid;
   grid-template-columns: 1fr 480px;
   gap: 60px;
@@ -167,7 +131,7 @@ html { scroll-behavior: smooth; }
   width: 100%;
 }
 .hero-left h1 {
- 
+  font-family: 'Inter', system-ui, sans-serif;
   font-size: clamp(32px, 5.5vw, 68px);
   font-weight: 800;
   line-height: 1.05;
@@ -506,22 +470,17 @@ html { scroll-behavior: smooth; }
 export default function LinkInBioLanding() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("hs");
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isSolid, setIsSolid] = useState(false);
 
 
 
   useEffect(() => {
     // SCROLL EVENTS
     const prog = document.getElementById('prog');
-    const nav = document.getElementById('nav');
-
     const handleScroll = () => {
       if (prog) {
         const h = document.body.scrollHeight - window.innerHeight;
         prog.style.width = (window.scrollY / h * 100) + '%';
       }
-      setIsSolid(window.scrollY > 50);
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -563,49 +522,8 @@ export default function LinkInBioLanding() {
       <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
       <div id="prog"></div>
 
-      <nav className={`nav ${isSolid ? 'solid' : ''}`} id="nav">
-        <Link to="/" className="flex items-center">
-          <DynamicLogo
-            forceTheme={isSolid ? "light" : "dark"}
-            lightHeightClass="h-7"
-            darkHeightClass="h-10"
-          />
-        </Link>
-        <ul className="nav-links">
-          <li><Link to="/destinations"><MapPin size={16} /> Destinations</Link></li>
-          <li><Link to="/stays"><Home size={16} /> Stays</Link></li>
-          <li><Link to="/hotels"><Building size={16} /> Hotels</Link></li>
-          <li><Link to="/resorts"><Palmtree size={16} /> Resorts</Link></li>
-          <li><Link to="/bikes"><Bike size={16} /> Bikes</Link></li>
-          <li><Link to="/cars"><Car size={16} /> Cars</Link></li>
-          <li><Link to="/experiences"><Compass size={16} /> Experiences</Link></li>
-        </ul>
-        <div className="nav-r">
-          {!user && <Link to="/auth" className="btn-ghost">Login</Link>}
-          {user && <Link to="/host" className="btn-ghost">Dashboard</Link>}
-          <Link to={user ? "/host" : "/auth"} className="btn-lime">Get started free</Link>
-          <button className={`hamburger ${isMenuOpen ? 'open' : ''}`} onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Menu">
-            <span></span><span></span><span></span>
-          </button>
-        </div>
-      </nav>
-
-      <div className={`mobile-menu ${isMenuOpen ? 'open' : ''}`} id="mobileMenu">
-        <ul>
-          <li><Link to="/destinations" onClick={() => setIsMenuOpen(false)}><span className="m-nav-ic"><MapPin size={18} /></span> Destinations</Link></li>
-          <li><Link to="/stays" onClick={() => setIsMenuOpen(false)}><span className="m-nav-ic"><Home size={18} /></span> Stays</Link></li>
-          <li><Link to="/hotels" onClick={() => setIsMenuOpen(false)}><span className="m-nav-ic"><Building size={18} /></span> Hotels</Link></li>
-          <li><Link to="/resorts" onClick={() => setIsMenuOpen(false)}><span className="m-nav-ic"><Palmtree size={18} /></span> Resorts</Link></li>
-          <li><Link to="/bikes" onClick={() => setIsMenuOpen(false)}><span className="m-nav-ic"><Bike size={18} /></span> Bikes</Link></li>
-          <li><Link to="/cars" onClick={() => setIsMenuOpen(false)}><span className="m-nav-ic"><Car size={18} /></span> Cars</Link></li>
-          <li><Link to="/experiences" onClick={() => setIsMenuOpen(false)}><span className="m-nav-ic"><Compass size={18} /></span> Experiences</Link></li>
-        </ul>
-        <div className="mobile-menu-btns">
-          {!user && <Link to="/auth" className="mb-ghost" onClick={() => setIsMenuOpen(false)}><User size={18} /> Login</Link>}
-          {user && <Link to="/host" className="mb-ghost" onClick={() => setIsMenuOpen(false)}><LayoutDashboard size={18} /> Dashboard</Link>}
-          <Link to={user ? "/host" : "/auth"} className="mb-lime" onClick={() => setIsMenuOpen(false)}>Get started free</Link>
-        </div>
-      </div>
+      <Marquee />
+      <Header />
 
       <section className="hero-section">
         <div className="hero-bg">
@@ -633,7 +551,7 @@ export default function LinkInBioLanding() {
             </h1>
             <p>Bookings, stays, rentals and experiences — all inside one smart travel storefront. Live in minutes. Zero coding required.</p>
             <div className="hero-ctas">
-              <Link to={user ? "/host" : "/auth"} className="cta-primary">Create Your Wing Bio<span style={{ fontSize: '18px' }}>→</span></Link>
+              <Link to={user ? "/host" : "/host/signup"} className="cta-primary">Create Your Wing Bio<span style={{ fontSize: '18px' }}>→</span></Link>
               <Link to="/p/suresh-reddy" className="cta-secondary">View Demo</Link>
             </div>
             <div className="trust-row" style={{ color: 'rgba(255,255,255,0.7)', marginTop: '32px' }}>
@@ -646,7 +564,7 @@ export default function LinkInBioLanding() {
           <div className="hero-right">
             <div className="glass-badge badge-1">⭐ 4.9 Rating</div>
             <div className="glass-badge badge-2">🔥 120+ Guests Hosted</div>
-            <div className="glass-badge badge-3">💬 WhatsApp Bookings</div>
+            <div className="glass-badge badge-3">💬 More earnings</div>
             <div className="glass-badge badge-4">🏕 Stay curators</div>
 
 
@@ -675,11 +593,11 @@ export default function LinkInBioLanding() {
                       <p>₹1,200 · Innova Crysta</p>
                     </div>
                   </div>
-                  <div className="m-card" style={{ background: '#25D366', color: '#fff' }}>
-                    <div className="m-card-icon" style={{ background: 'transparent' }}>💬</div>
+                  <div className="m-card">
+                    <div className="m-card-icon">🌄</div>
                     <div className="m-card-info">
-                      <h5 style={{ color: '#fff' }}>Chat on WhatsApp</h5>
-                      <p style={{ color: 'rgba(255,255,255,0.8)' }}>Instant replies</p>
+                      <h5>Sunset Trek</h5>
+                      <p>₹1,500 · 4 Hours</p>
                     </div>
                   </div>
                   <div className="m-card">
@@ -821,20 +739,20 @@ export default function LinkInBioLanding() {
         </div>
       </section>
 
-      <div className="pricing-wrap">
+      {/* <div className="pricing-wrap">
         <div className="pricing-inner">
           <div className="section-top rv"><div className="eyebrow">Pricing</div><h2>Simple, transparent pricing</h2><p>Start free. Pay only when you earn — no subscriptions, no hidden fees.</p></div>
           <div className="p-grid">
             <div className="pc rv rv-delay-1">
               <div className="p-tier">Wing Starter</div><div className="p-price">Free</div><div className="p-cycle">Forever, no card required</div>
               <ul className="p-list"><li>Up to 10 listings</li><li>Wing Bio Public page</li><li>Wing Pass QR code</li><li>10% fee on direct bookings</li><li>Marketplace not included</li></ul>
-              <Link to={user ? "/host" : "/auth"} className="p-btn">Get started free</Link>
+              <Link to={user ? "/host" : "/host/signup"} className="p-btn">Get started free</Link>
             </div>
             <div className="pc hot rv rv-delay-2">
               <div className="hot-badge">MOST POPULAR</div>
               <div className="p-tier hi">Wing Pro</div><div className="p-price">₹499<span style={{ fontSize: '17px', fontWeight: 400 }}>/mo</span></div><div className="p-cycle">Best for active hosts</div>
               <ul className="p-list"><li>Unlimited listings</li><li>Marketplace opt-in (20% on marketplace)</li><li>Analytics dashboard</li><li>Priority support</li><li>10% fee on direct bookings</li></ul>
-              <Link to={user ? "/host" : "/auth"} className="p-btn">Start Wing Pro</Link>
+              <Link to={user ? "/host" : "/host/signup"} className="p-btn">Start Wing Pro</Link>
             </div>
             <div className="pc rv rv-delay-3">
               <div className="p-tier">Wing Franchise</div><div className="p-price">Custom</div><div className="p-cycle">For large operators</div>
@@ -848,14 +766,14 @@ export default function LinkInBioLanding() {
           <div className="num-i rv rv-delay-2"><span className="num-n">10 min</span><span className="num-l">average onboarding time</span></div>
           <div className="num-i rv rv-delay-4"><span className="num-n">10%</span><span className="num-l">only on direct bookings earned</span></div>
         </div>
-      </div>
+      </div> */}
 
       <section className="final">
         <div className="final-orb"></div>
         <h2 className="rv">Ready to create your Wing Bio?</h2>
         <p className="rv rv-delay-1">Join Xplorwing as a host — your storefront goes live in minutes, for free.</p>
         <div className="final-btns rv rv-delay-2">
-          <Link to={user ? "/host" : "/auth"} className="fcta">Get started as a host<span className="fcta-arrow">→</span></Link>
+          <Link to={user ? "/host" : "/host/signup"} className="fcta">Get started as a host<span className="fcta-arrow">→</span></Link>
           <a href="https://wa.me/919422799420?text=Hi%2C%20I%20want%20to%20create%20my%20Wing%20Link" className="fcta-wa" target="_blank" rel="noreferrer">💬 Chat on WhatsApp</a>
         </div>
       </section>

@@ -120,7 +120,9 @@ const Stays = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6">
-            {stays.map((stay, index) => (
+            {stays
+              .filter(stay => !stay.title.toLowerCase().includes("comfy homestay"))
+              .map((stay, index) => (
               <ListingCard
                 key={stay.id}
                 image={resolveListingCardImage(stay.images, "stay")}

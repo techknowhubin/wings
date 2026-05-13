@@ -376,61 +376,6 @@ export default function HostOnboarding() {
     return true;
   };
 
-  const fillDummyData = () => {
-    setBiz({
-      hostType: "business",
-      fullName: "Rohan Mehta",
-      displayName: "Rohan Travels",
-      phone: "9876543210",
-      altPhone: "9123456780",
-      email: user?.email || "host.demo@xplorwing.com",
-      businessName: "Rohan Eco Travels Pvt Ltd",
-      businessType: "Pvt Ltd",
-      gstNumber: "27ABCDE1234F1Z5",
-      msmeNumber: "UDYAM-MH-12-1234567",
-      street: "12 Green Valley Road",
-      city: "Manali",
-      state: "Himachal Pradesh",
-      pin: "175131",
-      serviceTypes: ["Eco Stay", "Self-Drive Cab", "Travel Package"],
-      listingCount: "2-5",
-    });
-
-    setBank({
-      accountHolderName: "Rohan Mehta",
-      bankName: "State Bank of India",
-      accountNumber: "123456789012",
-      confirmAccountNumber: "123456789012",
-      ifscCode: "SBIN0001234",
-      accountType: "current",
-      chequeFile: undefined,
-      chequePreview: undefined,
-    });
-
-    setIfscData({
-      bank: "State Bank of India",
-      branch: "Manali",
-      city: "Manali",
-    });
-
-    setIdentity({
-      aadhaarNumber: "123412341234",
-      panNumber: "ABCDE1234F",
-      aadhaarVerified: true,
-      panVerified: true,
-      agreed: true,
-      digiPhone: "9876543210",
-      digiOtp: "123456",
-      digiOtpSent: true,
-      aadhaarFrontFile: undefined,
-      aadhaarBackFile: undefined,
-      panFile: undefined,
-      gstCertFile: undefined,
-      businessRegFile: undefined,
-    });
-
-    toast.success("Dummy onboarding data applied.");
-  };
 
   const handleComplete = async () => {
     if (!user) return;
@@ -527,16 +472,6 @@ export default function HostOnboarding() {
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-6 text-base font-semibold"
                   >
                     Get Started <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      fillDummyData();
-                      setStep(4);
-                    }}
-                    className="w-full py-6 text-base font-semibold"
-                  >
-                    Use Dummy Data & Skip
                   </Button>
                 </CardContent>
               </Card>

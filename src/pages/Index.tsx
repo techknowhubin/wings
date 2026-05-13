@@ -9,7 +9,7 @@ import CustomerTestimonials from "@/components/CustomerTestimonials";
 import HomeFAQ from "@/components/HomeFAQ";
 import CabFareSection from "@/components/CabFareSection";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { ChevronRight, ChevronLeft, Calendar, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -247,6 +247,36 @@ const Index = () => {
     loadInitialData();
   }, []);
 
+  const processedDestinations = useMemo(() => {
+    const allListings = [
+      ...stays.map(s => ({ ...s, price: s.price_per_night })),
+      ...bikes.map(b => ({ ...b, price: b.price_per_day })),
+      ...cars.map(c => ({ ...c, price: c.price_per_day })),
+      ...hotels.map(h => ({ ...h, price: h.price_per_night })),
+      ...resorts.map(r => ({ ...r, price: r.price_per_night }))
+    ];
+    
+    return destinations.map(dest => {
+      const destListings = allListings.filter(l => 
+        l.location?.toLowerCase().includes(dest.title.toLowerCase())
+      );
+      
+      if (destListings.length === 0) return null;
+
+      const prices = destListings
+        .map(l => Number(l.price))
+        .filter(p => !isNaN(p) && p > 0);
+      
+      const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+      
+      return {
+        ...dest,
+        subtitle: `Over ${destListings.length} stays and vehicles`,
+        priceRange: minPrice > 0 ? `Starting ₹${minPrice.toLocaleString()}/night` : dest.priceRange
+      };
+    }).filter(Boolean);
+  }, [stays, bikes, cars, hotels, resorts]);
+
   return (
     <div className="min-h-screen">
       <Marquee />
@@ -364,12 +394,14 @@ const Index = () => {
         <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.5 }} viewport={{ once: true }}>
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-3xl font-bold text-foreground">Explore India</h2>
-            <Link to="/destinations" className="flex items-center gap-1 text-sm font-medium text-primary-text hover:underline">
-              See more <ChevronRight className="h-4 w-4" />
-            </Link>
+            {processedDestinations.length > 6 && (
+              <Link to="/destinations" className="flex items-center gap-1 text-sm font-medium text-primary-text hover:underline">
+                See more <ChevronRight className="h-4 w-4" />
+              </Link>
+            )}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {destinations.map((dest, index) => (
+            {processedDestinations.map((dest: any, index) => (
               <DestinationCard
                 key={dest.title}
                 image={dest.image}
@@ -391,7 +423,9 @@ const Index = () => {
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.5 }} viewport={{ once: true }}>
             <h2 className="text-3xl font-bold text-foreground mb-8">Featured Homestays</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
-              {stays.map((stay, index) => (
+              {stays
+                .filter(stay => !stay.title.toLowerCase().includes("comfy homestay"))
+                .map((stay, index) => (
                 <ListingCard key={stay.id} id={stay.id} image={resolveListingCardImage(stay.images, "stay")} title={stay.title} location={stay.location} price={`₹${stay.price_per_night}`} rating={Number(stay.rating) || 0} type="stay" delay={index * 0.05} />
               ))}
             </div>

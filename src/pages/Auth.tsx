@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, User, PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -158,11 +158,15 @@ const Auth = () => {
   const { signUp, signIn, signInWithProvider, signInWithPopup, signInWithOtp, verifyOtp, user, getUserRole } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   // Guard: only route once per login event, ignore subsequent flickers
   const hasRoutedRef = useRef(false);
 
+  const isHostSignupPath = location.pathname === "/host/signup";
+  const isHostSigninPath = location.pathname === "/host/signin";
+
   // View state
-  const [authMethod, setAuthMethod] = useState<"whatsapp" | "email">("whatsapp");
+  const [authMethod, setAuthMethod] = useState<"whatsapp" | "email">("email");
 
   // WhatsApp state
   const [waNumber, setWaNumber] = useState("");
@@ -181,14 +185,43 @@ const Auth = () => {
   // WhatsApp fallback modal
   const [showWaModal, setShowWaModal] = useState(false);
 
+  const [searchParams] = useSearchParams();
+  const targetRole = (isHostSignupPath || isHostSigninPath) ? "host" : searchParams.get("role");
+
+  // Set initial mode based on path
+  useEffect(() => {
+    if (isHostSigninPath) {
+      setIsLoginMode(true);
+    } else if (isHostSignupPath) {
+      setIsLoginMode(false);
+    }
+  }, [isHostSigninPath, isHostSignupPath]);
+
   /* ─── routing ─── */
   const handleSuccessRoleRouting = async (currentUser = user) => {
     setLoading(true);
     const r = await getUserRole();
+    const savedRole = localStorage.getItem("pending_role");
+    
     if (r === "admin") {
       navigate("/admin");
     } else if (r === "host") {
       navigate("/host");
+    } else if (targetRole === "host" || savedRole === "host") {
+      // User specifically clicked "Become a host"
+      localStorage.removeItem("pending_role");
+      
+      // Safety check: if they are already a host but r was null for some reason, double check
+      if (r !== "host") {
+        const { data: hostProfile } = await supabase.from('host_profiles').select('id').eq('id', currentUser?.id).maybeSingle();
+        if (hostProfile) {
+          navigate("/host");
+          setLoading(false);
+          return;
+        }
+      }
+      
+      navigate("/onboarding/host");
     } else {
       // Regular user — check if onboarding is done
       const { data: profile } = await supabase
@@ -233,6 +266,9 @@ const Auth = () => {
   /* ─── WhatsApp handlers ─── */
   const handleSendWaOtp = async (e?: React.FormEvent) => {
     e?.preventDefault();
+    if (targetRole) {
+      localStorage.setItem("pending_role", targetRole);
+    }
     if (waNumber.replace(/\D/g, "").length !== 10) {
       toast({ variant: "destructive", title: "Invalid Number", description: "Please enter a valid 10-digit number." });
       return;
@@ -264,7 +300,13 @@ const Auth = () => {
       }
       // Route immediately based on server-provided flag — don't wait for useEffect
       if ((data as any)?.is_new_user) {
-        navigate("/onboarding/user");
+        const savedRole = localStorage.getItem("pending_role");
+        if (targetRole === 'host' || savedRole === 'host') {
+          localStorage.removeItem("pending_role");
+          navigate("/onboarding/host");
+        } else {
+          navigate("/onboarding/user");
+        }
       }
       // Returning users are routed by the useEffect watching `user` state
     }
@@ -272,8 +314,11 @@ const Auth = () => {
 
   /* ─── Google ─── */
   const handleGoogleSignIn = async () => {
+    if (targetRole) {
+      localStorage.setItem("pending_role", targetRole);
+    }
     setLoading(true);
-    const { error } = await signInWithPopup("google");
+    const { error } = await signInWithProvider("google");
     setLoading(false);
     if (error) {
       // If the email is already registered via email/password, guide user
@@ -296,6 +341,9 @@ const Auth = () => {
   /* ─── Email ─── */
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (targetRole) {
+      localStorage.setItem("pending_role", targetRole);
+    }
     setLoading(true);
     if (isLoginMode) {
       try {
@@ -310,7 +358,8 @@ const Auth = () => {
     } else {
       try {
         signupSchema.parse({ fullName, email, password });
-        const { data, error } = await signUp(email, password, fullName, "user");
+        const roleToAssign = targetRole === 'host' ? 'host' : 'user';
+        const { data, error } = await signUp(email, password, fullName, roleToAssign);
         if (error) throw error;
         if (data.session) {
           toast({ title: "Account Created!", description: "Welcome to Xplorwing." });
@@ -457,9 +506,7 @@ const Auth = () => {
             <h1 className="text-[1.5rem] font-extrabold text-gray-900 tracking-tight leading-tight">
               {authMethod === "whatsapp"
                 ? (isOtpSent ? "Enter verification code" : "Sign in with WhatsApp")
-                : verificationPending
-                  ? "Check your inbox"
-                  : isLoginMode ? "Sign in with email" : "Create your account"
+                : isLoginMode ? "Sign in with email" : "Create your account"
               }
             </h1>
             <p className="text-gray-500 mt-1.5 text-[13px] leading-relaxed max-w-[260px] mx-auto">
@@ -467,11 +514,9 @@ const Auth = () => {
                 ? (isOtpSent
                   ? "A 6-digit code was sent to your WhatsApp."
                   : "Enter your mobile number to get a secure verification code.")
-                : verificationPending
-                  ? `We've sent a link to ${email}`
-                  : isLoginMode
-                    ? "Welcome back! Enter your credentials."
-                    : "Join the community of explorers."
+                : isLoginMode
+                  ? "Welcome back! Enter your credentials."
+                  : "Join the community of explorers."
               }
             </p>
           </div>
@@ -504,12 +549,18 @@ const Auth = () => {
               }}
             >
               {verificationPending ? (
-                <div className="flex flex-col items-center py-6 text-center space-y-3">
-                  <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center">
-                    <Mail className="w-6 h-6 text-gray-600" />
+                <div className="flex flex-col items-center py-6 text-center space-y-4">
+                  <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center">
+                    <Mail className="w-8 h-8 text-[#115f10]" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-gray-900">Check your email</h3>
+                    <p className="text-xs text-gray-500 max-w-[200px]">
+                      We've sent a verification link to <span className="font-semibold text-gray-900">{email}</span>
+                    </p>
                   </div>
                   <p className="text-[10px] uppercase tracking-[0.2em] text-[#115f10] font-bold animate-pulse">
-                    Waiting for verification…
+                    Waiting for confirmation…
                   </p>
                 </div>
               ) : (
@@ -571,7 +622,15 @@ const Auth = () => {
                     <p className="text-center">
                       <button
                         type="button"
-                        onClick={() => setIsLoginMode(!isLoginMode)}
+                        onClick={() => {
+                          if (isHostSignupPath) {
+                            navigate("/host/signin");
+                          } else if (isHostSigninPath) {
+                            navigate("/host/signup");
+                          } else {
+                            setIsLoginMode(!isLoginMode);
+                          }
+                        }}
                         className="text-[11px] text-[#115f10] font-semibold hover:opacity-80 transition-opacity"
                       >
                         {isLoginMode ? "Don't have an account? " : "Already have an account? "}
@@ -595,17 +654,16 @@ const Auth = () => {
 
           {/* Social row */}
           <div className="grid grid-cols-3 gap-3">
-            {/* WhatsApp toggle */}
+            {/* Email toggle */}
             <button
               onClick={() => {
-                setAuthMethod("whatsapp");
+                setAuthMethod("email");
+                setIsOtpSent(false);
               }}
-              className={`social-btn ${authMethod === "whatsapp" ? "active" : ""}`}
-              title="WhatsApp"
+              className={`social-btn ${authMethod === "email" ? "active" : ""}`}
+              title="Email"
             >
-              <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill={authMethod === "whatsapp" ? "#fff" : "#25D366"}>
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-              </svg>
+              <Mail className="h-[18px] w-[18px]" />
             </button>
 
             {/* Google */}
@@ -618,16 +676,20 @@ const Auth = () => {
               </svg>
             </button>
 
-            {/* Email toggle */}
+            {/* WhatsApp toggle */}
             <button
               onClick={() => {
-                setAuthMethod(authMethod === "whatsapp" ? "email" : "whatsapp");
-                setIsOtpSent(false);
+                toast({
+                  title: "Coming Soon",
+                  description: "WhatsApp login is currently under development.",
+                });
               }}
-              className={`social-btn ${authMethod === "email" ? "active" : ""}`}
-              title="Email"
+              className={`social-btn ${authMethod === "whatsapp" ? "active" : ""}`}
+              title="WhatsApp"
             >
-              <Mail className="h-[18px] w-[18px]" />
+              <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill={authMethod === "whatsapp" ? "#fff" : "#25D366"}>
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+              </svg>
             </button>
           </div>
 

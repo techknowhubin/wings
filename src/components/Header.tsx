@@ -4,7 +4,7 @@ import { Moon, Sun, Menu, User, Heart, X, Home, Car, Bike, Compass, MapPin, Chev
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/ThemeProvider";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import MegaMenu from "./MegaMenu";
 import { DynamicLogo } from "./DynamicLogo";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import ButtonWithIcon from "@/components/ui/button-with-icon";
 
 
 
@@ -38,6 +39,9 @@ const Header = () => {
   const { data: profile } = useProfile(user?.id);
   const [role, setRole] = useState<string | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const isDarkHeader = location.pathname === "/link-in-bio" || location.pathname === "/";
 
   // Derive display name — prefer profile display_name/full_name, fall back to phone, never show derived email
   const isWhatsAppUser = user?.user_metadata?.phone_provider === "whatsapp";
@@ -70,7 +74,7 @@ const Header = () => {
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.5 }}
-        className="sticky top-0 z-50 glass-effect"
+        className="sticky top-[32px] z-[90] glass-effect"
       >
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -197,7 +201,7 @@ const Header = () => {
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={handleSignOut}
                       className="rounded-lg cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive"
                     >
@@ -207,14 +211,26 @@ const Header = () => {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <Link to="/login">
-                  <Button variant="ghost" className="gap-2 rounded-full p-1 pr-3 hover:bg-muted/60">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 border border-border flex items-center justify-center overflow-hidden">
-                      <User className="h-4 w-4 text-primary-text" />
-                    </div>
-                    <span className="hidden md:inline text-sm font-medium text-foreground">Login</span>
-                  </Button>
-                </Link>
+                <>
+                  <Link to="/auth">
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "rounded-full px-5 transition-all font-semibold",
+                        isDarkHeader
+                          ? "bg-transparent text-black border-black hover:bg-black/5 hover:text-black"
+                          : "border-border text-foreground hover:bg-muted/50"
+                      )}
+                    >
+                      Login/Signup
+                    </Button>
+                  </Link>
+                  <div className="hidden md:flex ml-2">
+                    <Link to={user ? "/onboarding/host" : "/host/signup"}>
+                      <ButtonWithIcon label="Become a host" />
+                    </Link>
+                  </div>
+                </>
               )}
 
               <Button
@@ -328,9 +344,9 @@ const Header = () => {
                         </Button>
                       </Link>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => { handleSignOut(); setMobileOpen(false); }} 
+                    <Button
+                      variant="ghost"
+                      onClick={() => { handleSignOut(); setMobileOpen(false); }}
                       className="w-full rounded-xl text-destructive hover:bg-destructive/10 gap-2 py-5"
                     >
                       <LogOut className="h-4 w-4" />
@@ -339,16 +355,14 @@ const Header = () => {
                   </div>
                 ) : (
                   <>
-                    <Link to="/login" onClick={() => setMobileOpen(false)}>
+                    <Link to="/auth" onClick={() => setMobileOpen(false)}>
                       <Button variant="gradient" className="w-full rounded-full gap-2">
                         <User className="h-4 w-4" />
                         Login / Sign Up
                       </Button>
                     </Link>
-                    <Link to="/host/dashboard" onClick={() => setMobileOpen(false)}>
-                      <Button variant="outline" className="w-full rounded-full mt-2">
-                        Become a Host
-                      </Button>
+                    <Link to="/auth?role=host" onClick={() => setMobileOpen(false)}>
+                      <ButtonWithIcon label="Become a Host" className="w-full h-12" />
                     </Link>
                   </>
                 )}

@@ -205,21 +205,16 @@ const Auth = () => {
     if (r === "admin") {
       navigate("/admin");
     } else if (r === "host") {
-      navigate("/host");
+      // Check if they have finished onboarding by seeing if a host_profile exists
+      const { data: hostProfile } = await supabase.from('host_profiles').select('id').eq('id', currentUser?.id).maybeSingle();
+      if (hostProfile) {
+        navigate("/host");
+      } else {
+        navigate("/onboarding/host");
+      }
     } else if (targetRole === "host" || savedRole === "host") {
       // User specifically clicked "Become a host"
       localStorage.removeItem("pending_role");
-
-      // Safety check: if they are already a host but r was null for some reason, double check
-      if (r !== "host") {
-        const { data: hostProfile } = await supabase.from('host_profiles').select('id').eq('id', currentUser?.id).maybeSingle();
-        if (hostProfile) {
-          navigate("/host");
-          setLoading(false);
-          return;
-        }
-      }
-
       navigate("/onboarding/host");
     } else {
       // Regular user — check if onboarding is done

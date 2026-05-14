@@ -212,31 +212,18 @@ const Header = () => {
                 </DropdownMenu>
               ) : (
                 <>
-<<<<<<< HEAD
                   <Link to="/auth" className="hidden md:flex">
                     <Button
                       variant="outline"
-=======
-                  <Link to="/auth">
-                    <motion.button
->>>>>>> 98627eb92a58440c0b6edec7c060297253dd7370
                       className={cn(
-                        "relative px-5 py-2 text-sm font-medium rounded-full cursor-pointer",
-                        "bg-transparent border-none outline-none",
-                        "transition-colors duration-200",
+                        "rounded-full px-5 transition-all font-semibold",
                         isDarkHeader
-                          ? "text-black/80 hover:text-black"
-                          : "text-foreground/70 hover:text-foreground"
+                          ? "bg-transparent text-black border-black hover:bg-black/5 hover:text-black"
+                          : "border-border text-foreground hover:bg-muted/50"
                       )}
                     >
                       Login/Signup
-                      <motion.span
-                        className="absolute bottom-1 left-1/2 -translate-x-1/2 h-[2px] rounded-full bg-primary"
-                        initial={{ width: 0 }}
-                        whileHover={{ width: "60%" }}
-                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                      />
-                    </motion.button>
+                    </Button>
                   </Link>
                   <div className="hidden md:flex ml-2">
                     <Link to={user ? "/onboarding/host" : "/host/signup"}>

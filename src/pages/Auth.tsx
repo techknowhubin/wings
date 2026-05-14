@@ -649,8 +649,6 @@ const Auth = () => {
                       We've sent a verification link to <span className="font-semibold text-gray-900">{email}</span>
                     </p>
                   </div>
-<<<<<<< HEAD
-                  
                   <div className="pt-2 flex flex-col items-center gap-3">
                     <button
                       type="button"
@@ -669,11 +667,6 @@ const Auth = () => {
                       Use a different email
                     </button>
                   </div>
-=======
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-[#e5f76e] font-bold animate-pulse">
-                    Waiting for confirmation…
-                  </p>
->>>>>>> 98627eb92a58440c0b6edec7c060297253dd7370
                 </div>
               ) : (
                 <form onSubmit={handleEmailAuth} className="flex flex-col justify-center space-y-3" style={{ minHeight: "250px" }}>

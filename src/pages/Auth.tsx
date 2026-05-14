@@ -239,17 +239,29 @@ const Auth = () => {
 
   useEffect(() => {
     // 1. Check for confirmation link in URL (hash or query)
-    const hasConfirmParams = location.hash.includes("access_token") || 
-                             location.hash.includes("type=signup") || 
-                             location.hash.includes("type=recovery") ||
-                             location.search.includes("type=signup");
+    const hash = location.hash;
+    const search = location.search;
+    
+    const hasConfirmParams = hash.includes("access_token") || 
+                             hash.includes("type=signup") || 
+                             hash.includes("type=recovery") ||
+                             hash.includes("type=invite") ||
+                             search.includes("type=signup") ||
+                             search.includes("type=recovery") ||
+                             search.includes("code="); // For PKCE flow if enabled
 
     if (hasConfirmParams && !confirmationSuccess) {
-      console.log("[Auth] Confirmation detected, showing success screen.");
+      console.log("[Auth] Confirmation detected in URL:", { hash: hash.substring(0, 20) + "...", search });
       setConfirmationSuccess(true);
       setVerificationPending(false);
       setSuccessCountdown(5);
-      if (user) signOut(); // Clear session to allow manual sign-in as requested
+      
+      // If we landed here with a session, clear it as we want the user to manually login 
+      // after seeing the success message (as requested for better UX flow)
+      if (user) {
+        console.log("[Auth] Clearing temporary session after confirmation");
+        signOut();
+      }
       return;
     }
 

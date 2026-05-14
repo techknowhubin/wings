@@ -12,7 +12,7 @@ import JourneyCTA from "@/components/JourneyCTA";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { ChevronRight, ChevronLeft, Calendar, User } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import heroImage from "@/assets/hero-travel.jpg";
 import heroXplorwing from "@/assets/hero-xplorwing.jpg";
@@ -119,6 +119,23 @@ const Index = () => {
   const [resorts, setResorts] = useState<any[]>([]);
   const [blogs, setBlogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Detect if we landed here from an email confirmation link
+    // sometimes Supabase redirects to the Site URL (Home) instead of /auth
+    const hash = location.hash;
+    const search = location.search;
+    const hasConfirmParams = hash.includes("access_token") || 
+                             hash.includes("type=signup") || 
+                             search.includes("type=signup");
+
+    if (hasConfirmParams) {
+      console.log("[Index] Auth confirmation detected on home page, redirecting to /auth");
+      navigate("/auth" + search + hash, { replace: true });
+    }
+  }, [location, navigate]);
   const [categoryPage, setCategoryPage] = useState(0);
   const [heroSlide, setHeroSlide] = useState(0);
   const heroImages = [heroImage, heroXplorwing, heroTajmahal, heroOutstationCabs];

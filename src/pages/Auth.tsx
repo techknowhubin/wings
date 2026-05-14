@@ -265,7 +265,8 @@ const Auth = () => {
       return;
     }
 
-    if (confirmationSuccess) return;
+    // BLOCK standard routing if we are in the middle of a confirmation or recovery flow
+    if (confirmationSuccess || hasConfirmParams) return;
 
     // 2. Standard session handling
     if (!user) {
@@ -285,7 +286,7 @@ const Auth = () => {
       handleSuccessRoleRouting(user);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, verificationPending, confirmationSuccess, location.hash, location.search]);
+  }, [user, verificationPending, confirmationSuccess, location.hash, location.search, location.pathname]);
 
   /* ─── Success Countdown ─── */
   useEffect(() => {

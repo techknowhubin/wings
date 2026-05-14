@@ -8,6 +8,7 @@ import ListingCard from "@/components/ListingCard";
 import CustomerTestimonials from "@/components/CustomerTestimonials";
 import HomeFAQ from "@/components/HomeFAQ";
 import CabFareSection from "@/components/CabFareSection";
+import JourneyCTA from "@/components/JourneyCTA";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { ChevronRight, ChevronLeft, Calendar, User } from "lucide-react";
@@ -545,12 +546,8 @@ const Index = () => {
 
       {/* Footer CTA */}
       <section className="container mx-auto px-4 py-24">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} viewport={{ once: true }} className="card-gradient rounded-3xl p-12 text-center">
-          <h2 className="text-4xl font-bold text-foreground mb-4">Ready to Start Your Journey?</h2>
-          <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">Join thousands of travelers discovering unique experiences around India</p>
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="bg-primary text-primary-foreground px-8 py-4 rounded-full font-semibold text-lg hover:bg-accent transition-colors">
-            Get Started
-          </motion.button>
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} viewport={{ once: true }}>
+          <JourneyCTA />
         </motion.div>
       </section>
 

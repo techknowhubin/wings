@@ -212,7 +212,7 @@ const Header = () => {
                 </DropdownMenu>
               ) : (
                 <>
-                  <Link to="/auth">
+                  <Link to="/auth" className="hidden md:flex">
                     <Button
                       variant="outline"
                       className={cn(
@@ -238,9 +238,9 @@ const Header = () => {
                 size="icon"
                 className="md:hidden rounded-full"
                 aria-label="Menu"
-                onClick={() => setMobileOpen(true)}
+                onClick={() => setMobileOpen(!mobileOpen)}
               >
-                <Menu className="h-5 w-5" />
+                {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </Button>
             </div>
           </div>
@@ -257,7 +257,7 @@ const Header = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-[60] bg-foreground/20 backdrop-blur-sm"
+              className="fixed inset-0 z-[100] bg-foreground/20 backdrop-blur-sm"
               onClick={() => setMobileOpen(false)}
             />
 
@@ -267,7 +267,7 @@ const Header = () => {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="fixed top-0 right-0 bottom-0 z-[70] w-[80vw] max-w-sm bg-card border-l border-border shadow-2xl flex flex-col"
+              className="fixed top-0 right-0 bottom-0 z-[110] w-[80vw] max-w-sm bg-card border-l border-border shadow-2xl flex flex-col"
             >
               {/* Header */}
               <div className="flex items-center justify-between p-4 border-b border-border">
@@ -311,9 +311,9 @@ const Header = () => {
               </div>
 
               {/* Bottom actions */}
-              <div className="p-4 border-t border-border space-y-3">
+              <div className="p-4 border-t border-border flex flex-col gap-3">
                 {user ? (
-                  <div className="space-y-3">
+                  <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/50">
                       <Avatar className="h-10 w-10 border border-border">
                         <AvatarImage src={profile?.profile_image || user.user_metadata?.avatar_url || ""} />
@@ -354,17 +354,17 @@ const Header = () => {
                     </Button>
                   </div>
                 ) : (
-                  <>
-                    <Link to="/auth" onClick={() => setMobileOpen(false)}>
-                      <Button variant="gradient" className="w-full rounded-full gap-2">
+                  <div className="flex flex-col gap-3">
+                    <Link to="/auth" className="w-full" onClick={() => setMobileOpen(false)}>
+                      <Button variant="gradient" className="w-full rounded-full gap-2 py-6">
                         <User className="h-4 w-4" />
                         Login / Sign Up
                       </Button>
                     </Link>
-                    <Link to="/auth?role=host" onClick={() => setMobileOpen(false)}>
+                    <Link to="/auth?role=host" className="w-full" onClick={() => setMobileOpen(false)}>
                       <ButtonWithIcon label="Become a Host" className="w-full h-12" />
                     </Link>
-                  </>
+                  </div>
                 )}
               </div>
             </motion.div>

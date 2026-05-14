@@ -16,6 +16,7 @@ interface AuthContextValue {
   getUserRole: () => Promise<'user' | 'host' | 'admin' | 'moderator' | null>;
   signInWithOtp: (phone: string) => Promise<{ error: Error | null }>;
   verifyOtp: (phone: string, token: string) => Promise<{ data: any; error: any }>;
+  resendEmail: (email: string) => Promise<{ error: any }>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -75,9 +76,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     });
 
-    if (!error && data.user) {
-      await supabase.from('user_roles').insert({ user_id: data.user.id, role });
-    }
+    // Manual insert removed: Profiles and roles are created by the 'handle_new_user' trigger.
+    // This avoids creating records for unconfirmed users prematurely.
+
 
     return { data, error };
   };
@@ -215,6 +216,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const resendEmail = async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth`,
+      },
+    });
+    return { error };
+  };
+
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
@@ -231,6 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         getUserRole,
         signInWithOtp,
         verifyOtp,
+        resendEmail,
       }}
     >
       {children}

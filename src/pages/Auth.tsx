@@ -155,7 +155,7 @@ const styles = `
 
 const Auth = () => {
   const [loading, setLoading] = useState(false);
-  const { signUp, signIn, signInWithProvider, signInWithPopup, signInWithOtp, verifyOtp, user, getUserRole } = useAuth();
+  const { signUp, signIn, signOut, resendEmail, signInWithProvider, signInWithPopup, signInWithOtp, verifyOtp, user, getUserRole } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -181,6 +181,9 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [verificationPending, setVerificationPending] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(0);
+  const [confirmationSuccess, setConfirmationSuccess] = useState(false);
+  const [successCountdown, setSuccessCountdown] = useState(5);
 
   // WhatsApp fallback modal
   const [showWaModal, setShowWaModal] = useState(false);
@@ -239,22 +242,57 @@ const Auth = () => {
   };
 
   useEffect(() => {
-    // Reset the guard whenever the user logs out
+    // 1. Check for confirmation link in URL (hash or query)
+    const hasConfirmParams = location.hash.includes("access_token") || 
+                             location.hash.includes("type=signup") || 
+                             location.hash.includes("type=recovery") ||
+                             location.search.includes("type=signup");
+
+    if (hasConfirmParams && !confirmationSuccess) {
+      console.log("[Auth] Confirmation detected, showing success screen.");
+      setConfirmationSuccess(true);
+      setVerificationPending(false);
+      setSuccessCountdown(5);
+      if (user) signOut(); // Clear session to allow manual sign-in as requested
+      return;
+    }
+
+    if (confirmationSuccess) return;
+
+    // 2. Standard session handling
     if (!user) {
       hasRoutedRef.current = false;
       return;
     }
+    
     // Only route once — ignore subsequent re-renders during auth initialization
-    if (hasRoutedRef.current || verificationPending) return;
+    if (hasRoutedRef.current) return;
+    if (verificationPending && !user) return;
+
     hasRoutedRef.current = true;
 
     if (!user.phone && !isOtpSent && user.app_metadata?.provider === "google") {
       setShowWaModal(true);
-    } else if (!showWaModal) {
+    } else {
       handleSuccessRoleRouting(user);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, verificationPending]);
+  }, [user, verificationPending, confirmationSuccess, location.hash, location.search]);
+
+  /* ─── Success Countdown ─── */
+  useEffect(() => {
+    if (!confirmationSuccess || successCountdown <= 0) {
+      if (confirmationSuccess && successCountdown <= 0) {
+        setConfirmationSuccess(false);
+        setIsLoginMode(true);
+        setAuthMethod("email");
+        navigate("/auth");
+      }
+      return;
+    }
+    const id = setInterval(() => setSuccessCountdown((c) => c - 1), 1000);
+    return () => clearInterval(id);
+  }, [confirmationSuccess, successCountdown, navigate]);
 
   /* ─── countdown ─── */
   useEffect(() => {
@@ -311,6 +349,26 @@ const Auth = () => {
       // Returning users are routed by the useEffect watching `user` state
     }
   };
+
+  const handleResendEmail = async () => {
+    if (resendCountdown > 0) return;
+    setLoading(true);
+    const { error } = await resendEmail(email);
+    setLoading(false);
+    if (error) {
+      toast({ variant: "destructive", title: "Resend Failed", description: error.message });
+    } else {
+      toast({ title: "Email Sent", description: "Verification link has been resent to your email." });
+      setResendCountdown(60);
+    }
+  };
+
+  /* ─── resend countdown ─── */
+  useEffect(() => {
+    if (resendCountdown <= 0) return;
+    const id = setInterval(() => setResendCountdown((c) => c - 1), 1000);
+    return () => clearInterval(id);
+  }, [resendCountdown]);
 
   /* ─── Google ─── */
   const handleGoogleSignIn = async () => {
@@ -548,7 +606,41 @@ const Auth = () => {
                 inset: authMethod === "email" ? undefined : 0,
               }}
             >
-              {verificationPending ? (
+              {confirmationSuccess ? (
+                <div className="flex flex-col items-center py-6 text-center space-y-5">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center animate-bounce">
+                    <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-bold text-gray-900">Signup Successful!</h3>
+                    <p className="text-sm text-gray-500">
+                      Your email has been verified. You can now sign in to your account.
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-col items-center gap-4 w-full pt-2">
+                    <div className="text-xs font-medium text-gray-400">
+                      Redirecting to sign in in <span className="text-[#115f10] font-bold text-base">{successCountdown}s</span>
+                    </div>
+                    
+                    <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-[#115f10] transition-all duration-1000 ease-linear"
+                        style={{ width: `${(successCountdown / 5) * 100}%` }}
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => { setConfirmationSuccess(false); setIsLoginMode(true); }}
+                      className="text-xs font-bold text-[#115f10] hover:underline underline-offset-4"
+                    >
+                      Sign in now
+                    </button>
+                  </div>
+                </div>
+              ) : verificationPending ? (
                 <div className="flex flex-col items-center py-6 text-center space-y-4">
                   <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center">
                     <Mail className="w-8 h-8 text-[#115f10]" />
@@ -559,9 +651,25 @@ const Auth = () => {
                       We've sent a verification link to <span className="font-semibold text-gray-900">{email}</span>
                     </p>
                   </div>
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-[#115f10] font-bold animate-pulse">
-                    Waiting for confirmation…
-                  </p>
+                  
+                  <div className="pt-2 flex flex-col items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleResendEmail}
+                      disabled={loading || resendCountdown > 0}
+                      className="text-xs font-bold text-[#115f10] hover:underline underline-offset-4 disabled:opacity-50 disabled:no-underline"
+                    >
+                      {resendCountdown > 0 ? `Resend mail in ${resendCountdown}s` : "Resend mail"}
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setVerificationPending(false)}
+                      className="text-[10px] text-gray-400 font-medium hover:text-gray-600 transition-colors"
+                    >
+                      Use a different email
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <form onSubmit={handleEmailAuth} className="flex flex-col justify-center space-y-3" style={{ minHeight: "250px" }}>

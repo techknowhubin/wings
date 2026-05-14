@@ -2,6 +2,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Marquee from "@/components/Marquee";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 import { Calendar, User, BookOpen } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,20 +49,14 @@ const Blog = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("blog_posts")
-        .select(`
-          id,
-          title,
-          excerpt,
-          featured_image,
-          published_at,
-          slug,
-          profiles:author_id ( full_name ),
-          blog_categories:category_id ( name )
-        `)
+        .select("id, title, excerpt, featured_image, published_at, slug, tags")
         .eq("status", "published")
         .order("published_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error("[Blog] Supabase error:", error.message);
+        throw error;
+      }
 
       return (data ?? []).map((p: any) => ({
         id:             p.id,
@@ -70,8 +65,8 @@ const Blog = () => {
         featured_image: p.featured_image,
         published_at:   p.published_at,
         slug:           p.slug,
-        author_name:    p.profiles?.full_name ?? "Xplorwing Team",
-        category_name:  p.blog_categories?.name ?? "Travel",
+        author_name:    "Xplorwing Team",
+        category_name:  Array.isArray(p.tags) && p.tags.length > 0 ? p.tags[0] : "Travel",
       }));
     },
   });
@@ -130,56 +125,57 @@ const Blog = () => {
         {!isLoading && posts.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {posts.map((post, index) => (
-              <motion.article
-                key={post.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.07 }}
-                className="glass-effect rounded-2xl overflow-hidden hover-lift cursor-pointer group"
-              >
-                {/* Image */}
-                <div className="relative h-48 overflow-hidden bg-muted">
-                  {post.featured_image ? (
-                    <img
-                      src={post.featured_image}
-                      alt={post.title}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <BookOpen className="h-10 w-10 text-muted-foreground/40" />
-                    </div>
-                  )}
-                  {/* Category badge */}
-                  <div className="absolute top-4 left-4">
-                    <span className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-semibold">
-                      {post.category_name}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="p-6">
-                  <h2 className="text-xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors line-clamp-2">
-                    {post.title}
-                  </h2>
-                  {post.excerpt && (
-                    <p className="text-muted-foreground mb-4 line-clamp-2">{post.excerpt}</p>
-                  )}
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <User className="h-4 w-4" />
-                      {post.author_name}
-                    </span>
-                    {post.published_at && (
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        {format(new Date(post.published_at), "MMM d, yyyy")}
-                      </span>
+              <Link key={post.id} to={`/blog/${post.slug}`}>
+                <motion.article
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: index * 0.07 }}
+                  className="glass-effect rounded-2xl overflow-hidden hover-lift cursor-pointer group h-full"
+                >
+                  {/* Image */}
+                  <div className="relative h-48 overflow-hidden bg-muted">
+                    {post.featured_image ? (
+                      <img
+                        src={post.featured_image}
+                        alt={post.title}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <BookOpen className="h-10 w-10 text-muted-foreground/40" />
+                      </div>
                     )}
+                    {/* Category badge */}
+                    <div className="absolute top-4 left-4">
+                      <span className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-semibold">
+                        {post.category_name}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </motion.article>
+
+                  {/* Content */}
+                  <div className="p-6">
+                    <h2 className="text-xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors line-clamp-2">
+                      {post.title}
+                    </h2>
+                    {post.excerpt && (
+                      <p className="text-muted-foreground mb-4 line-clamp-2">{post.excerpt}</p>
+                    )}
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <User className="h-4 w-4" />
+                        {post.author_name}
+                      </span>
+                      {post.published_at && (
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          {format(new Date(post.published_at), "MMM d, yyyy")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </motion.article>
+              </Link>
             ))}
           </div>
         )}

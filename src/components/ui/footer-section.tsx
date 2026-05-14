@@ -11,12 +11,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Facebook, Instagram, Linkedin, Moon, Send, Sun, Twitter } from "lucide-react";
+import { Facebook, Instagram, Linkedin, Moon, Send, Sun } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { DynamicLogo } from "../DynamicLogo";
 
 function Footerdemo() {
   const { theme, toggleTheme } = useTheme();
+  const { toast } = useToast();
+  const [isSubscribing, setIsSubscribing] = React.useState(false);
+  const [hasSubscribed, setHasSubscribed] = React.useState(false);
   const isDarkMode = theme === "dark";
 
   return (
@@ -32,20 +37,64 @@ function Footerdemo() {
             <p className="mb-6 text-muted-foreground">
               Join our newsletter for the latest updates and exclusive offers.
             </p>
-            <form className="relative" onSubmit={(e) => e.preventDefault()}>
+            <form 
+              className="relative" 
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const form = e.currentTarget;
+                const email = (form.elements.namedItem("email") as HTMLInputElement).value;
+                if (!email) return;
+                
+                setIsSubscribing(true);
+                
+                try {
+                  const { data, error } = await supabase.functions.invoke("send-newsletter-welcome", {
+                    body: { email },
+                  });
+
+                  if (error) throw error;
+
+                  toast({
+                    title: "Joined Xplorwing newsletter!",
+                    description: "A confirmation has been sent to your email.",
+                  });
+                  
+                  setHasSubscribed(true);
+                } catch (error) {
+                  console.error("Newsletter error:", error);
+                  toast({
+                    title: "Subscription failed",
+                    description: "There was an error joining the newsletter. Please try again.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setIsSubscribing(false);
+                  form.reset();
+                }
+              }}
+            >
               <Input
+                name="email"
                 type="email"
                 placeholder="Enter your email"
                 className="pr-12 backdrop-blur-sm"
+                required
+                disabled={hasSubscribed || isSubscribing}
               />
               <Button
                 type="submit"
                 size="icon"
+                disabled={hasSubscribed || isSubscribing}
                 className="absolute right-1 top-1 h-8 w-8 rounded-full bg-primary text-primary-foreground transition-transform hover:scale-105"
               >
-                <Send className="h-4 w-4" />
+                <Send className={cn("h-4 w-4", isSubscribing && "animate-pulse")} />
                 <span className="sr-only">Subscribe</span>
               </Button>
+              {hasSubscribed && (
+                <p className="mt-2 text-xs text-primary font-medium animate-in fade-in slide-in-from-top-1">
+                  Successfully joined! Check your inbox soon.
+                </p>
+              )}
             </form>
           </div>
 
@@ -101,10 +150,12 @@ function Footerdemo() {
               <div className="mb-6 flex space-x-3">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="outline" size="icon" className="rounded-full">
-                      <Facebook className="h-4 w-4" />
-                      <span className="sr-only">Facebook</span>
-                    </Button>
+                    <a href="http://facebook.com/joinXplorwing" target="_blank" rel="noopener noreferrer">
+                      <Button variant="outline" size="icon" className="rounded-full">
+                        <Facebook className="h-4 w-4" />
+                        <span className="sr-only">Facebook</span>
+                      </Button>
+                    </a>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Follow us on Facebook</p>
@@ -112,21 +163,12 @@ function Footerdemo() {
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="outline" size="icon" className="rounded-full">
-                      <Twitter className="h-4 w-4" />
-                      <span className="sr-only">Twitter</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Follow us on Twitter</p>
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="icon" className="rounded-full">
-                      <Instagram className="h-4 w-4" />
-                      <span className="sr-only">Instagram</span>
-                    </Button>
+                    <a href="https://www.instagram.com/xplorwing" target="_blank" rel="noopener noreferrer">
+                      <Button variant="outline" size="icon" className="rounded-full">
+                        <Instagram className="h-4 w-4" />
+                        <span className="sr-only">Instagram</span>
+                      </Button>
+                    </a>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Follow us on Instagram</p>
@@ -134,10 +176,12 @@ function Footerdemo() {
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="outline" size="icon" className="rounded-full">
-                      <Linkedin className="h-4 w-4" />
-                      <span className="sr-only">LinkedIn</span>
-                    </Button>
+                    <a href="https://www.linkedin.com/company/xplor-wing/" target="_blank" rel="noopener noreferrer">
+                      <Button variant="outline" size="icon" className="rounded-full">
+                        <Linkedin className="h-4 w-4" />
+                        <span className="sr-only">LinkedIn</span>
+                      </Button>
+                    </a>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Connect with us on LinkedIn</p>

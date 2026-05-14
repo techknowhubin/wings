@@ -24,6 +24,7 @@ import ExperienceDetail from "./pages/ExperienceDetail";
 import AboutUs from "./pages/AboutUs";
 import Careers from "./pages/Careers";
 import Blog from "./pages/Blog";
+import BlogDetail from "./pages/BlogDetail";
 import HelpCenter from "./pages/HelpCenter";
 import NotFound from "./pages/NotFound";
 import LinkInBioLanding from "./pages/LinkInBioLanding";
@@ -94,6 +95,7 @@ const App = () => (
             <Route path="/about" element={<AboutUs />} />
             <Route path="/careers" element={<Careers />} />
             <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:slug" element={<BlogDetail />} />
             <Route path="/help" element={<HelpCenter />} />
             <Route path="/link-in-bio" element={<LinkInBioLanding />} />
             <Route path="/p/:slug" element={<PublicLinkInBio />} />

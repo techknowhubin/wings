@@ -251,8 +251,10 @@ const SearchBar = ({ defaultCategory }: SearchBarProps) => {
       transition={{ duration: 0.6, delay: 0.2 }}
       className="bg-background/95 backdrop-blur-md rounded-2xl shadow-xl max-w-4xl mx-auto border border-border/50 overflow-visible"
     >
-      {/* Category Tabs */}
-      <div className="flex items-center gap-1 px-4 pt-4 pb-2 overflow-x-auto scrollbar-hide">
+      {/* Category Tabs — Desktop: pill tabs | Mobile: icon tiles */}
+
+      {/* Desktop pill tabs */}
+      <div className="hidden md:flex items-center gap-1 px-4 pt-4 pb-2 overflow-x-auto scrollbar-hide">
         {searchCategories.map((cat) => {
           const Icon = cat.icon;
           const isActive = activeCategory === cat.id;
@@ -269,6 +271,40 @@ const SearchBar = ({ defaultCategory }: SearchBarProps) => {
             >
               <Icon className="h-3.5 w-3.5" />
               {cat.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Mobile icon tiles */}
+      <div className="flex md:hidden items-center justify-around gap-2 px-4 pt-4 pb-3">
+        {searchCategories.map((cat) => {
+          const Icon = cat.icon;
+          const isActive = activeCategory === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => handleCategoryChange(cat.id)}
+              className="flex flex-col items-center gap-1.5 flex-1"
+            >
+              <div
+                className={cn(
+                  "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200 shadow-sm",
+                  isActive
+                    ? "bg-primary text-primary-foreground scale-105 shadow-md"
+                    : "bg-muted text-muted-foreground"
+                )}
+              >
+                <Icon className="h-6 w-6" />
+              </div>
+              <span
+                className={cn(
+                  "text-[11px] font-medium text-center leading-tight",
+                  isActive ? "text-foreground font-semibold" : "text-muted-foreground"
+                )}
+              >
+                {cat.label}
+              </span>
             </button>
           );
         })}

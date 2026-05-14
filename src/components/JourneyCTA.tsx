@@ -234,12 +234,65 @@ const JourneyCTA = () => {
         .journey-l-sub { font-size: 9px; color: #b0b0b0; }
 
         @media (max-width: 900px) {
-          .journey-card { flex-direction: column; text-align: center; padding: 60px 30px; gap: 40px; overflow: hidden; }
-          .journey-left { text-align: center; max-width: 100%; }
-          .journey-sub { margin: 0 auto 30px; }
-          .journey-right { width: 100%; height: auto; justify-content: center; flex-direction: column-reverse; gap: 20px; }
-          .journey-phone-wrap { position: relative; right: 0; top: 0; transform: none; margin-top: 0; }
-          .journey-sub-cards { flex-direction: row; }
+          .journey-scene {
+            width: 95%;
+            margin: 20px auto;
+            overflow: visible;
+            padding-top: 130px; /* space for phone overflowing above card */
+          }
+          .journey-card {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: 0 20px 32px;
+            gap: 0;
+            overflow: visible;
+            min-height: auto;
+          }
+          /* Phone first, content below */
+          .journey-right {
+            order: 1;
+            width: 100%;
+            justify-content: center;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+            margin-bottom: 20px;
+            overflow: visible;
+          }
+          .journey-left {
+            order: 2;
+            text-align: center;
+            padding-right: 0;
+            max-width: 100%;
+            transform: none;
+          }
+          .journey-left .journey-pill {
+            margin-left: auto;
+            margin-right: auto;
+          }
+          .journey-sub {
+            margin: 0 auto 24px;
+          }
+          .journey-cta {
+            margin: 0 auto;
+          }
+          .journey-phone-wrap {
+            position: relative;
+            margin-top: -170px; /* adjusted for taller phone */
+            margin-bottom: 100px; /* compensate for scaleY extra visual height */
+            transform: none;
+            animation: journey-floatPhone 4s ease-in-out infinite;
+          }
+          .journey-phone {
+            width: 260px; /* 1.3x of 200px */
+            transform: scaleY(1.3);
+            transform-origin: top center;
+          }
+          /* Hide sub-cards on mobile */
+          .journey-sub-cards {
+            display: none;
+          }
         }
       ` }} />
 

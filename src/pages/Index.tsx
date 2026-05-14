@@ -204,30 +204,27 @@ const Index = () => {
     return data || [];
   };
   const fetchBlogs = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("blog_posts")
-      .select(`
-        id,
-        title,
-        excerpt,
-        featured_image,
-        published_at,
-        slug,
-        profiles:author_id ( full_name ),
-        blog_categories:category_id ( name )
-      `)
+      .select("id, title, excerpt, featured_image, published_at, slug, tags, status")
       .eq("status", "published")
       .order("published_at", { ascending: false })
       .limit(3);
-    
+
+    if (error) {
+      console.error("[fetchBlogs] Error:", error.message);
+      return [];
+    }
+
+    // Return only real posts from the database — no hardcoded fallbacks
     return (data || []).map((p: any) => ({
       id: p.id,
       title: p.title,
       excerpt: p.excerpt,
       image: p.featured_image,
       date: p.published_at ? format(new Date(p.published_at), "MMMM d, yyyy") : "",
-      author: p.profiles?.full_name || "Xplorwing Team",
-      category: p.blog_categories?.name || "Travel",
+      author: "Xplorwing Team",
+      category: Array.isArray(p.tags) && p.tags.length > 0 ? p.tags[0] : "Travel",
       slug: p.slug
     }));
   };
@@ -285,7 +282,7 @@ const Index = () => {
       <Header />
 
       {/* Hero Section with Slider */}
-      <section className="container mx-auto px-4 pt-4">
+      <section className="container mx-auto px-4 pt-4 hidden md:block">
         <div className="relative h-[85vh] rounded-3xl overflow-hidden">
           {heroImages.map((img, i) => (
             <motion.div
@@ -328,8 +325,8 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Search Bar - offset below hero */}
-      <div className="container mx-auto px-4 -mt-12 relative z-20 mb-8">
+      {/* Search Bar - offset below hero on desktop, normal on mobile */}
+      <div className="container mx-auto px-4 mt-8 md:-mt-12 relative z-20 mb-8">
         <SearchBar />
       </div>
 
@@ -494,8 +491,8 @@ const Index = () => {
         </section>
       )}
 
-      {/* Blog Section */}
-      <section className="container mx-auto px-4 py-16">
+      {/* Blog Section — only rendered when there are published posts */}
+      {blogs.length > 0 && <section className="container mx-auto px-4 py-16">
         <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.5 }} viewport={{ once: true }}>
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-3xl font-bold text-foreground">From Our Blog</h2>
@@ -505,39 +502,40 @@ const Index = () => {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {blogs.map((post, index) => (
-              <motion.article
-                key={post.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: index * 0.1 }}
-                viewport={{ once: true }}
-                className="glass-effect rounded-2xl overflow-hidden hover-lift cursor-pointer group"
-              >
-                <div className="relative h-48 overflow-hidden bg-muted">
-                  {post.image ? (
-                    <img src={post.image} alt={post.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" loading="lazy" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <BookOpen className="h-10 w-10 text-muted-foreground/40" />
+              <Link key={post.id} to={`/blog/${post.slug}`}>
+                <motion.article
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: index * 0.1 }}
+                  viewport={{ once: true }}
+                  className="glass-effect rounded-2xl overflow-hidden hover-lift cursor-pointer group h-full"
+                >
+                  <div className="relative h-48 overflow-hidden bg-muted">
+                    {post.image ? (
+                      <img src={post.image} alt={post.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" loading="lazy" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <BookOpen className="h-10 w-10 text-muted-foreground/40" />
+                      </div>
+                    )}
+                    <div className="absolute top-4 left-4">
+                      <span className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-semibold">{post.category}</span>
                     </div>
-                  )}
-                  <div className="absolute top-4 left-4">
-                    <span className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-semibold">{post.category}</span>
                   </div>
-                </div>
-                <div className="p-5">
-                  <h3 className="text-lg font-bold text-foreground mb-2 group-hover:text-primary transition-colors line-clamp-2">{post.title}</h3>
-                  <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{post.excerpt}</p>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{post.author}</span>
-                    <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{post.date}</span>
+                  <div className="p-5">
+                    <h3 className="text-lg font-bold text-foreground mb-2 group-hover:text-primary transition-colors line-clamp-2">{post.title}</h3>
+                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{post.excerpt}</p>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{post.author}</span>
+                      <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{post.date}</span>
+                    </div>
                   </div>
-                </div>
-              </motion.article>
+                </motion.article>
+              </Link>
             ))}
           </div>
         </motion.div>
-      </section>
+      </section>}
 
       {/* Customer Testimonials */}
       <CustomerTestimonials />

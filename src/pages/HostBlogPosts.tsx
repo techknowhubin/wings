@@ -1,11 +1,15 @@
-import { useEffect, useMemo, useState, useRef } from "react";
-import { Check, Eye, EyeOff, Globe, Pencil, Plus, RefreshCw, Trash2, X, BookOpen, FileText, ImageIcon, Tag, Bold, Italic, Heading2, Heading3, List, Link as LinkIcon, Quote } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Check, Eye, EyeOff, Globe, Pencil, Plus, RefreshCw, Trash2, X,
+  BookOpen, FileText, ImageIcon, Tag, Columns2, PanelRight,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { useCreateBlogPost, useDeleteBlogPost, useIsAdmin, useUpdateBlogPost, useBlogPosts } from "@/hooks/useListings";
 import { toast } from "sonner";
@@ -19,10 +23,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import BlogBlockEditor from "@/components/blog/BlogBlockEditor";
+import { BlogBlockRenderer, BlogTableOfContents } from "@/components/blog/BlogBlockRenderer";
+import { createEmptyBlock, isBlockContent, parseBlocks } from "@/components/blog/types";
+import type { ContentBlock } from "@/components/blog/types";
 
 const CATEGORIES = [
-  "Travel Tips", "Destination Guide", "Adventure", "Culture", 
-  "Food & Cuisine", "Homestay Stories", "Sustainable Travel", "Hidden Gems"
+  "Travel Tips", "Destination Guide", "Adventure", "Culture",
+  "Food & Cuisine", "Homestay Stories", "Sustainable Travel", "Hidden Gems",
 ];
 
 function generateSlug(title: string) {
@@ -34,13 +42,22 @@ function generateSlug(title: string) {
     .replace(/^-+|-+$/g, "");
 }
 
-const emptyForm = {
+interface BlogForm {
+  title: string;
+  slug: string;
+  excerpt: string;
+  featured_image: string;
+  status: "draft" | "published";
+  category: string;
+  tags: string;
+}
+
+const emptyForm: BlogForm = {
   title: "",
   slug: "",
   excerpt: "",
-  content: "",
   featured_image: "",
-  status: "draft" as "draft" | "published",
+  status: "draft",
   category: "",
   tags: "",
 };
@@ -56,67 +73,18 @@ export default function HostBlogPosts() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<BlogForm>(emptyForm);
+  const [blocks, setBlocks] = useState<ContentBlock[]>([createEmptyBlock("paragraph")]);
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [filter, setFilter] = useState<"all" | "published" | "draft">("all");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [editorTab, setEditorTab] = useState<"editor" | "preview">("editor");
 
-  const insertStyle = (style: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-    const selectedText = text.substring(start, end);
-    let before = text.substring(0, start);
-    let after = text.substring(end);
-    let replacement = "";
-
-    switch (style) {
-      case "bold":
-        replacement = `<b>${selectedText || "bold text"}</b>`;
-        break;
-      case "italic":
-        replacement = `<i>${selectedText || "italic text"}</i>`;
-        break;
-      case "h2":
-        replacement = `\n<h2>${selectedText || "Heading 2"}</h2>\n`;
-        break;
-      case "h3":
-        replacement = `\n<h3>${selectedText || "Heading 3"}</h3>\n`;
-        break;
-      case "list":
-        replacement = `\n<ul>\n  <li>${selectedText || "List item"}</li>\n  <li>List item</li>\n</ul>\n`;
-        break;
-      case "quote":
-        replacement = `\n<blockquote>${selectedText || "Blockquote"}</blockquote>\n`;
-        break;
-      case "link":
-        replacement = `<a href="https://example.com" class="text-primary hover:underline">${selectedText || "Link text"}</a>`;
-        break;
-      default:
-        return;
-    }
-
-    const newValue = before + replacement + after;
-    setForm(p => ({ ...p, content: newValue }));
-    
-    // Set focus back and selection
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + replacement.length, start + replacement.length);
-    }, 0);
-  };
-
-  // Auto-generate slug from title (unless manually edited)
+  // Auto-generate slug from title
   useEffect(() => {
     if (!slugManuallyEdited && form.title) {
       setForm((p) => ({ ...p, slug: generateSlug(form.title) }));
     }
   }, [form.title, slugManuallyEdited]);
-
-  const buttonText = useMemo(() => (editingId ? "Update Post" : "Publish Post"), [editingId]);
 
   if (!isAdminUser) {
     return (
@@ -131,31 +99,61 @@ export default function HostBlogPosts() {
     setShowForm(false);
     setSlugManuallyEdited(false);
     setForm(emptyForm);
+    setBlocks([createEmptyBlock("paragraph")]);
+    setEditorTab("editor");
   };
 
   const handleSave = async () => {
     if (!user) return;
-    if (!form.title.trim() || !form.slug.trim() || !form.content.trim()) {
-      toast.error("Title, slug and content are required.");
+    if (!form.title.trim() || !form.slug.trim()) {
+      toast.error("Title and slug are required.");
       return;
     }
+
+    // Validate blocks have some content
+    const hasContent = blocks.some((b) => {
+      if (b.type === "paragraph") return !!b.text.trim();
+      if (b.type === "heading") return !!b.text.trim();
+      if (b.type === "image") return !!b.url.trim();
+      if (b.type === "quote") return !!b.text.trim();
+      if (b.type === "list") return b.items.some((i) => i.trim());
+      if (b.type === "callout") return !!b.text.trim();
+      if (b.type === "listing_embed") return !!b.listing_id;
+      if (b.type === "divider") return true;
+      return false;
+    });
+
+    if (!hasContent) {
+      toast.error("Add some content to your blog post.");
+      return;
+    }
+
     try {
       const tagsArray = form.tags
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean);
 
+      // Calculate reading time (~200 words per minute)
+      const wordCount = blocks.reduce((acc, b) => {
+        if ("text" in b && b.text) acc += b.text.split(/\s+/).length;
+        if (b.type === "list") acc += b.items.join(" ").split(/\s+/).length;
+        return acc;
+      }, 0);
+      const readingTime = Math.max(1, Math.ceil(wordCount / 200));
+
       const payload = {
         author_id: user.id,
         title: form.title.trim(),
         slug: form.slug.trim(),
         excerpt: form.excerpt.trim() || null,
-        content: form.content.trim(),
+        content: JSON.stringify(blocks),
         featured_image: form.featured_image.trim() || null,
         status: form.status,
-        category_id: null, // extend if you have category table linked
+        category_id: null,
         tags: tagsArray.length > 0 ? tagsArray : null,
         published_at: form.status === "published" ? new Date().toISOString() : null,
+        reading_time: readingTime,
       };
 
       if (editingId) {
@@ -178,13 +176,27 @@ export default function HostBlogPosts() {
       title: post.title ?? "",
       slug: post.slug ?? "",
       excerpt: post.excerpt ?? "",
-      content: post.content ?? "",
       featured_image: post.featured_image ?? "",
       status: post.status ?? "draft",
       category: post.category ?? "",
       tags: Array.isArray(post.tags) ? post.tags.join(", ") : "",
     });
+
+    // Parse content into blocks
+    if (post.content && isBlockContent(post.content)) {
+      setBlocks(parseBlocks(post.content));
+    } else {
+      // Legacy: wrap raw text/HTML in a single paragraph block
+      setBlocks([
+        {
+          ...createEmptyBlock("paragraph"),
+          text: post.content || "",
+        } as ContentBlock,
+      ]);
+    }
+
     setShowForm(true);
+    setEditorTab("editor");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -206,6 +218,15 @@ export default function HostBlogPosts() {
   });
 
   const isSaving = createPost.isPending || updatePost.isPending;
+
+  // Stats
+  const wordCount = blocks.reduce((acc, b) => {
+    if ("text" in b && b.text) acc += b.text.split(/\s+/).filter(Boolean).length;
+    if (b.type === "list") acc += b.items.join(" ").split(/\s+/).filter(Boolean).length;
+    return acc;
+  }, 0);
+  const readingTime = Math.max(1, Math.ceil(wordCount / 200));
+  const blockCount = blocks.length;
 
   return (
     <div className="space-y-6">
@@ -234,15 +255,25 @@ export default function HostBlogPosts() {
 
       {/* Create / Edit Form */}
       {showForm && (
-        <Card className="border-primary/30">
+        <Card className="border-primary/30 shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <FileText className="h-5 w-5" />
               {editingId ? "Edit Blog Post" : "Create New Blog Post"}
             </CardTitle>
-            <Button variant="ghost" size="icon" onClick={resetForm}>
-              <X className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* Stats */}
+              <div className="hidden md:flex items-center gap-3 text-xs text-muted-foreground mr-2">
+                <span>{wordCount} words</span>
+                <span>·</span>
+                <span>~{readingTime} min read</span>
+                <span>·</span>
+                <span>{blockCount} blocks</span>
+              </div>
+              <Button variant="ghost" size="icon" onClick={resetForm}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-5">
             {/* Title + Slug */}
@@ -349,46 +380,41 @@ export default function HostBlogPosts() {
               />
             </div>
 
-            {/* Content */}
+            {/* Content — Block Editor with Preview */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label>Content <span className="text-destructive">*</span></Label>
-                <div className="flex items-center gap-1 border border-border rounded-md p-1 bg-muted/30">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertStyle('bold')} title="Bold">
-                    <Bold className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertStyle('italic')} title="Italic">
-                    <Italic className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertStyle('h2')} title="Heading 2">
-                    <Heading2 className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertStyle('h3')} title="Heading 3">
-                    <Heading3 className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertStyle('list')} title="Bullet List">
-                    <List className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertStyle('quote')} title="Quote">
-                    <Quote className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => insertStyle('link')} title="Insert Link">
-                    <LinkIcon className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
+                <Tabs value={editorTab} onValueChange={(v) => setEditorTab(v as any)}>
+                  <TabsList className="h-8">
+                    <TabsTrigger value="editor" className="text-xs h-6 px-3 gap-1.5">
+                      <Pencil className="h-3 w-3" />
+                      Editor
+                    </TabsTrigger>
+                    <TabsTrigger value="preview" className="text-xs h-6 px-3 gap-1.5">
+                      <Eye className="h-3 w-3" />
+                      Preview
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
               </div>
-              <Textarea
-                ref={textareaRef}
-                rows={12}
-                placeholder="Write your full blog post content here. You can use the toolbar above to add formatting."
-                value={form.content}
-                onChange={(e) => setForm((p) => ({ ...p, content: e.target.value }))}
-                className="font-mono text-sm"
-              />
-              <p className="text-xs text-muted-foreground flex justify-between">
-                <span>{form.content.length} characters · ~{Math.ceil(form.content.split(" ").length / 200)} min read</span>
-                <span>Pro tip: Double Enter for new paragraph</span>
-              </p>
+
+              {editorTab === "editor" ? (
+                <div className="rounded-xl border border-border bg-background p-4 md:px-12 min-h-[400px]">
+                  <BlogBlockEditor blocks={blocks} onChange={setBlocks} />
+                </div>
+              ) : (
+                <div className="rounded-xl border border-border bg-background p-6 md:px-12 min-h-[400px]">
+                  <div className="max-w-3xl mx-auto">
+                    {form.title && (
+                      <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
+                        {form.title}
+                      </h1>
+                    )}
+                    <BlogTableOfContents blocks={blocks} />
+                    <BlogBlockRenderer blocks={blocks} />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Tags */}
@@ -413,6 +439,24 @@ export default function HostBlogPosts() {
               )}
             </div>
 
+            {/* SEO Preview */}
+            {form.title && (
+              <div className="rounded-lg border border-border p-4 bg-muted/10">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 font-bold">
+                  SEO Preview
+                </p>
+                <p className="text-primary text-sm font-medium truncate">
+                  {form.title} — Xplorwing Blog
+                </p>
+                <p className="text-xs text-emerald-700 dark:text-emerald-400 truncate">
+                  xplorwing.com/blog/{form.slug}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                  {form.excerpt || "No excerpt provided. Add a short description for better SEO."}
+                </p>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex gap-2 pt-2 border-t border-border">
               <Button onClick={handleSave} disabled={isSaving} className="min-w-[140px]">
@@ -423,7 +467,7 @@ export default function HostBlogPosts() {
                 ) : (
                   <Plus className="h-4 w-4 mr-2" />
                 )}
-                {isSaving ? "Saving..." : buttonText}
+                {isSaving ? "Saving..." : editingId ? "Update Post" : "Publish Post"}
               </Button>
               <Button variant="outline" onClick={resetForm}>Cancel</Button>
             </div>
@@ -465,77 +509,93 @@ export default function HostBlogPosts() {
               </Button>
             </div>
           )}
-          {filteredPosts.map((post: any) => (
-            <div
-              key={post.id}
-              className="rounded-xl border border-border p-4 flex items-start gap-4 hover:bg-muted/30 transition-colors"
-            >
-              {/* Thumbnail */}
-              {post.featured_image ? (
-                <img
-                  src={post.featured_image}
-                  alt={post.title}
-                  className="w-16 h-16 object-cover rounded-lg flex-shrink-0 border border-border"
-                  onError={(e) => (e.currentTarget.style.display = "none")}
-                />
-              ) : (
-                <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="h-6 w-6 text-muted-foreground/50" />
-                </div>
-              )}
+          {filteredPosts.map((post: any) => {
+            const isBlock = post.content && isBlockContent(post.content);
+            const blockList = isBlock ? parseBlocks(post.content) : [];
+            const embedCount = blockList.filter((b) => b.type === "listing_embed").length;
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-foreground truncate">{post.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                  /blog/{post.slug}
-                </p>
-                {post.excerpt && (
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{post.excerpt}</p>
+            return (
+              <div
+                key={post.id}
+                className="rounded-xl border border-border p-4 flex items-start gap-4 hover:bg-muted/30 transition-colors"
+              >
+                {/* Thumbnail */}
+                {post.featured_image ? (
+                  <img
+                    src={post.featured_image}
+                    alt={post.title}
+                    className="w-16 h-16 object-cover rounded-lg flex-shrink-0 border border-border"
+                    onError={(e) => (e.currentTarget.style.display = "none")}
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                    <BookOpen className="h-6 w-6 text-muted-foreground/50" />
+                  </div>
                 )}
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge
-                    variant={post.status === "published" ? "default" : "secondary"}
-                    className="text-[10px] px-2 py-0"
-                  >
-                    {post.status === "published" ? (
-                      <><Globe className="h-2.5 w-2.5 mr-1" />Published</>
-                    ) : (
-                      <><EyeOff className="h-2.5 w-2.5 mr-1" />Draft</>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-foreground truncate">{post.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                    /blog/{post.slug}
+                  </p>
+                  {post.excerpt && (
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{post.excerpt}</p>
+                  )}
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <Badge
+                      variant={post.status === "published" ? "default" : "secondary"}
+                      className="text-[10px] px-2 py-0"
+                    >
+                      {post.status === "published" ? (
+                        <><Globe className="h-2.5 w-2.5 mr-1" />Published</>
+                      ) : (
+                        <><EyeOff className="h-2.5 w-2.5 mr-1" />Draft</>
+                      )}
+                    </Badge>
+                    {isBlock && (
+                      <Badge variant="outline" className="text-[10px] px-2 py-0">
+                        {blockList.length} blocks
+                      </Badge>
                     )}
-                  </Badge>
-                  {Array.isArray(post.tags) && post.tags.slice(0, 2).map((tag: string) => (
-                    <Badge key={tag} variant="outline" className="text-[10px] px-2 py-0">{tag}</Badge>
-                  ))}
-                  <span className="text-[10px] text-muted-foreground ml-auto">
-                    {new Date(post.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                  </span>
+                    {embedCount > 0 && (
+                      <Badge variant="outline" className="text-[10px] px-2 py-0 text-primary">
+                        {embedCount} listing{embedCount > 1 ? "s" : ""}
+                      </Badge>
+                    )}
+                    {Array.isArray(post.tags) && post.tags.slice(0, 2).map((tag: string) => (
+                      <Badge key={tag} variant="outline" className="text-[10px] px-2 py-0">{tag}</Badge>
+                    ))}
+                    <span className="text-[10px] text-muted-foreground ml-auto">
+                      {new Date(post.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-1.5 flex-shrink-0">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-8 w-8"
+                    onClick={() => handleEdit(post)}
+                    title="Edit"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:border-destructive/50"
+                    onClick={() => setDeleteTargetId(post.id)}
+                    title="Delete"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               </div>
-
-              {/* Actions */}
-              <div className="flex gap-1.5 flex-shrink-0">
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8"
-                  onClick={() => handleEdit(post)}
-                  title="Edit"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:border-destructive/50"
-                  onClick={() => setDeleteTargetId(post.id)}
-                  title="Delete"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
 

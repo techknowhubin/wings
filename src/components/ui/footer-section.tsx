@@ -77,7 +77,7 @@ function Footerdemo() {
                 name="email"
                 type="email"
                 placeholder="Enter your email"
-                className="pr-12 backdrop-blur-sm"
+                className="pr-12 rounded-full backdrop-blur-sm"
                 required
                 disabled={hasSubscribed || isSubscribing}
               />
@@ -85,7 +85,7 @@ function Footerdemo() {
                 type="submit"
                 size="icon"
                 disabled={hasSubscribed || isSubscribing}
-                className="absolute right-1 top-1 h-8 w-8 rounded-full bg-primary text-primary-foreground transition-transform hover:scale-105"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-primary text-primary-foreground transition-transform hover:scale-105"
               >
                 <Send className={cn("h-4 w-4", isSubscribing && "animate-pulse")} />
                 <span className="sr-only">Subscribe</span>

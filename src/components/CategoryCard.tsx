@@ -23,7 +23,7 @@ const CategoryCard = ({ image, title, subtitle, link, bgColor, delay = 0, iconSc
         transition={{ duration: 0.5, delay }}
         whileHover={{ scale: 1.05, y: -4 }}
         whileTap={{ scale: 0.97 }}
-        className={`${bgColor} rounded-2xl px-6 py-5 flex items-center justify-between gap-4 cursor-pointer w-[286px] h-[114px] shadow-md hover:shadow-lg transition-shadow relative overflow-visible`}
+        className={`${bgColor} rounded-2xl px-6 py-5 flex items-center justify-between gap-4 cursor-pointer w-[286px] h-[114px] shadow-md hover:shadow-lg transition-shadow relative overflow-visible dark:border dark:border-white/10 dark:ring-1 dark:ring-white/5`}
       >
         <div className="flex flex-col gap-0.5">
           <span className="font-bold text-foreground text-base leading-tight">{title}</span>

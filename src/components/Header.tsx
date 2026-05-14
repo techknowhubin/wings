@@ -218,7 +218,9 @@ const Header = () => {
                       className={cn(
                         "rounded-full px-5 transition-all font-semibold",
                         isDarkHeader
-                          ? "bg-transparent text-black border-black hover:bg-black/5 hover:text-black"
+                          ? theme === "dark"
+                            ? "bg-transparent text-white border-white hover:bg-white/10 hover:text-white"
+                            : "bg-transparent text-black border-black hover:bg-black/5 hover:text-black"
                           : "border-border text-foreground hover:bg-muted/50"
                       )}
                     >

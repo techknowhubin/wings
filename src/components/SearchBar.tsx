@@ -249,7 +249,7 @@ const SearchBar = ({ defaultCategory }: SearchBarProps) => {
       initial={{ y: 50, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.6, delay: 0.2 }}
-      className="bg-background/95 backdrop-blur-md rounded-2xl shadow-xl max-w-4xl mx-auto border border-border/50 overflow-visible"
+      className="bg-background rounded-2xl shadow-2xl max-w-4xl mx-auto border border-border overflow-visible"
     >
       {/* Category Tabs — Desktop: pill tabs | Mobile: icon tiles */}
 
@@ -263,7 +263,7 @@ const SearchBar = ({ defaultCategory }: SearchBarProps) => {
               key={cat.id}
               onClick={() => handleCategoryChange(cat.id)}
               className={cn(
-                "flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap",
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-medium transition-all duration-200 whitespace-nowrap",
                 isActive
                   ? "bg-foreground text-background shadow-sm"
                   : "bg-transparent text-muted-foreground hover:bg-muted"
@@ -289,13 +289,13 @@ const SearchBar = ({ defaultCategory }: SearchBarProps) => {
             >
               <div
                 className={cn(
-                  "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200 shadow-sm",
+                  "w-11 h-11 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm",
                   isActive
                     ? "bg-primary text-primary-foreground scale-105 shadow-md"
                     : "bg-muted text-muted-foreground"
                 )}
               >
-                <Icon className="h-6 w-6" />
+                <Icon className="h-5 w-5" />
               </div>
               <span
                 className={cn(
@@ -314,7 +314,7 @@ const SearchBar = ({ defaultCategory }: SearchBarProps) => {
       <div className="hidden md:flex items-center gap-2 px-4 pb-4 pt-2">
         {/* Location */}
         <div className="flex-1 relative" ref={destinationRef}>
-          <div className="flex items-center gap-2.5 border border-border rounded-full px-4 py-2.5">
+          <div className="flex items-center gap-2.5 border border-border rounded-full px-4 py-2">
             <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <input
               type="text"
@@ -339,7 +339,7 @@ const SearchBar = ({ defaultCategory }: SearchBarProps) => {
         {/* Check-in / Pick-up */}
         <Popover open={checkInOpenDesktop} onOpenChange={setCheckInOpenDesktop}>
           <PopoverTrigger asChild>
-            <button className="flex-1 flex items-center gap-2.5 border border-border rounded-full px-4 py-2.5 cursor-pointer hover:border-primary/40 transition-colors">
+            <button className="flex-1 flex items-center gap-2.5 border border-border rounded-full px-4 py-2 cursor-pointer hover:border-primary/40 transition-colors">
               <CalendarIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <span className={cn("text-sm", checkIn ? "text-foreground" : "text-muted-foreground")}>
                 {checkIn ? format(checkIn, "dd MMM yyyy") : dateLabels.start}
@@ -368,7 +368,7 @@ const SearchBar = ({ defaultCategory }: SearchBarProps) => {
         {(activeCategory !== "bikes" && activeCategory !== "cars") || activeCategory === "stays" || activeCategory === "hotels" || activeCategory === "resorts" || true ? (
           <Popover open={checkOutOpenDesktop} onOpenChange={setCheckOutOpenDesktop}>
             <PopoverTrigger asChild>
-              <button className="flex-1 flex items-center gap-2.5 border border-border rounded-full px-4 py-2.5 cursor-pointer hover:border-primary/40 transition-colors">
+              <button className="flex-1 flex items-center gap-2.5 border border-border rounded-full px-4 py-2 cursor-pointer hover:border-primary/40 transition-colors">
                 <CalendarIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className={cn("text-sm", checkOut ? "text-foreground" : "text-muted-foreground")}>
                   {checkOut ? format(checkOut, "dd MMM yyyy") : dateLabels.end}
@@ -393,7 +393,7 @@ const SearchBar = ({ defaultCategory }: SearchBarProps) => {
         {/* Travelers */}
         <Popover open={travelersOpenDesktop} onOpenChange={setTravelersOpenDesktop}>
           <PopoverTrigger asChild>
-            <button className="flex-1 flex items-center gap-2.5 border border-border rounded-full px-4 py-2.5 cursor-pointer hover:border-primary/40 transition-colors">
+            <button className="flex-1 flex items-center gap-2.5 border border-border rounded-full px-4 py-2 cursor-pointer hover:border-primary/40 transition-colors">
               <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <span className="text-sm text-foreground truncate">
                 {adults + children > 1 || rooms > 1 ? travelersLabel : getGuestsLabel()}
@@ -420,7 +420,7 @@ const SearchBar = ({ defaultCategory }: SearchBarProps) => {
       <div className="flex md:hidden flex-col gap-3 px-4 pb-4 pt-2">
         {/* Location */}
         <div className="relative" ref={mobileDestinationRef}>
-          <div className="flex items-center gap-2.5 border border-border rounded-xl px-4 py-3">
+          <div className="flex items-center gap-2.5 border border-border rounded-full px-4 py-2.5">
             <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <input
               type="text"
@@ -446,7 +446,7 @@ const SearchBar = ({ defaultCategory }: SearchBarProps) => {
         <div className="flex gap-3">
           <Popover open={checkInOpenMobile} onOpenChange={setCheckInOpenMobile}>
             <PopoverTrigger asChild>
-              <button className="flex-1 flex items-center gap-2.5 border border-border rounded-xl px-4 py-3 cursor-pointer">
+              <button className="flex-1 flex items-center gap-2.5 border border-border rounded-full px-4 py-2.5 cursor-pointer">
                 <CalendarIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className={cn("text-sm", checkIn ? "text-foreground" : "text-muted-foreground")}>
                   {checkIn ? format(checkIn, "dd MMM") : dateLabels.start}
@@ -474,7 +474,7 @@ const SearchBar = ({ defaultCategory }: SearchBarProps) => {
           {(activeCategory !== "bikes" && activeCategory !== "cars") || activeCategory === "stays" || activeCategory === "hotels" || activeCategory === "resorts" || true ? (
             <Popover open={checkOutOpenMobile} onOpenChange={setCheckOutOpenMobile}>
               <PopoverTrigger asChild>
-                <button className="flex-1 flex items-center gap-2.5 border border-border rounded-xl px-4 py-3 cursor-pointer">
+                <button className="flex-1 flex items-center gap-2.5 border border-border rounded-full px-4 py-2.5 cursor-pointer">
                   <CalendarIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   <span className={cn("text-sm", checkOut ? "text-foreground" : "text-muted-foreground")}>
                     {checkOut ? format(checkOut, "dd MMM") : dateLabels.end}
@@ -500,7 +500,7 @@ const SearchBar = ({ defaultCategory }: SearchBarProps) => {
         {/* Travelers */}
         <Popover open={travelersOpenMobile} onOpenChange={setTravelersOpenMobile}>
           <PopoverTrigger asChild>
-            <button className="w-full flex items-center gap-2.5 border border-border rounded-xl px-4 py-3 cursor-pointer">
+            <button className="w-full flex items-center gap-2.5 border border-border rounded-full px-4 py-2.5 cursor-pointer">
               <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <span className="text-sm text-foreground">
                 {adults + children > 1 || rooms > 1 ? travelersLabel : getGuestsLabel()}
@@ -517,7 +517,7 @@ const SearchBar = ({ defaultCategory }: SearchBarProps) => {
         <Button
           size="lg"
           onClick={handleSearch}
-          className="w-full rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground h-12 gap-2 font-semibold text-base"
+          className="w-full rounded-full bg-primary hover:bg-primary/90 text-primary-foreground h-11 gap-2 font-semibold text-base"
         >
           <Search className="h-4 w-4" />
           Search

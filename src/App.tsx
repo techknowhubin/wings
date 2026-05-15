@@ -38,6 +38,7 @@ import BookingConfirmation from "./pages/BookingConfirmation";
 import TransactionFailed from "./pages/TransactionFailed";
 import PublicLinkInBio from "./pages/PublicLinkInBio";
 import Terms from "./pages/Terms";
+import WhatsAppButton from "./components/WhatsAppButton";
 
 // Host Dashboard
 import HostLayout from "./pages/HostLayout";
@@ -155,6 +156,7 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <WhatsAppButton />
         </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>

@@ -26,11 +26,12 @@ html, body, #root {
   max-width: 100vw;
   margin: 0; 
   padding: 0; 
+  overflow-x: hidden;
 }
 html { scroll-behavior: smooth; }
 #prog { position: fixed; top: 0; left: 0; height: 3px; background: linear-gradient(90deg, var(--lime), var(--gm)); width: 0; z-index: 300; transition: width .1s linear; }
 
-/* NAV removed - using standard Header */
+
 .marquee-section { width: 100%; overflow: hidden; background: var(--g); padding: 14px 0; }
 .trust-row { display: flex; gap: 24px; font-size: 14px; font-weight: 500; flex-wrap: wrap; }
 @media(max-width: 768px) { .trust-row { justify-content: center; gap: 16px; } }
@@ -84,7 +85,8 @@ html { scroll-behavior: smooth; }
 }
 .mt-layer {
   position: absolute;
-  bottom: 0; left: 0; right: 0;
+  bottom: 0; left: -10%; right: -10%;
+  width: 120%;
   background-size: cover;
   background-position: bottom center;
   background-repeat: repeat-x;
@@ -163,39 +165,38 @@ html { scroll-behavior: smooth; }
   flex-wrap: wrap;
 }
 .cta-primary {
-  background: #D9F24C;
-  color: #0B3D2E;
- 
-  font-size: 16px;
-  font-weight: 800;
-  padding: 16px 32px;
+  background: var(--lime);
+  color: var(--g);
+  font-size: 15px;
+  font-weight: 700;
+  padding: 14px 28px;
   border-radius: 100px;
   text-decoration: none;
-  box-shadow: 0 8px 32px rgba(217,242,76,0.3);
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 4px 14px rgba(200,230,76,0.25);
+  transition: all 0.3s ease;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 .cta-primary:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 12px 40px rgba(217,242,76,0.5);
-  background: #C8E64C;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(200,230,76,0.35);
+  background: #B8D63C;
 }
 .cta-secondary {
-  background: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.08);
   color: #fff;
   border: 1px solid rgba(255,255,255,0.2);
-  backdrop-filter: blur(12px);
-  font-size: 16px;
+  backdrop-filter: blur(8px);
+  font-size: 15px;
   font-weight: 600;
-  padding: 15px 32px;
+  padding: 14px 28px;
   border-radius: 100px;
   text-decoration: none;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
 }
 .cta-secondary:hover {
-  background: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.15);
   transform: translateY(-2px);
 }
 
@@ -303,7 +304,7 @@ html { scroll-behavior: smooth; }
 .marquee-item span { color: var(--lime); font-size: 16px; }
 
 /* SECTIONS */
-.section { max-width: 1200px; margin: 0 auto; padding: 90px 40px; }
+.section { max-width: 1200px; margin: 0 auto; padding: 90px 40px; overflow: hidden; }
 .section-top { text-align: center; margin-bottom: 56px; }
 .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 12px; }
 .eyebrow::before, .eyebrow::after { content: ''; flex: 0 0 28px; height: 1px; background: var(--border); }
@@ -387,11 +388,11 @@ html { scroll-behavior: smooth; }
 .p-list li { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: rgba(255,255,255,.7); transition: color .2s, transform .2s; }
 .p-list li:hover { color: #fff; transform: translateX(3px); }
 .p-list li::before { content: '✓'; flex-shrink: 0; width: 19px; height: 19px; border-radius: 50%; background: rgba(200,230,76,.12); display: inline-flex; align-items: center; justify-content: center; font-size: 9px; color: var(--lime); font-weight: 900; }
-.p-btn { display: block; margin-top: 26px; border-radius: 100px; padding: 12px; text-align: center; text-decoration: none; font-weight: 700; font-size: 14px; transition: all .25s; }
-.pc:not(.hot) .p-btn { background: rgba(255,255,255,.08); color: #fff; border: 1.5px solid rgba(255,255,255,.15); }
-.pc:not(.hot) .p-btn:hover { background: rgba(255,255,255,.16); }
-.pc.hot .p-btn { background: var(--lime); color: var(--g); border: none; }
-.pc.hot .p-btn:hover { background: var(--lime-d); transform: translateY(-2px); box-shadow: 0 8px 24px var(--lime-glow); }
+.p-btn { display: block; margin-top: 26px; border-radius: 100px; padding: 12px; text-align: center; text-decoration: none; font-weight: 700; font-size: 14.5px; transition: all .3s ease; }
+.pc:not(.hot) .p-btn { background: rgba(255,255,255,.08); color: #fff; border: 1.5px solid rgba(255,255,255,.15); backdrop-filter: blur(8px); }
+.pc:not(.hot) .p-btn:hover { background: rgba(255,255,255,.16); transform: translateY(-2px); }
+.pc.hot .p-btn { background: var(--lime); color: var(--g); border: none; box-shadow: 0 4px 14px rgba(200,230,76,0.2); }
+.pc.hot .p-btn:hover { background: #B8D63C; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(200,230,76,0.3); }
 .nums { border-top: 1px solid rgba(255,255,255,.07); display: grid; grid-template-columns: repeat(3, 1fr); position: relative; z-index: 1; }
 .num-i { padding: 44px; border-right: 1px solid rgba(255,255,255,.07); text-align: center; transition: background .3s; }
 .num-i:last-child { border: none; }
@@ -399,24 +400,54 @@ html { scroll-behavior: smooth; }
 .num-n { font-size: 50px; font-weight: 800; color: var(--lime); display: block; line-height: 1; margin-bottom: 6px; transition: transform .3s; }
 .num-i:hover .num-n { transform: scale(1.07); }
 .num-l { font-size: 13.5px; color: rgba(255,255,255,.42); }
-.final { max-width: 1200px; margin: 0 auto; padding: 90px 40px; text-align: center; position: relative; }
+.final { max-width: 1200px; margin: 0 auto; padding: 90px 40px; text-align: center; position: relative; overflow: hidden; }
 .final-orb { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 600px; height: 300px; background: radial-gradient(ellipse, rgba(200,230,76,.13) 0%, transparent 65%); pointer-events: none; }
 .final h2 { font-size: clamp(28px, 4.2vw, 52px); font-weight: 800; color: var(--g); letter-spacing: -.02em; line-height: 1.1; margin-bottom: 14px; }
 .final p { font-size: 17px; color: var(--muted); margin-bottom: 34px; line-height: 1.7; }
 .final-btns { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-.fcta { display: inline-flex; align-items: center; gap: 10px; background: var(--lime); color: var(--g); font-size: 16px; font-weight: 800; border-radius: 100px; padding: 18px 36px; text-decoration: none; transition: all .28s; position: relative; overflow: hidden; }
-.fcta::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.3), transparent); transform: translateX(-100%); animation: shim 2.5s ease-in-out infinite 1s; }
-.fcta:hover { background: var(--lime-d); transform: translateY(-3px) scale(1.02); box-shadow: 0 18px 56px rgba(200,230,76,.38); }
-.fcta-arrow { width: 26px; height: 26px; border-radius: 50%; background: var(--g); display: flex; align-items: center; justify-content: center; font-size: 13px; transition: transform .25s; }
-.fcta:hover .fcta-arrow { transform: translateX(5px); }
-.fcta-wa { display: inline-flex; align-items: center; gap: 10px; background: #fff; color: var(--g); border: 1.5px solid var(--border); font-size: 15px; font-weight: 600; border-radius: 100px; padding: 16px 28px; text-decoration: none; transition: all .25s; }
-.fcta-wa:hover { border-color: var(--g); transform: translateY(-2px); box-shadow: var(--shadow-md); }
-.wa { position: fixed; bottom: 28px; right: 28px; z-index: 90; background: #25d366; color: #fff; border-radius: 100px; padding: 13px 20px; display: flex; align-items: center; gap: 9px; font-size: 13.5px; font-weight: 700; text-decoration: none; box-shadow: 0 6px 28px rgba(37,211,102,.45); transition: transform .25s, box-shadow .25s; animation: fadeU .7s 2.5s ease both; }
-.wa:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 14px 44px rgba(37,211,102,.5); }
-.wa-ic { font-size: 18px; }
-@keyframes fadeU { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes fadeD { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes shim { to { transform: translateX(200%); } }
+.fcta { 
+  display: inline-flex; 
+  align-items: center; 
+  gap: 10px; 
+  background: var(--lime); 
+  color: var(--g); 
+  font-size: 16px; 
+  font-weight: 700; 
+  border-radius: 100px; 
+  padding: 16px 32px; 
+  text-decoration: none; 
+  transition: all .3s ease; 
+  position: relative; 
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(200,230,76,0.25);
+}
+.fcta:hover { 
+  background: #B8D63C; 
+  transform: translateY(-3px); 
+  box-shadow: 0 12px 36px rgba(200,230,76,0.35); 
+}
+.fcta-arrow { width: 24px; height: 24px; border-radius: 50%; background: var(--g); color: var(--lime); display: flex; align-items: center; justify-content: center; font-size: 12px; transition: transform .25s; }
+.fcta:hover .fcta-arrow { transform: translateX(4px); }
+.fcta-wa { 
+  display: inline-flex; 
+  align-items: center; 
+  gap: 10px; 
+  background: var(--white); 
+  color: var(--g); 
+  border: 1.5px solid var(--border); 
+  font-size: 15px; 
+  font-weight: 600; 
+  border-radius: 100px; 
+  padding: 16px 32px; 
+  text-decoration: none; 
+  transition: all .3s ease; 
+}
+.fcta-wa:hover { 
+  border-color: var(--lime); 
+  transform: translateY(-3px); 
+  box-shadow: var(--shadow-md); 
+}
+
 @media(max-width: 1024px) {
   .hero-inner { grid-template-columns: 1fr; gap: 40px; padding: 100px 20px 60px; text-align: center; min-height: auto; width: 100%; max-width: 100%; overflow: hidden; }
   .hero-left h1 { margin: 0 auto; max-width: 800px; }
@@ -431,16 +462,12 @@ html { scroll-behavior: smooth; }
   .p-grid { grid-template-columns: 1fr; gap: 24px; }
   .nums { grid-template-columns: 1fr; }
   .num-i { border-right: none; border-bottom: 1px solid rgba(255,255,255,.07); padding: 24px; }
-  .nav { padding: 0 20px; }
+
   .section, .how-inner, .pricing-inner, .final { padding: 50px 20px; }
 
 }
 @media(max-width: 768px) {
-  .nav-links { display: none; }
-  .nav-r .btn-ghost { display: none; }
-  .nav-r { gap: 8px; }
-  .hamburger { display: flex; margin-left: 4px; }
-  .nav-r .btn-lime { font-size: 11px; padding: 7px 12px; white-space: nowrap; flex-shrink: 0; }
+
   .feats-grid { grid-template-columns: 1fr; }
   .steps { grid-template-columns: 1fr; }
   .section, .how-inner, .pricing-inner, .final { padding: 48px 20px; }
@@ -452,8 +479,7 @@ html { scroll-behavior: smooth; }
   .phone-mockup { transform: scale(0.85); transform-origin: center top; margin-bottom: -40px; max-width: 270px; }
 }
 @media(max-width: 480px) {
-  .nav-r .btn-lime { display: none; }
-  .nav { padding: 0 16px; }
+
   .hero-inner { padding: 70px 12px 30px; }
   .hero-left h1 { font-size: 28px; }
   .hero-ctas { flex-direction: column; width: 100%; gap: 10px; }
@@ -464,12 +490,91 @@ html { scroll-behavior: smooth; }
   .p-price { font-size: 26px; }
   .num-n { font-size: 32px; }
   .marquee-item { padding: 0 12px; font-size: 10px; }
+  .testi-card { width: 300px; padding: 24px; border-radius: 24px; }
+  .testi-text { font-size: 13px; }
+  .testi-quote { font-size: 32px; }
 }
+
+/* TESTIMONIALS */
+.testi-section { background: var(--bg); padding: 100px 0; overflow: hidden; }
+.testi-badge-top { display: flex; flex-direction: column; align-items: center; margin-bottom: 50px; }
+.testi-stars { color: var(--lime); font-size: 20px; margin-bottom: 8px; }
+.testi-rating-text { font-size: 14px; font-weight: 700; color: var(--g); letter-spacing: 0.5px; }
+
+.testi-container { display: flex; flex-direction: column; gap: 24px; position: relative; }
+.testi-row { display: flex; gap: 24px; width: max-content; }
+.testi-row.ltr { animation: marquee-ltr 40s linear infinite; }
+.testi-row.rtl { animation: marquee-rtl 40s linear infinite; }
+.testi-row:hover { animation-play-state: paused; }
+
+@keyframes marquee-ltr { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+@keyframes marquee-rtl { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+.testi-card { 
+  background: var(--white); 
+  border: 1.5px solid var(--border); 
+  border-radius: 28px; 
+  padding: 32px; 
+  width: 380px; 
+  flex-shrink: 0; 
+  display: flex; 
+  flex-direction: column; 
+  gap: 18px; 
+  box-shadow: var(--shadow-sm); 
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.testi-card:hover { border-color: var(--lime); transform: translateY(-5px); box-shadow: var(--shadow-md); }
+.testi-quote { color: var(--lime); font-size: 44px; line-height: 1; font-family: serif; font-weight: 900; opacity: 1; }
+.testi-text { font-size: 14.5px; line-height: 1.65; color: var(--text); font-weight: 500; }
+.testi-footer { display: flex; align-items: center; gap: 14px; margin-top: auto; }
+.testi-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: var(--lime-p); border: 1.5px solid var(--lime); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.testi-info { display: flex; flex-direction: column; }
+.testi-name { font-size: 13.5px; font-weight: 800; color: var(--text); }
+.testi-title { font-size: 11.5px; color: var(--muted); }
 `;
 
 export default function LinkInBioLanding() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("hs");
+
+  const testimonials = [
+    {
+      name: "Arjun Hegde",
+      title: "Owner, Green View Homestay",
+      text: "Finally, a tool that understands the Indian homestay market. Managing bookings on WhatsApp was a nightmare until I found Wing Bio. Direct payments to UPI is a game-changer!",
+      avatar: "🏡"
+    },
+    {
+      name: "Sriya Reddy",
+      title: "Founder, Wanderlust Boutique",
+      text: "The 10% commission is unbeatable. Most OTAs take 30%. Our direct bookings increased by 40% since we shared our Wing Bio link on Instagram.",
+      avatar: "🏨"
+    },
+    {
+      name: "Rahul Sharma",
+      title: "Manager, Himalayan Trails",
+      text: "Clean, professional, and so easy to set up. Guests love the Wing Pass QR check-in — it makes us look like a tech-savvy enterprise.",
+      avatar: "🏔️"
+    },
+    {
+      name: "Deepika M.",
+      title: "Host, Sun-Kissed Villa",
+      text: "I was skeptical about another link-in-bio tool, but Wing Bio is actually a full-fledged storefront. The analytics help me see exactly what drives stays.",
+      avatar: "🏖️"
+    },
+    {
+      name: "Vikram Singh",
+      title: "CEO, Wheels on Rent",
+      text: "Listing our bike fleet was simple. The availability management is robust, and getting payouts in 24 hours keeps our cash flow healthy.",
+      avatar: "🏍️"
+    },
+    {
+      name: "Ananya K.",
+      title: "Owner, Hidden Valley Resort",
+      text: "Our guests appreciate the WingPoints. It's rare for small resorts to have a loyalty program, and Wing Bio gives us that edge over competition.",
+      avatar: "🌿"
+    }
+  ];
 
 
 
@@ -574,8 +679,8 @@ export default function LinkInBioLanding() {
               <div className="phone-screen">
                 <div className="mockup-inner">
                   <div className="m-profile">
-                    <div className="m-avatar">🧑🏽</div>
-                    <div className="m-name">Chandra's Escapes</div>
+                    <div className="m-avatar">🏡</div>
+                    <div className="m-name">Misty Coorg stays</div>
                     <div className="m-bio">📍 Coorg, Karnataka</div>
                   </div>
 
@@ -768,6 +873,49 @@ export default function LinkInBioLanding() {
         </div>
       </div> */}
 
+      <section className="testi-section">
+        <div className="testi-badge-top rv">
+          <div className="testi-stars">★★★★★</div>
+          <div className="testi-rating-text">RATED 4.9/5 BY 200+ SERVICE PROVIDERS</div>
+        </div>
+
+        <div className="testi-container">
+          {/* Row 1: Right to Left */}
+          <div className="testi-row rtl">
+            {[...testimonials, ...testimonials].map((t, i) => (
+              <div key={`rtl-${i}`} className="testi-card">
+                <div className="testi-quote">“</div>
+                <p className="testi-text">{t.text}</p>
+                <div className="testi-footer">
+                  <div className="testi-avatar">{t.avatar}</div>
+                  <div className="testi-info">
+                    <span className="testi-name">{t.name}</span>
+                    <span className="testi-title">{t.title}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Row 2: Left to Right */}
+          <div className="testi-row ltr">
+            {[...testimonials.slice().reverse(), ...testimonials.slice().reverse()].map((t, i) => (
+              <div key={`ltr-${i}`} className="testi-card">
+                <div className="testi-quote">“</div>
+                <p className="testi-text">{t.text}</p>
+                <div className="testi-footer">
+                  <div className="testi-avatar">{t.avatar}</div>
+                  <div className="testi-info">
+                    <span className="testi-name">{t.name}</span>
+                    <span className="testi-title">{t.title}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="final">
         <div className="final-orb"></div>
         <h2 className="rv">Ready to create your Wing Bio?</h2>
@@ -780,7 +928,7 @@ export default function LinkInBioLanding() {
 
       <Footer />
 
-      <a href="https://wa.me/919422799420?text=Hi%2C%20I%20want%20to%20create%20my%20Wing%20Link" className="wa" target="_blank" rel="noreferrer"><span className="wa-ic">💬</span><span>Chat with us</span></a>
+
     </>
   );
 }

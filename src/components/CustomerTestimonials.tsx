@@ -1,97 +1,130 @@
 import { motion } from "framer-motion";
-import { Star } from "lucide-react";
 
 const testimonials = [
   {
-    name: "Ananya S",
-    rating: 5,
-    text: "Booked a cozy homestay in Manali through Xplorwing — the place was exactly as shown. Seamless check-in and the host was wonderful!",
-    avatar: "A",
+    name: "Amit V.",
+    title: "Traveler from Bangalore",
+    text: "Booking our Coorg stay through Xplorwing was so seamless. The direct WhatsApp contact with the host made everything personal and easy. Highly recommended!",
+    avatar: "🏡"
   },
   {
-    name: "Rohit M",
-    rating: 5,
-    text: "Rented a Royal Enfield for my Ladakh trip. The bike was in great condition and the pricing was super transparent. Will definitely use again!",
-    avatar: "R",
+    name: "Sanya Malhotra",
+    title: "Adventure Enthusiast",
+    text: "I love the Wing Bio layout. It's so much better than browsing through hundreds of generic listings. Finding unique cabins was a breeze!",
+    avatar: "🎒"
   },
   {
-    name: "Priya K",
-    rating: 5,
-    text: "The sunrise trek experience in Munnar was magical. Our guide was knowledgeable and made the whole group feel safe. Highly recommend!",
-    avatar: "P",
+    name: "Karan J.",
+    title: "Road Tripper",
+    text: "Rented a Thar for our Spiti trip. The car was in great condition, and the transparent pricing was refreshing. No hidden fees at all.",
+    avatar: "🚗"
   },
   {
-    name: "Vikram D",
-    rating: 5,
-    text: "Finding a car rental in Goa has never been easier. Great selection, fair prices, and the car was delivered right to our hotel.",
-    avatar: "V",
+    name: "Priyanka Sethi",
+    title: "Solo Traveler",
+    text: "The Wing Pass QR check-in is futuristic! No more carrying physical IDs or waiting at the reception. Just scan and enter. So convenient.",
+    avatar: "📸"
   },
   {
-    name: "Meera J",
-    rating: 5,
-    text: "We stayed at a heritage haveli in Jaipur — an unforgettable experience. Xplorwing made the booking effortless and the support team was always responsive.",
-    avatar: "M",
+    name: "Rohan Das",
+    title: "Family Traveler",
+    text: "We stayed at a heritage homestay in Jaipur. The host was amazing, and the prices were much better than other big travel sites. Real value for money.",
+    avatar: "👨‍👩‍👧‍👦"
   },
   {
-    name: "Arjun T",
-    rating: 5,
-    text: "Used Xplorwing for an outstation cab from Bangalore to Coorg. Punctual driver, clean car, and very reasonable fare. Perfect weekend getaway!",
-    avatar: "A",
-  },
+    name: "Ishani G.",
+    title: "Backpacker",
+    text: "Found the perfect sunset trek in Munnar. The guide was verified and knew all the secret spots. Best part of our entire trip!",
+    avatar: "🏔️"
+  }
 ];
 
 const CustomerTestimonials = () => {
   return (
-    <section className="container mx-auto px-4 py-16">
-      <motion.div
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
-        viewport={{ once: true }}
-      >
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
-            Loved by Travelers Across India
-          </h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            See what our customers have to say about their Xplorwing experiences
-          </p>
-        </div>
+    <section className="testi-section-home py-24 overflow-hidden bg-[#f8f6f0]">
+      <style dangerouslySetInnerHTML={{ __html: `
+        .testi-badge-top-home { display: flex; flex-direction: column; align-items: center; margin-bottom: 50px; }
+        .testi-stars-home { color: #c8e64c; font-size: 20px; margin-bottom: 8px; }
+        .testi-rating-text-home { font-size: 14px; font-weight: 700; color: #1a3d2b; letter-spacing: 0.5px; }
 
-        {/* Masonry-style grid */}
-        <div className="columns-1 sm:columns-2 lg:columns-3 gap-5 space-y-5 max-w-5xl mx-auto">
-          {testimonials.map((t, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: i * 0.08 }}
-              viewport={{ once: true }}
-              className="break-inside-avoid glass-effect rounded-2xl p-6 border border-border"
-            >
-              {/* Stars */}
-              <div className="flex gap-0.5 mb-3">
-                {Array.from({ length: t.rating }).map((_, s) => (
-                  <Star key={s} className="h-4 w-4 fill-primary-text text-primary-text" />
-                ))}
-              </div>
+        .testi-container-home { display: flex; flex-direction: column; gap: 24px; position: relative; }
+        .testi-row-home { display: flex; gap: 24px; width: max-content; }
+        .testi-row-home.ltr { animation: marquee-ltr-home 45s linear infinite; }
+        .testi-row-home.rtl { animation: marquee-rtl-home 45s linear infinite; }
+        .testi-row-home:hover { animation-play-state: paused; }
 
-              {/* Quote */}
-              <p className="text-sm text-foreground leading-relaxed mb-4">
-                {t.text}
-              </p>
+        @keyframes marquee-ltr-home { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+        @keyframes marquee-rtl-home { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
-              {/* Author */}
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary-text">
-                  {t.avatar}
+        .testi-card-home { 
+          background: #ffffff; 
+          border: 1.5px solid #e5e1d4; 
+          border-radius: 28px; 
+          padding: 32px; 
+          width: 380px; 
+          flex-shrink: 0; 
+          display: flex; 
+          flex-direction: column; 
+          gap: 18px; 
+          box-shadow: 0 2px 12px rgba(26,61,43,.07); 
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .testi-card-home:hover { border-color: #c8e64c; transform: translateY(-5px); box-shadow: 0 8px 36px rgba(26,61,43,.13); }
+        .testi-quote-home { color: #c8e64c; font-size: 44px; line-height: 1; font-family: serif; font-weight: 900; }
+        .testi-text-home { font-size: 14.5px; line-height: 1.65; color: #1a3d2b; font-weight: 500; }
+        .testi-footer-home { display: flex; align-items: center; gap: 14px; margin-top: auto; }
+        .testi-avatar-home { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #f0f8d0; border: 1.5px solid #c8e64c; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .testi-info-home { display: flex; flex-direction: column; }
+        .testi-name-home { font-size: 13.5px; font-weight: 800; color: #1a3d2b; }
+        .testi-title-home { font-size: 11.5px; color: #6b7c72; }
+
+        @media(max-width: 768px) {
+          .testi-card-home { width: 300px; padding: 24px; border-radius: 24px; }
+          .testi-text-home { font-size: 13px; }
+          .testi-quote-home { font-size: 32px; }
+        }
+      ` }} />
+
+      <div className="testi-badge-top-home">
+        <div className="testi-stars-home">★★★★★</div>
+        <div className="testi-rating-text-home uppercase tracking-widest text-xs">Loved by 2000+ Happy Travelers</div>
+      </div>
+
+      <div className="testi-container-home">
+        {/* Row 1: Right to Left */}
+        <div className="testi-row-home rtl">
+          {[...testimonials, ...testimonials].map((t, i) => (
+            <div key={`rtl-${i}`} className="testi-card-home">
+              <div className="testi-quote-home">“</div>
+              <p className="testi-text-home">{t.text}</p>
+              <div className="testi-footer-home">
+                <div className="testi-avatar-home">{t.avatar}</div>
+                <div className="testi-info-home">
+                  <span className="testi-name-home">{t.name}</span>
+                  <span className="testi-title-home">{t.title}</span>
                 </div>
-                <span className="text-sm font-medium text-foreground">{t.name}</span>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
-      </motion.div>
+
+        {/* Row 2: Left to Right */}
+        <div className="testi-row-home ltr">
+          {[...testimonials.slice().reverse(), ...testimonials.slice().reverse()].map((t, i) => (
+            <div key={`ltr-${i}`} className="testi-card-home">
+              <div className="testi-quote-home">“</div>
+              <p className="testi-text-home">{t.text}</p>
+              <div className="testi-footer-home">
+                <div className="testi-avatar-home">{t.avatar}</div>
+                <div className="testi-info-home">
+                  <span className="testi-name-home">{t.name}</span>
+                  <span className="testi-title-home">{t.title}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </section>
   );
 };

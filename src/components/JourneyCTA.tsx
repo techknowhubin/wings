@@ -52,7 +52,7 @@ const JourneyCTA = () => {
           gap: 7px;
           border: 1.5px solid #a3e635;
           border-radius: 999px;
-          padding: 6px 16px;
+          padding: 5px 14px;
           font-size: 12px;
           font-weight: 600;
           color: #a3e635;
@@ -71,7 +71,7 @@ const JourneyCTA = () => {
         }
 
         .journey-card h2 {
-          font-size: clamp(32px, 5vw, 56px);
+          font-size: clamp(22px, 4vw, 40px);
           font-weight: 800;
           color: #ffffff;
           line-height: 1.1;
@@ -81,11 +81,11 @@ const JourneyCTA = () => {
         .journey-card h2 .green { color: #a3e635; }
 
         .journey-sub {
-          font-size: 16px;
+          font-size: 14px;
           color: #7aaa82;
-          line-height: 1.7;
-          max-width: 520px;
-          margin-bottom: 36px;
+          line-height: 1.6;
+          max-width: 420px;
+          margin-bottom: 28px;
         }
 
         .journey-cta-btn {
@@ -96,7 +96,7 @@ const JourneyCTA = () => {
           color: #0d2218;
           font-size: 16px;
           font-weight: 700;
-          padding: 14px 20px 14px 32px;
+          padding: 10px 16px 10px 24px;
           border-radius: 999px;
           cursor: pointer;
           text-decoration: none;
@@ -105,11 +105,11 @@ const JourneyCTA = () => {
         }
         .journey-cta-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 28px #a3e63540; }
         .journey-cta-circle {
-          width: 36px; height: 36px;
+          width: 28px; height: 28px;
           background: #0d2218;
           border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
-          font-size: 16px;
+          font-size: 12px;
           color: #a3e635;
         }
 
@@ -190,8 +190,8 @@ const JourneyCTA = () => {
           border: 3px solid #fff;
           box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
-        .jm-name { font-size: 16px; font-weight: 800; color: #1a3d2b; }
-        .jm-bio { font-size: 11px; color: #6b7c72; margin-top: 3px; }
+        .jm-name { font-size: 12px; font-weight: 800; color: #1a3d2b; }
+        .jm-bio { font-size: 8px; color: #6b7c72; margin-top: 2px; }
 
         .jm-card {
           background: #fff;
@@ -210,8 +210,8 @@ const JourneyCTA = () => {
           font-size: 18px;
           flex-shrink: 0;
         }
-        .jm-card-info h5 { font-size: 13px; font-weight: 700; color: #1a3d2b; margin: 0 0 2px; }
-        .jm-card-info p { font-size: 10px; color: #6b7c72; margin: 0; }
+        .jm-card-info h5 { font-size: 9px; font-weight: 700; color: #1a3d2b; margin: 0 0 1px; }
+        .jm-card-info p { font-size: 7.5px; color: #6b7c72; margin: 0; }
 
         /* --- Floating glass badges --- */
         .j-glass-badge {
@@ -220,10 +220,10 @@ const JourneyCTA = () => {
           backdrop-filter: blur(16px);
           -webkit-backdrop-filter: blur(16px);
           border: 1px solid rgba(255,255,255,0.25);
-          padding: 10px 16px;
+          padding: 7px 12px;
           border-radius: 100px;
           color: #fff;
-          font-size: 12px;
+          font-size: 9px;
           font-weight: 600;
           display: flex;
           align-items: center;
@@ -236,8 +236,8 @@ const JourneyCTA = () => {
 
         /* Positioned well outside the phone (phone is ~260px centered) */
         .j-badge-rating {
-          top: -60px;
-          left: -40px;
+          top: 50px;
+          right: -20px;
           animation: j-floatBadge 5s ease-in-out infinite 0.5s;
         }
         .j-badge-guests {
@@ -295,10 +295,10 @@ const JourneyCTA = () => {
           50% { transform: rotate(3deg) translateY(-8px); }
         }
 
-        .j-sc-label { font-size: 8px; font-weight: 700; text-transform: uppercase; color: #999; margin-bottom: 4px; }
-        .j-sc-amount { font-size: 22px; font-weight: 800; color: #1a1a1a; line-height: 1; margin-bottom: 3px; }
-        .j-sc-earn { font-size: 9px; color: #777; }
-        .j-sc-title { font-size: 11px; font-weight: 700; color: #1a1a1a; }
+        .j-sc-label { font-size: 6px; font-weight: 700; text-transform: uppercase; color: #999; margin-bottom: 3px; }
+        .j-sc-amount { font-size: 16px; font-weight: 800; color: #1a1a1a; line-height: 1; margin-bottom: 2px; }
+        .j-sc-earn { font-size: 7px; color: #777; }
+        .j-sc-title { font-size: 8px; font-weight: 700; color: #1a1a1a; }
         .j-sc-url { font-size: 9px; color: #555; margin-bottom: 8px; }
         .j-tag {
           background: rgba(255,255,255,.75);
@@ -418,8 +418,8 @@ const JourneyCTA = () => {
                 <div className="journey-phone-screen">
                   <div className="journey-mockup-inner">
                     <div className="jm-profile">
-                      <div className="jm-avatar">🧑🏽</div>
-                      <div className="jm-name">Chandra's Escapes</div>
+                      <div className="jm-avatar">🏡</div>
+                      <div className="jm-name">Misty Coorg stays</div>
                       <div className="jm-bio">📍 Coorg, Karnataka</div>
                     </div>
 

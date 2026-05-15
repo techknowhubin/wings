@@ -41,7 +41,7 @@ const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const isDarkHeader = location.pathname === "/link-in-bio" || location.pathname === "/";
+
 
   // Derive display name — prefer profile display_name/full_name, fall back to phone, never show derived email
   const isWhatsAppUser = user?.user_metadata?.phone_provider === "whatsapp";
@@ -215,14 +215,7 @@ const Header = () => {
                   <Link to="/auth" className="hidden md:flex">
                     <Button
                       variant="outline"
-                      className={cn(
-                        "rounded-full px-5 transition-all font-semibold",
-                        isDarkHeader
-                          ? theme === "dark"
-                            ? "bg-transparent text-white border-white hover:bg-white/10 hover:text-white"
-                            : "bg-transparent text-black border-black hover:bg-black/5 hover:text-black"
-                          : "border-border text-foreground hover:bg-muted/50"
-                      )}
+                      className="rounded-full px-5 transition-all font-semibold border-border text-foreground hover:bg-muted/50"
                     >
                       Login/Signup
                     </Button>
@@ -273,7 +266,7 @@ const Header = () => {
             >
               {/* Header */}
               <div className="flex items-center justify-between p-4 border-b border-border">
-                <DynamicLogo lightHeightClass="h-7" darkHeightClass="h-[36px]" />
+                <span className="text-sm font-bold tracking-tight text-foreground/70 uppercase px-2">Menu</span>
                 <Button
                   variant="ghost"
                   size="icon"

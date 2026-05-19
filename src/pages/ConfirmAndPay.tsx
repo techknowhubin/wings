@@ -215,22 +215,26 @@ const ConfirmAndPay = () => {
   }, [booking, hostDiscountAmount]);
 
   const normalBookingFee = useMemo(() => {
-    return Math.round(baseTotal * 0.10);
+    return baseTotal * 0.10;
   }, [baseTotal]);
 
   const couponDiscountAmount = useMemo(() => {
     if (!booking || !appliedCoupon) return 0;
     if (appliedCoupon.code.toUpperCase() === "WINGSTART") {
       // WINGSTART reduces the booking fee from 10% to 5%, so the discount is 5% of baseTotal
-      return Math.round(baseTotal * 0.05);
+      return baseTotal * 0.05;
     }
     // For other coupons, we can apply their percentage discount directly to the booking fee
-    return Math.round((normalBookingFee * appliedCoupon.value) / 100);
+    return (normalBookingFee * appliedCoupon.value) / 100;
   }, [appliedCoupon, booking, baseTotal, normalBookingFee]);
 
   const totalPayable = useMemo(() => {
     return Math.max(normalBookingFee - couponDiscountAmount, 0);
   }, [normalBookingFee, couponDiscountAmount]);
+
+  const formatAmount = (val: number) => {
+    return val % 1 === 0 ? String(val) : val.toFixed(2);
+  };
 
   const handleApplyCoupon = async () => {
     if (!availableCoupons.length) {
@@ -417,7 +421,7 @@ const ConfirmAndPay = () => {
                     type="button"
                     variant="link"
                     size="sm"
-                    className="h-auto p-0 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+                    className="h-auto p-0 text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors"
                     onClick={handleSameAsLogin}
                   >
                     Same as login details
@@ -488,28 +492,28 @@ const ConfirmAndPay = () => {
             <div className="space-y-2 text-sm border-t border-border pt-4">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Item total</span>
-                <span className="font-medium text-foreground">{booking.currencySymbol}{booking.subtotal}</span>
+                <span className="font-medium text-foreground">{booking.currencySymbol}{formatAmount(booking.subtotal)}</span>
               </div>
               {hostDiscountAmount > 0 ? (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Host discount ({booking.hostDiscountPercent ?? 0}%)</span>
-                  <span className="font-medium text-accent">-{booking.currencySymbol}{hostDiscountAmount}</span>
+                  <span className="font-medium text-accent">-{booking.currencySymbol}{formatAmount(hostDiscountAmount)}</span>
                 </div>
               ) : null}
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Service fee</span>
-                <span className="font-medium text-foreground">{booking.currencySymbol}{booking.serviceFee}</span>
+                <span className="font-medium text-foreground">{booking.currencySymbol}{formatAmount(booking.serviceFee)}</span>
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-dashed border-border">
                 <span className="text-muted-foreground">Booking Fee (10%)</span>
-                <span className="font-medium text-foreground">{booking.currencySymbol}{normalBookingFee}</span>
+                <span className="font-medium text-foreground">{booking.currencySymbol}{formatAmount(normalBookingFee)}</span>
               </div>
               {appliedCoupon ? (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground font-semibold text-accent">
                     Coupon discount {appliedCoupon.code.toUpperCase() === "WINGSTART" ? "(Wingstart 5%)" : `(${appliedCoupon.value}%)`}
                   </span>
-                  <span className="font-medium text-accent">-{booking.currencySymbol}{couponDiscountAmount}</span>
+                  <span className="font-medium text-accent">-{booking.currencySymbol}{formatAmount(couponDiscountAmount)}</span>
                 </div>
               ) : null}
               <div className="flex items-center justify-between pt-3 mt-2 border-t border-border">
@@ -517,7 +521,7 @@ const ConfirmAndPay = () => {
                   <Receipt className="h-4 w-4 text-accent" />
                   Total payable ({bookingFeeRate}% Booking Fee)
                 </span>
-                <span className="font-bold text-xl text-accent">{booking.currencySymbol}{totalPayable}</span>
+                <span className="font-bold text-xl text-accent">{booking.currencySymbol}{formatAmount(totalPayable)}</span>
               </div>
             </div>
 

@@ -1,6 +1,7 @@
 import type { CouponOffer } from "@/lib/discounts";
 
 export interface BookingDetails {
+  listingId?: string;
   listingType: "stay" | "vehicle" | "experience";
   listingCouponType?: "stays" | "hotels" | "resorts" | "cars" | "bikes" | "experiences";
   hostId?: string;

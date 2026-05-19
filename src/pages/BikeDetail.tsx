@@ -274,6 +274,7 @@ const BikeDetail = () => {
 
           <div className="lg:col-span-1">
             <VehicleBookingPanel
+              listingId={bike.id}
               pricePerDay={price}
               title={bike.title}
               currencySymbol={currencySymbol}

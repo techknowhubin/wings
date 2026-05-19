@@ -301,8 +301,59 @@ const ConfirmAndPay = () => {
       title: booking.listingTitle,
       description: booking.description,
       prefill: { name, email, contact: phone },
-      onSuccess: (response) => {
+      onSuccess: async (response) => {
         setIsProcessing(false);
+
+        let dbListingType = "stay";
+        if (booking.listingType === "stay") {
+          if (booking.listingCouponType === "hotels") {
+            dbListingType = "hotel";
+          } else if (booking.listingCouponType === "resorts") {
+            dbListingType = "resort";
+          } else {
+            dbListingType = "stay";
+          }
+        } else if (booking.listingType === "experience") {
+          dbListingType = "experience";
+        } else if (booking.listingType === "vehicle") {
+          if (booking.listingCouponType === "bikes") {
+            dbListingType = "bike";
+          } else {
+            dbListingType = "car";
+          }
+        }
+
+        try {
+          const bookingData = {
+            user_id: user?.id,
+            listing_id: booking.listingId || "00000000-0000-0000-0000-000000000000",
+            listing_type: dbListingType,
+            host_id: booking.hostId || user?.id || "00000000-0000-0000-0000-000000000000",
+            start_date: new Date(booking.startDate).toISOString().split('T')[0],
+            end_date: new Date(booking.endDate).toISOString().split('T')[0],
+            total_price: totalPayable,
+            currency: booking.currencySymbol === "₹" ? "INR" : "USD",
+            payment_status: "completed",
+            payment_method: "razorpay",
+            booking_status: "confirmed",
+            transaction_id: response.razorpay_payment_id,
+            guests_count: booking.quantity || 1,
+          };
+          
+          const { error: bookingError } = await supabase
+            .from("bookings")
+            .insert(bookingData);
+            
+          if (bookingError) {
+            console.error("Error creating booking:", bookingError);
+            toast.error("Payment successful, but failed to save booking to database.");
+          } else {
+            toast.success("Booking confirmed and saved!");
+          }
+        } catch (err) {
+          console.error("Failed to insert booking record:", err);
+        }
+
         if (appliedCoupon?.id && user && booking.hostId) {
           void supabase
             .from("host_coupon_redemptions" as any)

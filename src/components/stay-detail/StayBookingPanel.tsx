@@ -11,6 +11,7 @@ import type { BookingDetails } from "@/types/booking";
 import type { CouponOffer } from "@/lib/discounts";
 
 interface StayBookingPanelProps {
+  listingId?: string;
   pricePerNight: number;
   currencySymbol: string;
   maxGuests: number;
@@ -23,6 +24,7 @@ interface StayBookingPanelProps {
 }
 
 const StayBookingPanel = ({
+  listingId,
   pricePerNight,
   currencySymbol,
   maxGuests,
@@ -213,6 +215,7 @@ const StayBookingPanel = ({
         size="lg"
         onClick={() => {
           const booking: BookingDetails = {
+            listingId,
             listingType: "stay",
             listingCouponType,
             hostId,

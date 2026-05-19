@@ -468,6 +468,7 @@ const StayDetail = () => {
           {/* Right Column - Booking Panel */}
           <div className="lg:col-span-1">
             <StayBookingPanel
+              listingId={stay.id}
               pricePerNight={stay.price_per_night}
               currencySymbol={currencySymbol}
               maxGuests={stay.max_guests}

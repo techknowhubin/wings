@@ -11,6 +11,7 @@ import type { BookingDetails } from "@/types/booking";
 import type { CouponOffer } from "@/lib/discounts";
 
 interface VehicleBookingPanelProps {
+  listingId?: string;
   pricePerDay: number;
   currencySymbol?: string;
   title: string;
@@ -23,6 +24,7 @@ interface VehicleBookingPanelProps {
 }
 
 const VehicleBookingPanel = ({
+  listingId,
   pricePerDay,
   currencySymbol = "₹",
   title,
@@ -181,6 +183,7 @@ const VehicleBookingPanel = ({
         size="lg"
         onClick={() => {
           const booking: BookingDetails = {
+            listingId,
             listingType: "vehicle",
             listingCouponType,
             hostId,

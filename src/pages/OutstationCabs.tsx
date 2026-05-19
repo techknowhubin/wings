@@ -285,7 +285,7 @@ const OutstationCabs = () => {
       <BackButton />
 
       {/* Hero Section with Slider */}
-      <section className="container mx-auto px-4 pt-4">
+      <section className="hidden lg:block container mx-auto px-4 pt-4">
         <div className="relative h-[65vh] md:h-[85vh] rounded-3xl overflow-hidden">
           {heroImages.map((img, i) => (
             <motion.div

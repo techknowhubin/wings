@@ -229,7 +229,10 @@ const ConfirmAndPay = () => {
   }, [appliedCoupon, booking, baseTotal, normalBookingFee]);
 
   const totalPayable = useMemo(() => {
-    return Math.max(normalBookingFee - couponDiscountAmount, 0);
+    const raw = normalBookingFee - couponDiscountAmount;
+    if (raw <= 0) return 0;
+    // Razorpay minimum transaction amount is ₹1.00 (100 paise)
+    return Math.max(raw, 1.00);
   }, [normalBookingFee, couponDiscountAmount]);
 
   const formatAmount = (val: number) => {

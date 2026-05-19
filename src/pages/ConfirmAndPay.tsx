@@ -45,6 +45,54 @@ const ConfirmAndPay = () => {
   const [globalCoupons, setGlobalCoupons] = useState<HostedCoupon[]>([]);
 
   useEffect(() => {
+    const prefillFromProfile = async () => {
+      if (!user) return;
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, phone")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profile) {
+          setName(prev => prev || profile.full_name || user.user_metadata?.full_name || user.user_metadata?.name || "");
+          setPhone(prev => prev || profile.phone || user.phone || "");
+        }
+      } catch (err) {
+        // ignore
+      }
+      setEmail(prev => prev || user.email || "");
+    };
+    void prefillFromProfile();
+  }, [user]);
+
+  const handleSameAsLogin = async () => {
+    if (!user) {
+      toast.error("Please login first to use this feature.");
+      return;
+    }
+    try {
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("full_name, phone")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      setName(profile?.full_name || user.user_metadata?.full_name || user.user_metadata?.name || "");
+      setPhone(profile?.phone || user.phone || "");
+      setEmail(user.email || "");
+      toast.success("Details filled from your profile.");
+    } catch (err) {
+      setName(user.user_metadata?.full_name || user.user_metadata?.name || "");
+      setPhone(user.phone || "");
+      setEmail(user.email || "");
+      toast.success("Details filled from login session.");
+    }
+  };
+
+  useEffect(() => {
     const fetchCoupons = async () => {
       if (!booking?.hostId || !booking.listingCouponType) return;
       const { data } = await supabase
@@ -134,15 +182,55 @@ const ConfirmAndPay = () => {
   }, [booking]);
 
   const hostDiscountAmount = booking?.discount ?? 0;
-  const availableCoupons = globalCoupons.length > 0 ? globalCoupons : (booking?.availableCoupons as HostedCoupon[] | undefined) ?? [];
+  const availableCoupons = useMemo(() => {
+    const list = globalCoupons.length > 0 ? [...globalCoupons] : [...((booking?.availableCoupons as HostedCoupon[] | undefined) ?? [])];
+    
+    // Always ensure WINGSTART is in the available coupons list so users can apply it!
+    if (!list.some(c => c.code.toUpperCase() === "WINGSTART")) {
+      list.push({
+        id: "wingstart-global",
+        code: "WINGSTART",
+        type: "percent" as const,
+        value: 5,
+        startsAt: null,
+        endsAt: null,
+        usageLimit: null,
+        usedCount: 0,
+        oneTimePerUser: false
+      });
+    }
+    return list;
+  }, [globalCoupons, booking?.availableCoupons]);
+
+  const bookingFeeRate = useMemo(() => {
+    if (appliedCoupon && appliedCoupon.code.toUpperCase() === "WINGSTART") {
+      return 5;
+    }
+    return 10;
+  }, [appliedCoupon]);
+
+  const baseTotal = useMemo(() => {
+    if (!booking) return 0;
+    return Math.max(booking.subtotal - hostDiscountAmount + booking.serviceFee, 0);
+  }, [booking, hostDiscountAmount]);
+
+  const normalBookingFee = useMemo(() => {
+    return Math.round(baseTotal * 0.10);
+  }, [baseTotal]);
+
   const couponDiscountAmount = useMemo(() => {
     if (!booking || !appliedCoupon) return 0;
-    return Math.round(((booking.subtotal - hostDiscountAmount) * appliedCoupon.value) / 100);
-  }, [appliedCoupon, booking, hostDiscountAmount]);
+    if (appliedCoupon.code.toUpperCase() === "WINGSTART") {
+      // WINGSTART reduces the booking fee from 10% to 5%, so the discount is 5% of baseTotal
+      return Math.round(baseTotal * 0.05);
+    }
+    // For other coupons, we can apply their percentage discount directly to the booking fee
+    return Math.round((normalBookingFee * appliedCoupon.value) / 100);
+  }, [appliedCoupon, booking, baseTotal, normalBookingFee]);
+
   const totalPayable = useMemo(() => {
-    if (!booking) return 0;
-    return Math.max(booking.subtotal - hostDiscountAmount - couponDiscountAmount + booking.serviceFee, 0);
-  }, [booking, couponDiscountAmount, hostDiscountAmount]);
+    return Math.max(normalBookingFee - couponDiscountAmount, 0);
+  }, [normalBookingFee, couponDiscountAmount]);
 
   const handleApplyCoupon = async () => {
     if (!availableCoupons.length) {
@@ -319,10 +407,23 @@ const ConfirmAndPay = () => {
             </div>
 
             <div className="rounded-2xl border border-border bg-secondary/30 p-4">
-              <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <UserRound className="h-5 w-5 text-accent" />
-                Customer details
-              </h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <UserRound className="h-5 w-5 text-accent" />
+                  Customer details
+                </h2>
+                {user && (
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="h-auto p-0 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+                    onClick={handleSameAsLogin}
+                  >
+                    Same as login details
+                  </Button>
+                )}
+              </div>
               <form className="space-y-3" onSubmit={handleProceedToPay} id="checkout-form">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
@@ -396,17 +497,25 @@ const ConfirmAndPay = () => {
                 </div>
               ) : null}
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Coupon discount</span>
-                <span className="font-medium text-accent">-{booking.currencySymbol}{couponDiscountAmount}</span>
-              </div>
-              <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Service fee</span>
                 <span className="font-medium text-foreground">{booking.currencySymbol}{booking.serviceFee}</span>
               </div>
+              <div className="flex items-center justify-between pt-2 border-t border-dashed border-border">
+                <span className="text-muted-foreground">Booking Fee (10%)</span>
+                <span className="font-medium text-foreground">{booking.currencySymbol}{normalBookingFee}</span>
+              </div>
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground font-semibold text-accent">
+                    Coupon discount {appliedCoupon.code.toUpperCase() === "WINGSTART" ? "(Wingstart 5%)" : `(${appliedCoupon.value}%)`}
+                  </span>
+                  <span className="font-medium text-accent">-{booking.currencySymbol}{couponDiscountAmount}</span>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between pt-3 mt-2 border-t border-border">
                 <span className="font-semibold text-foreground flex items-center gap-1.5">
                   <Receipt className="h-4 w-4 text-accent" />
-                  Total payable
+                  Total payable ({bookingFeeRate}% Booking Fee)
                 </span>
                 <span className="font-bold text-xl text-accent">{booking.currencySymbol}{totalPayable}</span>
               </div>

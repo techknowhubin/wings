@@ -1,7 +1,7 @@
 import Header from "@/components/Header";
+import BackButton from "@/components/BackButton";
 import Footer from "@/components/Footer";
 import Marquee from "@/components/Marquee";
-import SearchBar from "@/components/SearchBar";
 import CategoryCard from "@/components/CategoryCard";
 import DestinationCard from "@/components/DestinationCard";
 import ListingCard from "@/components/ListingCard";
@@ -113,7 +113,7 @@ const destinations = [
   { image: rishikeshDestImage, title: "Rishikesh", subtitle: "Over 90 stays", rating: 4.7, priceRange: "Starting ₹800/night", link: "/stays" },
 ];
 
-const LandingPage = () => {
+const OutstationCabs = () => {
   const [stays, setStays] = useState<any[]>([]);
   const [bikes, setBikes] = useState<any[]>([]);
   const [cars, setCars] = useState<any[]>([]);
@@ -124,7 +124,7 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const [categoryPage, setCategoryPage] = useState(0);
   const [heroSlide, setHeroSlide] = useState(0);
-  const heroImages = [heroImage, heroXplorwing, heroTajmahal, heroOutstationCabs];
+  const heroImages = [heroXplorwing, heroOutstationCabs];
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
 
@@ -194,7 +194,7 @@ const LandingPage = () => {
     return data || [];
   };
   const fetchCars = async () => {
-    const { data } = await supabase.from("cars").select("*").eq("availability_status", true).eq("marketplace_visible", true).order("featured", { ascending: false }).order("created_at", { ascending: false }).limit(4);
+    const { data } = await supabase.from("cars").select("*").eq("availability_status", true).eq("marketplace_visible", true).order("featured", { ascending: false }).order("created_at", { ascending: false });
     return data || [];
   };
   const fetchHotels = async () => {
@@ -279,13 +279,14 @@ const LandingPage = () => {
   }, [stays, bikes, cars, hotels, resorts]);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-slate-50/50">
       <Marquee />
       <Header />
+      <BackButton />
 
       {/* Hero Section with Slider */}
-      <section className="container mx-auto px-4 pt-4 hidden md:block">
-        <div className="relative h-[85vh] rounded-3xl overflow-hidden">
+      <section className="container mx-auto px-4 pt-4">
+        <div className="relative h-[65vh] md:h-[85vh] rounded-3xl overflow-hidden">
           {heroImages.map((img, i) => (
             <motion.div
               key={i}
@@ -327,68 +328,26 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Search Bar - offset below hero on desktop, normal on mobile */}
-      <div className="container mx-auto px-4 mt-8 md:-mt-12 relative z-20 mb-8">
-        <SearchBar />
-      </div>
 
-      {/* Categories Section */}
-      <section className="container mx-auto px-4 pt-8 pb-12">
-        <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.5 }} viewport={{ once: true }}>
-          <div
-            className="flex justify-center gap-4 overflow-hidden py-4"
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-          >
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={categoryPage}
-                initial={isMobileOrTablet ? { opacity: 0, x: 60 } : { opacity: 1, x: 0 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={isMobileOrTablet ? { opacity: 0, x: -60 } : { opacity: 1, x: 0 }}
-                transition={{ duration: 0.35, ease: "easeInOut" }}
-                className="flex flex-wrap justify-center gap-4"
-              >
-                {visibleCategories.map((cat, index) => (
-                  <CategoryCard
-                    key={cat.title}
-                    image={cat.image}
-                    title={cat.title}
-                    subtitle={cat.subtitle}
-                    link={cat.link}
-                    bgColor={cat.bgColor}
-                    delay={index * 0.08}
-                    iconScale={cat.iconScale}
-                    iconOffsetX={cat.iconOffsetX}
-                    iconOffsetY={cat.iconOffsetY}
-                  />
+      <main className="flex-grow flex flex-col">
+        <div className="pt-8 md:pt-16">
+          <CabFareSection />
+        </div>
+
+        {/* Cars Section (Moved to top as requested) */}
+        {cars.length > 0 && (
+          <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full mb-16 mt-20">
+            <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.5 }} viewport={{ once: true }}>
+              <h2 className="text-2xl md:text-3xl font-bold text-accent mb-8 text-center">Available Cabs</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+                {cars.map((car, index) => (
+                  <ListingCard key={car.id} id={car.id} image={resolveListingCardImage(car.images, "car")} title={car.title} location={car.location} price={`₹${car.price_per_day}`} rating={Number(car.rating) || 0} type="car" delay={index * 0.05} />
                 ))}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-          {/* Dot navigation - hidden on desktop, transparent bg */}
-          {isMobileOrTablet && (
-            <div className="flex justify-center gap-2 mt-4 bg-transparent">
-              {Array.from({ length: totalPages }).map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setCategoryPage(i)}
-                  aria-label={`Go to slide ${i + 1}`}
-                  className={`h-2 rounded-full border-0 outline-none bg-transparent p-0 transition-all duration-300 ${
-                    i === categoryPage ? "!bg-primary/80 w-6" : "!bg-primary/20 w-2"
-                  }`}
-                  style={{ background: 'transparent' }}
-                >
-                  <span className={`block h-2 rounded-full transition-all duration-300 ${
-                    i === categoryPage ? "bg-primary/80 w-6" : "bg-primary/20 w-2"
-                  }`} />
-                </button>
-              ))}
-            </div>
-          )}
-        </motion.div>
-      </section>
+              </div>
+            </motion.div>
+          </section>
+        )}
+      </main>
 
       {/* Offers Section */}
       <OffersSection />
@@ -396,49 +355,7 @@ const LandingPage = () => {
       {/* What's New Section */}
       <WhatsNewSection />
 
-      {/* Explore India - Destination Cards */}
-      <section className="container mx-auto px-4 py-12">
-        <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.5 }} viewport={{ once: true }}>
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl font-bold text-foreground">Explore India</h2>
-            {processedDestinations.length > 6 && (
-              <Link to="/destinations" className="flex items-center gap-1 text-sm font-medium text-primary-text hover:underline">
-                See more <ChevronRight className="h-4 w-4" />
-              </Link>
-            )}
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {processedDestinations.map((dest: any, index) => (
-              <DestinationCard
-                key={dest.title}
-                image={dest.image}
-                title={dest.title}
-                subtitle={dest.subtitle}
-                rating={dest.rating}
-                priceRange={dest.priceRange}
-                link={dest.link}
-                delay={index * 0.08}
-              />
-            ))}
-          </div>
-        </motion.div>
-      </section>
 
-      {/* Homestays Section */}
-      {stays.length > 0 && (
-        <section className="container mx-auto px-4 py-16">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.5 }} viewport={{ once: true }}>
-            <h2 className="text-3xl font-bold text-foreground mb-8">Featured Homestays</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
-              {stays
-                .filter(stay => !stay.title.toLowerCase().includes("comfy homestay"))
-                .map((stay, index) => (
-                <ListingCard key={stay.id} id={stay.id} image={resolveListingCardImage(stay.images, "stay")} title={stay.title} location={stay.location} price={`₹${stay.price_per_night}`} rating={Number(stay.rating) || 0} type="stay" delay={index * 0.05} />
-              ))}
-            </div>
-          </motion.div>
-        </section>
-      )}
 
       {/* Bikes Section */}
       {bikes.length > 0 && (
@@ -454,22 +371,9 @@ const LandingPage = () => {
         </section>
       )}
 
-      {/* Cars Section */}
-      {cars.length > 0 && (
-        <section className="container mx-auto px-4 py-16">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.5 }} viewport={{ once: true }}>
-            <h2 className="text-3xl font-bold text-foreground mb-8">Car Rentals</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
-              {cars.map((car, index) => (
-                <ListingCard key={car.id} id={car.id} image={resolveListingCardImage(car.images, "car")} title={car.title} location={car.location} price={`₹${car.price_per_day}`} rating={Number(car.rating) || 0} type="car" delay={index * 0.05} />
-              ))}
-            </div>
-          </motion.div>
-        </section>
-      )}
 
-      {/* Cab Fare Section */}
-      <CabFareSection />
+
+
 
       {/* Hotels Section */}
       {hotels.length > 0 && (
@@ -563,4 +467,4 @@ const LandingPage = () => {
   );
 };
 
-export default LandingPage;
+export default OutstationCabs;

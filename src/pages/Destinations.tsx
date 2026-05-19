@@ -1,6 +1,7 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Marquee from "@/components/Marquee";
+import BackButton from "@/components/BackButton";
 import DestinationCard from "@/components/DestinationCard";
 import { motion } from "framer-motion";
 import { useState } from "react";
@@ -130,12 +131,12 @@ const Destinations = () => {
   });
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen flex flex-col bg-slate-50/50">
       <Marquee />
       <Header />
+      <BackButton />
 
-      {/* Hero */}
-      <section className="container mx-auto px-4 pt-10 pb-6">
+      <main className="flex-grow container mx-auto px-4 py-8 md:py-16 max-w-7xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -192,7 +193,7 @@ const Destinations = () => {
             ))}
           </div>
         </motion.div>
-      </section>
+      </main>
 
       {/* Results */}
       <section className="container mx-auto px-4 pb-16">

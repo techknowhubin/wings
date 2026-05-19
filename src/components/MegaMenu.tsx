@@ -57,6 +57,14 @@ const categories = [
     image: carsImage,
     stats: "300+ vehicles",
   },
+  {
+    title: "Outstation Cabs",
+    subtitle: "Intercity travel & tours",
+    icon: Car,
+    link: "/outstation-cabs",
+    image: carsImage,
+    stats: "50+ routes",
+  },
 ];
 
 const destinations = [

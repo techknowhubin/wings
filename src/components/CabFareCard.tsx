@@ -24,7 +24,7 @@ const CabFareCard = ({
 }: CabFareCardProps) => {
   const buildWhatsAppUrl = (vehicleType: string, fare: number) => {
     const message = `Hi, I'd like to book a cab.\n\n*From:* ${fromCity} (${fromCode})\n*To:* ${toCity} (${toCode})\n*Distance:* ${distance}\n*Trip Type:* \n*Vehicle Type:* ${vehicleType}\n*Fare:* ₹${fare.toLocaleString()}\n*Booking Person:* `;
-    return `https://wa.me/916362986420?text=${encodeURIComponent(message)}`;
+    return `https://wa.me/919492986412?text=${encodeURIComponent(message)}`;
   };
   return (
     <motion.div

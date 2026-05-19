@@ -922,7 +922,7 @@ export default function LinkInBioLanding() {
         <p className="rv rv-delay-1">Join Xplorwing as a host — your storefront goes live in minutes, for free.</p>
         <div className="final-btns rv rv-delay-2">
           <Link to={user ? "/host" : "/host/signup"} className="fcta">Get started as a host<span className="fcta-arrow">→</span></Link>
-          <a href="https://wa.me/919422799420?text=Hi%2C%20I%20want%20to%20create%20my%20Wing%20Link" className="fcta-wa" target="_blank" rel="noreferrer">💬 Chat on WhatsApp</a>
+          <a href="https://wa.me/919492986412?text=Hi%2C%20I%20want%20to%20create%20my%20Wing%20Link" className="fcta-wa" target="_blank" rel="noreferrer">💬 Chat on WhatsApp</a>
         </div>
       </section>
 

@@ -138,7 +138,7 @@ function Footerdemo() {
             <h3 className="mb-6 text-lg font-semibold">Contact Us</h3>
             <address className="space-y-3 text-sm not-italic text-muted-foreground">
               <p>Serving across India</p>
-              <p>Phone: +91 9422 799 420</p>
+              <p>Phone: +91 9492986412</p>
               <p>Email: hello@xplorwing.com</p>
             </address>
           </div>

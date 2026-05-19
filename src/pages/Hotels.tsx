@@ -3,6 +3,7 @@ import Footer from "@/components/Footer";
 import Marquee from "@/components/Marquee";
 import SearchBar from "@/components/SearchBar";
 import ListingCard from "@/components/ListingCard";
+import BackButton from "@/components/BackButton";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -87,6 +88,7 @@ const Hotels = () => {
     <div className="min-h-screen flex flex-col">
       <Marquee />
       <Header />
+      <BackButton />
 
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-primary/10 to-accent/5 py-16">

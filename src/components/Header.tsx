@@ -27,6 +27,7 @@ const mobileNavLinks = [
   { label: "Hotels", icon: Building, to: "/hotels" },
   { label: "Resorts", icon: Palmtree, to: "/resorts" },
   { label: "Experiences", icon: Compass, to: "/experiences" },
+  { label: "Outstation Cabs", icon: Car, to: "/outstation-cabs" },
   { label: "Bikes", icon: Bike, to: "/bikes" },
   { label: "Cars", icon: Car, to: "/cars" },
   { label: "Destinations", icon: MapPin, to: "/destinations" },
@@ -121,6 +122,12 @@ const Header = () => {
                 className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-3 py-2 rounded-lg nav-link-hover"
               >
                 Cars
+              </Link>
+              <Link
+                to="/outstation-cabs"
+                className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-3 py-2 rounded-lg nav-link-hover"
+              >
+                Outstation Cabs
               </Link>
               <Link
                 to="/experiences"

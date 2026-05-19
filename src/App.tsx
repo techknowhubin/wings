@@ -7,7 +7,7 @@ import { ThemeProvider } from "./components/ThemeProvider";
 import { AuthProvider } from "./contexts/AuthContext";
 import ScrollToTop from "./components/ScrollToTop";
 import AuthRedirectHandler from "./components/AuthRedirectHandler";
-import Index from "./pages/Index";
+import LandingPage from "./pages/LandingPage";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -15,6 +15,7 @@ import Stays from "./pages/Stays";
 import Hotels from "./pages/Hotels";
 import Resorts from "./pages/Resorts";
 import Experiences from "./pages/Experiences";
+import OutstationCabs from "./pages/OutstationCabs";
 import Bikes from "./pages/Bikes";
 import Cars from "./pages/Cars";
 import StayDetail from "./pages/StayDetail";
@@ -30,6 +31,7 @@ import NotFound from "./pages/NotFound";
 import LinkInBioLanding from "./pages/LinkInBioLanding";
 import Destinations from "./pages/Destinations";
 import DestinationDetail from "./pages/DestinationDetail";
+import Offers from "./pages/Offers";
 import UserOnboarding from "./pages/UserOnboarding";
 import HostOnboarding from "./pages/HostOnboarding";
 import UserProfile from "./pages/UserProfile";
@@ -73,7 +75,8 @@ const App = () => (
           <ScrollToTop />
           <AuthRedirectHandler />
           <Routes>
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={<OutstationCabs />} />
+            <Route path="/landing-page" element={<LandingPage />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/host/signup" element={<Auth />} />
             <Route path="/host/signin" element={<Auth />} />
@@ -89,6 +92,7 @@ const App = () => (
             <Route path="/resorts/:id" element={<StayDetail />} />
             <Route path="/experiences" element={<Experiences />} />
             <Route path="/experiences/:id" element={<ExperienceDetail />} />
+            <Route path="/outstation-cabs" element={<Navigate to="/" replace />} />
             <Route path="/bikes" element={<Bikes />} />
             <Route path="/bikes/:id" element={<BikeDetail />} />
             <Route path="/cars" element={<Cars />} />
@@ -102,6 +106,7 @@ const App = () => (
             <Route path="/p/:slug" element={<PublicLinkInBio />} />
             <Route path="/destinations" element={<Destinations />} />
             <Route path="/destinations/:name" element={<DestinationDetail />} />
+            <Route path="/offers" element={<Offers />} />
             <Route path="/onboarding" element={<Navigate to="/onboarding/user" replace />} />
             <Route path="/onboarding/user" element={<UserOnboarding />} />
             <Route path="/onboarding/host" element={<HostOnboarding />} />

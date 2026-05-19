@@ -585,7 +585,7 @@ export async function createStay(stay: Omit<Stay, 'id' | 'created_at' | 'updated
   const slug = generateSlug(stay.title);
   const { data, error } = await supabase
     .from('stays')
-    .insert({ ...stay, slug })
+    .insert({ ...stay, slug, marketplace_visible: true, marketplace_requested: true })
     .select()
     .single();
   if (error) throw error;
@@ -596,7 +596,7 @@ export async function createCar(car: Omit<Car, 'id' | 'created_at' | 'updated_at
   const slug = generateSlug(car.title);
   const { data, error } = await supabase
     .from('cars')
-    .insert({ ...car, slug })
+    .insert({ ...car, slug, marketplace_visible: true, marketplace_requested: true })
     .select()
     .single();
   if (error) throw error;
@@ -607,7 +607,7 @@ export async function createBike(bike: Omit<Bike, 'id' | 'created_at' | 'updated
   const slug = generateSlug(bike.title);
   const { data, error } = await supabase
     .from('bikes')
-    .insert({ ...bike, slug })
+    .insert({ ...bike, slug, marketplace_visible: true, marketplace_requested: true })
     .select()
     .single();
   if (error) throw error;
@@ -618,7 +618,7 @@ export async function createExperience(experience: Omit<Experience, 'id' | 'crea
   const slug = generateSlug(experience.title);
   const { data, error } = await supabase
     .from('experiences')
-    .insert({ ...experience, slug })
+    .insert({ ...experience, slug, marketplace_visible: true, marketplace_requested: true })
     .select()
     .single();
   if (error) throw error;
@@ -629,7 +629,7 @@ export async function createHotel(hotel: any) {
   const slug = generateSlug(hotel.title);
   const { data, error } = await supabase
     .from('hotels' as any)
-    .insert({ ...hotel, slug })
+    .insert({ ...hotel, slug, marketplace_visible: true, marketplace_requested: true })
     .select()
     .single();
   if (error) throw error;
@@ -640,7 +640,7 @@ export async function createResort(resort: any) {
   const slug = generateSlug(resort.title);
   const { data, error } = await supabase
     .from('resorts' as any)
-    .insert({ ...resort, slug })
+    .insert({ ...resort, slug, marketplace_visible: true, marketplace_requested: true })
     .select()
     .single();
   if (error) throw error;

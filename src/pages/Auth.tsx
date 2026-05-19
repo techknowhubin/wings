@@ -275,11 +275,7 @@ const Auth = () => {
 
     hasRoutedRef.current = true;
 
-    if (!user.phone && !isOtpSent && user.app_metadata?.provider === "google") {
-      setShowWaModal(true);
-    } else {
-      handleSuccessRoleRouting(user);
-    }
+    handleSuccessRoleRouting(user);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, verificationPending, confirmationSuccess, location.hash, location.search, location.pathname]);
 

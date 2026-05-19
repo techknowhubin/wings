@@ -284,7 +284,7 @@ const LandingPage = () => {
       <Header />
 
       {/* Hero Section with Slider */}
-      <section className="container mx-auto px-4 pt-4 hidden md:block">
+      <section className="container mx-auto px-4 pt-4 hidden lg:block">
         <div className="relative h-[85vh] rounded-3xl overflow-hidden">
           {heroImages.map((img, i) => (
             <motion.div

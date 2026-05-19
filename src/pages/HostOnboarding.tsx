@@ -212,6 +212,7 @@ export default function HostOnboarding() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const isGoogleUser = user?.app_metadata?.providers?.includes("google");
 
   // Step 2 state
   const [biz, setBiz] = useState<BusinessDetails>({
@@ -295,12 +296,12 @@ export default function HostOnboarding() {
 
   const validateStep2 = () => {
     if (biz.hostType === "individual") {
-      if (!biz.fullName || !biz.phone || !biz.email) {
+      if (!biz.fullName || (!isGoogleUser && !biz.phone) || !biz.email) {
         toast.error("Please fill all required fields");
         return false;
       }
     } else {
-      if (!biz.businessName || !biz.businessType || !biz.phone || !biz.email) {
+      if (!biz.businessName || !biz.businessType || (!isGoogleUser && !biz.phone) || !biz.email) {
         toast.error("Please fill all required business fields");
         return false;
       }
@@ -400,6 +401,17 @@ export default function HostOnboarding() {
         });
 
       if (profileError) throw profileError;
+
+      // Sync name and phone to primary profiles table
+      const { error: primaryProfileError } = await supabase
+        .from("profiles")
+        .update({
+          full_name: biz.hostType === "business" ? biz.businessName : biz.fullName,
+          phone: biz.phone || null,
+        })
+        .eq("id", user.id);
+
+      if (primaryProfileError) throw primaryProfileError;
 
       const { error: roleError } = await supabase
         .from("user_roles")
@@ -528,7 +540,7 @@ export default function HostOnboarding() {
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label>Phone *</Label>
+                              <Label>Phone {isGoogleUser ? "(Optional)" : "*"}</Label>
                               <Input value={biz.phone} onChange={(e) => setBiz({ ...biz, phone: e.target.value.replace(/\D/g, "") })} placeholder="10-digit mobile" maxLength={10} />
                             </div>
                             <div className="space-y-2">
@@ -570,7 +582,7 @@ export default function HostOnboarding() {
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label>Phone *</Label>
+                              <Label>Phone {isGoogleUser ? "(Optional)" : "*"}</Label>
                               <Input value={biz.phone} onChange={(e) => setBiz({ ...biz, phone: e.target.value.replace(/\D/g, "") })} placeholder="10-digit mobile" maxLength={10} />
                             </div>
                             <div className="space-y-2">

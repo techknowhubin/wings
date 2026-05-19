@@ -31,9 +31,30 @@ interface HostedCoupon extends CouponOffer {
 
 const ConfirmAndPay = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { state } = useLocation();
-  const booking = (state as ConfirmAndPayState | null)?.booking;
+
+  const [booking, setBooking] = useState<BookingDetails | null>(() => {
+    if (state?.booking) return state.booking;
+    const saved = localStorage.getItem("pending_booking");
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  useEffect(() => {
+    if (state?.booking) {
+      setBooking(state.booking);
+    }
+  }, [state]);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      if (booking) {
+        localStorage.setItem("pending_booking", JSON.stringify(booking));
+      }
+      toast.info("Please sign up or sign in to complete your booking.");
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate, booking]);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -112,11 +133,11 @@ const ConfirmAndPay = () => {
           usageLimit: item.usage_limit ?? null,
           usedCount: Number(item.used_count ?? 0),
           oneTimePerUser: Boolean(item.one_time_per_user),
-        })),
+        }))
       );
     };
     void fetchCoupons();
-  }, [booking?.hostId, booking?.listingCouponType]);
+  }, [booking]);
 
   const stayDates = useMemo(() => {
     if (!booking) return "";
@@ -183,31 +204,10 @@ const ConfirmAndPay = () => {
 
   const hostDiscountAmount = booking?.discount ?? 0;
   const availableCoupons = useMemo(() => {
-    const list = globalCoupons.length > 0 ? [...globalCoupons] : [...((booking?.availableCoupons as HostedCoupon[] | undefined) ?? [])];
-    
-    // Always ensure WINGSTART is in the available coupons list so users can apply it!
-    if (!list.some(c => c.code.toUpperCase() === "WINGSTART")) {
-      list.push({
-        id: "wingstart-global",
-        code: "WINGSTART",
-        type: "percent" as const,
-        value: 5,
-        startsAt: null,
-        endsAt: null,
-        usageLimit: null,
-        usedCount: 0,
-        oneTimePerUser: false
-      });
-    }
-    return list;
+    return globalCoupons.length > 0 ? [...globalCoupons] : [...((booking?.availableCoupons as HostedCoupon[] | undefined) ?? [])];
   }, [globalCoupons, booking?.availableCoupons]);
 
-  const bookingFeeRate = useMemo(() => {
-    if (appliedCoupon && appliedCoupon.code.toUpperCase() === "WINGSTART") {
-      return 5;
-    }
-    return 10;
-  }, [appliedCoupon]);
+  const bookingFeeRate = 10;
 
   const baseTotal = useMemo(() => {
     if (!booking) return 0;
@@ -220,13 +220,9 @@ const ConfirmAndPay = () => {
 
   const couponDiscountAmount = useMemo(() => {
     if (!booking || !appliedCoupon) return 0;
-    if (appliedCoupon.code.toUpperCase() === "WINGSTART") {
-      // WINGSTART reduces the booking fee from 10% to 5%, so the discount is 5% of baseTotal
-      return baseTotal * 0.05;
-    }
     // For other coupons, we can apply their percentage discount directly to the booking fee
     return (normalBookingFee * appliedCoupon.value) / 100;
-  }, [appliedCoupon, booking, baseTotal, normalBookingFee]);
+  }, [appliedCoupon, booking, normalBookingFee]);
 
   const totalPayable = useMemo(() => {
     const raw = normalBookingFee - couponDiscountAmount;
@@ -236,7 +232,7 @@ const ConfirmAndPay = () => {
   }, [normalBookingFee, couponDiscountAmount]);
 
   const formatAmount = (val: number) => {
-    return val % 1 === 0 ? String(val) : val.toFixed(2);
+    return val.toFixed(2);
   };
 
   const handleApplyCoupon = async () => {
@@ -329,9 +325,9 @@ const ConfirmAndPay = () => {
             listing_id: booking.listingId || "00000000-0000-0000-0000-000000000000",
             listing_type: dbListingType,
             host_id: booking.hostId || user?.id || "00000000-0000-0000-0000-000000000000",
-            start_date: new Date(booking.startDate).toISOString().split('T')[0],
-            end_date: new Date(booking.endDate).toISOString().split('T')[0],
-            total_price: totalPayable,
+            start_date: new Date(booking.startDate).toISOString(),
+            end_date: new Date(booking.endDate).toISOString(),
+            total_price: Number(totalPayable.toFixed(2)),
             currency: booking.currencySymbol === "₹" ? "INR" : "USD",
             payment_status: "completed",
             payment_method: "razorpay",
@@ -458,7 +454,7 @@ const ConfirmAndPay = () => {
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Total</p>
                   <p className="text-3xl font-bold text-foreground">
-                    {booking.currencySymbol}{booking.total}
+                    {booking.currencySymbol}{formatAmount(booking.total)}
                   </p>
                 </div>
               </div>
@@ -473,9 +469,8 @@ const ConfirmAndPay = () => {
                 {user && (
                   <Button
                     type="button"
-                    variant="link"
                     size="sm"
-                    className="h-auto p-0 text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors"
+                    className="h-8 rounded-full bg-[#115f10] hover:bg-[#0c4b0c] text-white px-4 text-xs font-semibold shadow-sm transition-all"
                     onClick={handleSameAsLogin}
                   >
                     Same as login details
@@ -565,7 +560,7 @@ const ConfirmAndPay = () => {
               {appliedCoupon ? (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground font-semibold text-accent">
-                    Coupon discount {appliedCoupon.code.toUpperCase() === "WINGSTART" ? "(Wingstart 5%)" : `(${appliedCoupon.value}%)`}
+                    Coupon discount ({appliedCoupon.value}%)
                   </span>
                   <span className="font-medium text-accent">-{booking.currencySymbol}{formatAmount(couponDiscountAmount)}</span>
                 </div>
@@ -595,7 +590,7 @@ const ConfirmAndPay = () => {
                 className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
               />
               <span>
-                By clicking Complete Payment, I confirm I have read and accepted Xplorwing's Privacy Policy,
+                By clicking Pay 10% and confirm booking, I confirm I have read and accepted Xplorwing's Privacy Policy,
                 Terms of Use, and Cancellation Policy for this booking.
               </span>
             </label>
@@ -608,7 +603,7 @@ const ConfirmAndPay = () => {
               className="w-full mt-5 h-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               <CreditCard className="h-4 w-4 mr-1" />
-              {isProcessing ? "Processing..." : "Complete Payment"}
+              {isProcessing ? "Processing..." : "Pay 10% and confirm booking"}
             </Button>
           </Card>
         </div>

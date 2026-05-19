@@ -334,19 +334,7 @@ const OutstationCabs = () => {
           <CabFareSection />
         </div>
 
-        {/* Cars Section (Moved to top as requested) */}
-        {cars.length > 0 && (
-          <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full mb-16 mt-20">
-            <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.5 }} viewport={{ once: true }}>
-              <h2 className="text-2xl md:text-3xl font-bold text-accent mb-8 text-center">Available Cabs</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
-                {cars.map((car, index) => (
-                  <ListingCard key={car.id} id={car.id} image={resolveListingCardImage(car.images, "car")} title={car.title} location={car.location} price={`₹${car.price_per_day}`} rating={Number(car.rating) || 0} type="car" delay={index * 0.05} />
-                ))}
-              </div>
-            </motion.div>
-          </section>
-        )}
+
       </main>
 
       {/* Offers Section */}
@@ -357,51 +345,15 @@ const OutstationCabs = () => {
 
 
 
-      {/* Bikes Section */}
-      {bikes.length > 0 && (
-        <section className="container mx-auto px-4 py-16">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.5 }} viewport={{ once: true }}>
-            <h2 className="text-3xl font-bold text-foreground mb-8">Bike Rentals</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
-              {bikes.map((bike, index) => (
-                <ListingCard key={bike.id} id={bike.id} image={resolveListingCardImage(bike.images, "bike")} title={bike.title} location={bike.location} price={`₹${bike.price_per_day}`} rating={Number(bike.rating) || 0} type="bike" delay={index * 0.05} />
-              ))}
-            </div>
-          </motion.div>
-        </section>
-      )}
 
 
 
 
 
-      {/* Hotels Section */}
-      {hotels.length > 0 && (
-        <section className="container mx-auto px-4 py-16">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.5 }} viewport={{ once: true }}>
-            <h2 className="text-3xl font-bold text-foreground mb-8">Hotels</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
-              {hotels.map((hotel, index) => (
-                <ListingCard key={hotel.id} id={hotel.id} image={resolveListingCardImage(hotel.images, "hotel")} title={hotel.title} location={hotel.location} price={`₹${hotel.price_per_night}`} rating={Number(hotel.rating) || 0} type="hotel" delay={index * 0.05} />
-              ))}
-            </div>
-          </motion.div>
-        </section>
-      )}
 
-      {/* Resorts Section */}
-      {resorts.length > 0 && (
-        <section className="container mx-auto px-4 py-16">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.5 }} viewport={{ once: true }}>
-            <h2 className="text-3xl font-bold text-foreground mb-8">Resorts</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
-              {resorts.map((resort, index) => (
-                <ListingCard key={resort.id} id={resort.id} image={resolveListingCardImage(resort.images, "resort")} title={resort.title} location={resort.location} price={`₹${resort.price_per_night}`} rating={Number(resort.rating) || 0} type="resort" delay={index * 0.05} />
-              ))}
-            </div>
-          </motion.div>
-        </section>
-      )}
+
+
+
 
       {/* Blog Section — only rendered when there are published posts */}
       {blogs.length > 0 && <section className="container mx-auto px-4 py-16">

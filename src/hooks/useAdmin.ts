@@ -55,6 +55,7 @@ export function useAdminMetrics() {
         registeredTravelers,
         wingIdsIssued,
         staysPending, carsPending, bikesPending, expPending,
+        activeProvidersCount,
       ] = await Promise.all([
         safeQuery(() => supabase.from('bookings').select('total_price').eq('payment_status', 'completed')),
         safeCount(() => supabase.from('bookings').select('*', { count: 'exact', head: true }).gte('created_at', today)),
@@ -65,6 +66,7 @@ export function useAdminMetrics() {
         safeQuery(() => supabase.from('cars').select('id').eq('is_verified', false)),
         safeQuery(() => supabase.from('bikes').select('id').eq('is_verified', false)),
         safeQuery(() => supabase.from('experiences').select('id').eq('is_verified', false)),
+        safeCount(() => supabase.from('user_roles').select('*', { count: 'exact', head: true }).eq('role', 'host')),
       ]);
 
       const totalGmv = (gmvData as any[] ?? []).reduce((s: number, r: any) => s + Number(r.total_price || 0), 0);
@@ -80,7 +82,7 @@ export function useAdminMetrics() {
         wingIdsIssued,
         platformRevenue,
         pendingListings,
-        activeProviders: 0,
+        activeProviders: activeProvidersCount,
       };
     },
     staleTime: 60_000,

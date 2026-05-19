@@ -541,9 +541,7 @@ export default function PublicLinkInBio() {
   if (isLoading) {
     return (
       <>
-        <Marquee />
-        <Header />
-        <div className="min-h-[calc(100vh-100px)] flex items-center justify-center">
+        <div className="min-h-screen flex items-center justify-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
         </div>
       </>
@@ -552,9 +550,7 @@ export default function PublicLinkInBio() {
   if (!page || !settings) {
     return (
       <>
-        <Marquee />
-        <Header />
-        <div className="min-h-[calc(100vh-100px)] flex items-center justify-center text-muted-foreground">Link not found.</div>
+        <div className="min-h-screen flex items-center justify-center text-muted-foreground">Link not found.</div>
       </>
     );
   }
@@ -575,9 +571,7 @@ export default function PublicLinkInBio() {
 
   return (
     <>
-      <Marquee />
-      <Header />
-      <div className="sm:min-h-[calc(100vh-100px)] sm:bg-stone-100 sm:dark:bg-stone-900 sm:flex sm:items-center sm:justify-center sm:p-6">
+      <div className="sm:min-h-screen sm:bg-stone-100 sm:dark:bg-stone-900 sm:flex sm:items-center sm:justify-center sm:p-6">
         <div className="w-full h-screen sm:h-[667px] sm:max-w-[375px] sm:rounded-3xl sm:border-[8px] sm:border-gray-900/90 overflow-hidden sm:shadow-2xl shadow-none relative bg-background">
           <div className={`w-full h-full flex flex-col ${T.bg} ${T.text} relative`}>
 

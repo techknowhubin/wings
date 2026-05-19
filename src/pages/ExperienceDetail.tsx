@@ -6,10 +6,12 @@ import { motion } from "framer-motion";
 import { Star, MapPin, Heart, Share2, Clock, Users, Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { addDays } from "date-fns";
 import experienceImage from "@/assets/experience-featured.jpg";
 import type { BookingDetails } from "@/types/booking";
+import { supabase } from "@/integrations/supabase/client";
+import StayImageGallery from "@/components/stay-detail/StayImageGallery";
 
 const ExperienceDetail = () => {
   const { id } = useParams();
@@ -17,10 +19,73 @@ const ExperienceDetail = () => {
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [guestCount, setGuestCount] = useState(1);
+  const [experience, setExperience] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchExperience = async () => {
+      if (!id) return;
+      try {
+        const { data, error } = await supabase
+          .from("experiences")
+          .select("*")
+          .eq("id", id)
+          .single();
+          
+        if (error) throw error;
+        setExperience(data);
+      } catch (err) {
+        console.error("Error fetching experience:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchExperience();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Marquee />
+        <Header />
+        <div className="container mx-auto px-4 py-8 flex-grow flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading experience details...</p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!experience) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Marquee />
+        <Header />
+        <div className="container mx-auto px-4 py-8 flex-grow flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-foreground mb-2">Experience Not Found</h2>
+            <p className="text-muted-foreground">The experience you're looking for doesn't exist or is no longer available.</p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  const primaryImage = experience.images?.[0]?.startsWith('http') ? experience.images[0] : experienceImage;
+  const resolvedImages = experience.images?.length > 0
+    ? experience.images.map((img: string) => img.startsWith('http') ? img : primaryImage)
+    : [primaryImage];
+
+  const currencySymbol = experience.currency === "INR" ? "₹" : (experience.currency || "$");
+  const unitPrice = Number(experience.price_per_person);
 
   const details = [
-    { icon: Clock, label: "Duration", value: "3 hours" },
-    { icon: Users, label: "Group Size", value: "Up to 12" },
+    { icon: Clock, label: "Duration", value: experience.duration || "3 hours" },
+    { icon: Users, label: "Group Size", value: `Up to ${experience.group_size || 12}` },
     { icon: CalendarIcon, label: "Availability", value: "Daily" },
   ];
 
@@ -39,16 +104,16 @@ const ExperienceDetail = () => {
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
-                Kerala Cooking Class
+                {experience.title}
               </h1>
               <div className="flex items-center gap-4 text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-primary-text text-primary-text" />
-                  5.0 (234 reviews)
+                  {experience.rating ? Number(experience.rating).toFixed(1) : "5.0"} ({experience.total_reviews || 0} reviews)
                 </span>
                 <span className="flex items-center gap-1">
                   <MapPin className="h-4 w-4" />
-                  Kochi, Kerala
+                  {experience.location}
                 </span>
               </div>
             </div>
@@ -71,40 +136,9 @@ const ExperienceDetail = () => {
           </div>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 h-[400px]"
-        >
-          <img
-            src={experienceImage}
-            alt="Main view"
-            className="w-full h-full object-cover rounded-2xl"
-          />
-          <div className="grid grid-cols-2 gap-4">
-            <img
-              src={experienceImage}
-              alt="View 2"
-              className="w-full h-full object-cover rounded-2xl"
-            />
-            <img
-              src={experienceImage}
-              alt="View 3"
-              className="w-full h-full object-cover rounded-2xl"
-            />
-            <img
-              src={experienceImage}
-              alt="View 4"
-              className="w-full h-full object-cover rounded-2xl"
-            />
-            <img
-              src={experienceImage}
-              alt="View 5"
-              className="w-full h-full object-cover rounded-2xl"
-            />
-          </div>
-        </motion.div>
+        <div className="mb-8">
+          <StayImageGallery images={resolvedImages} title={experience.title} />
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
@@ -116,11 +150,7 @@ const ExperienceDetail = () => {
             >
               <h2 className="text-2xl font-bold text-foreground mb-4">About this experience</h2>
               <p className="text-muted-foreground leading-relaxed">
-                Immerse yourself in the aromatic world of Kerala cuisine with our hands-on cooking
-                class. Learn to prepare authentic dishes using traditional techniques and fresh,
-                locally-sourced ingredients. Our expert chef will guide you through making classic
-                Kerala recipes, from fragrant curries to delicious coconut-based sides. You'll
-                discover the secrets of Kerala's famous spices and enjoy the meal you've created.
+                {experience.description}
               </p>
             </motion.div>
 
@@ -142,35 +172,36 @@ const ExperienceDetail = () => {
               </div>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
-              className="mb-8"
-            >
-              <h2 className="text-2xl font-bold text-foreground mb-4">What's Included</h2>
-              <ul className="space-y-2 text-muted-foreground">
-                <li>✓ All ingredients and cooking equipment</li>
-                <li>✓ Traditional Kerala recipes booklet</li>
-                <li>✓ Professional chef instruction</li>
-                <li>✓ Full meal that you'll prepare and eat</li>
-                <li>✓ Complimentary Kerala tea and snacks</li>
-                <li>✓ Apron and chef's hat (take home)</li>
-              </ul>
-            </motion.div>
+            {experience.inclusions && experience.inclusions.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+                className="mb-8"
+              >
+                <h2 className="text-2xl font-bold text-foreground mb-4">What's Included</h2>
+                <ul className="space-y-2 text-muted-foreground">
+                  {experience.inclusions.map((inc: string, idx: number) => (
+                    <li key={idx}>✓ {inc}</li>
+                  ))}
+                </ul>
+              </motion.div>
+            )}
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.5 }}
-            >
-              <h2 className="text-2xl font-bold text-foreground mb-4">What to Bring</h2>
-              <ul className="space-y-2 text-muted-foreground">
-                <li>• Comfortable clothes</li>
-                <li>• Appetite for learning and eating!</li>
-                <li>• Camera (optional, for photos)</li>
-              </ul>
-            </motion.div>
+            {experience.exclusions && experience.exclusions.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.5 }}
+              >
+                <h2 className="text-2xl font-bold text-foreground mb-4">What's Excluded</h2>
+                <ul className="space-y-2 text-muted-foreground">
+                  {experience.exclusions.map((exc: string, idx: number) => (
+                    <li key={idx}>• {exc}</li>
+                  ))}
+                </ul>
+              </motion.div>
+            )}
           </div>
 
           <div className="lg:col-span-1">
@@ -182,7 +213,7 @@ const ExperienceDetail = () => {
             >
               <div className="mb-6">
                 <div className="flex items-baseline gap-2 mb-4">
-                  <span className="text-3xl font-bold text-foreground">₹2,000</span>
+                  <span className="text-3xl font-bold text-foreground">{currencySymbol}{unitPrice.toLocaleString("en-IN")}</span>
                   <span className="text-muted-foreground">/ person</span>
                 </div>
               </div>
@@ -222,15 +253,17 @@ const ExperienceDetail = () => {
                 size="lg"
                 onClick={() => {
                   const startDate = selectedDate ?? new Date();
-                  const unitPrice = 2000;
                   const subtotal = unitPrice * guestCount;
                   const discount = 0;
                   const serviceFee = 0;
                   const booking: BookingDetails = {
+                    listingId: experience.id,
                     listingType: "experience",
-                    listingTitle: "Village Cooking Experience",
-                    listingImage: experienceImage,
-                    currencySymbol: "₹",
+                    listingCouponType: "experiences" as any,
+                    hostId: experience.host_id,
+                    listingTitle: experience.title,
+                    listingImage: primaryImage,
+                    currencySymbol,
                     unitLabel: guestCount === 1 ? "guest" : "guests",
                     unitPrice,
                     quantity: guestCount,

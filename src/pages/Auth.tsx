@@ -202,6 +202,15 @@ const Auth = () => {
     const r = await getUserRole();
     const savedRole = localStorage.getItem("pending_role");
 
+    const pendingBooking = localStorage.getItem("pending_booking");
+    if (pendingBooking) {
+      console.log("[Auth] Found pending booking, redirecting to confirm-and-pay");
+      // Let the ConfirmAndPay component read from localStorage itself, or pass state:
+      navigate("/confirm-and-pay");
+      setLoading(false);
+      return;
+    }
+
     if (r === "admin") {
       navigate("/admin");
     } else if (r === "host") {

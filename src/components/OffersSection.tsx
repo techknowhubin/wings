@@ -103,31 +103,7 @@ const offers = [
       couponBorder: "border-[#1C3D1E]",
       couponText: "text-[#1C3D1E]",
     }
-  },
-  {
-    id: 5,
-    type: "Stay",
-    title: "Pay only 5% booking\nfee with Wingstart",
-    validity: "Valid till 30 Jun",
-    code: "WINGSTART",
-    emoji: "🚀",
-    category: "Stay",
-    terms: [
-      "Pay only 5% booking fee instead of 10% on your booking.",
-      "Applicable on all bookings across stays, cabs, and tours.",
-      "Cannot be combined with other active discount codes.",
-      "Remaining amount to be paid directly to the host during check-in/handover."
-    ],
-    colors: {
-      cardBg: "bg-[#e8daff]",
-      badgeBg: "bg-[#7c3aed]",
-      badgeText: "text-white",
-      title: "text-[#2e1065]",
-      validity: "text-[#5b21b6]",
-      couponBorder: "border-[#7c3aed]",
-      couponText: "text-[#7c3aed]",
     }
-  }
 ];
 
 const filters = ["All", "Stay", "Cab", "Tour"];
@@ -175,6 +151,7 @@ const OffersSection = () => {
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ duration: 0.2 }}
                 key={offer.id}
+                onClick={() => setSelectedOffer(offer)}
                 className={`relative overflow-hidden rounded-[18px] p-[20px_18px_18px] min-h-[172px] cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.10)] ${offer.colors.cardBg}`}
               >
                 {/* Big background emoji */}

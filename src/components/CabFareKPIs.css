@@ -1,0 +1,137 @@
+.kpi-wrapper {
+  --teal:      #1A3C34;
+  --teal-light:#2A6B57;
+  --lime:      #E5F76D;
+  --lime-dim:  #d4e85e;
+  --white:     #ffffff;
+  --off-white: #F2F4F0;
+  --text-dark: #111C18;
+  --text-muted:#6B7A74;
+  --border:    #D8E0DC;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.6rem;
+  max-width: 1100px;
+  margin: 0 auto 1.5rem;
+}
+
+.kpi-card {
+  background: var(--white);
+  border-radius: 20px;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  opacity: 0;
+  animation: fadeUp 0.5s ease forwards;
+  text-align: left;
+}
+.kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(26,60,52,0.09);
+}
+.kpi-card:nth-child(1) { animation-delay: 0.05s }
+.kpi-card:nth-child(2) { animation-delay: 0.12s }
+.kpi-card:nth-child(3) { animation-delay: 0.19s }
+.kpi-card:nth-child(4) { animation-delay: 0.26s }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.kpi-card.dark {
+  background: var(--teal);
+  border-color: var(--teal);
+}
+.kpi-card.lime-card {
+  background: var(--lime);
+  border-color: var(--lime-dim);
+}
+
+.kpi-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.kpi-card.dark .kpi-label { color: rgba(255,255,255,0.5); }
+.kpi-card.lime-card .kpi-label { color: #3a5040; }
+
+.kpi-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-dark);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.kpi-card.dark .kpi-value { color: var(--lime); }
+.kpi-card.lime-card .kpi-value { color: var(--teal); }
+
+.kpi-sub {
+  font-size: 0.63rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-top: 0.1rem;
+}
+.kpi-card.dark .kpi-sub { color: rgba(255,255,255,0.5); }
+.kpi-card.lime-card .kpi-sub { color: #3d5040; }
+
+.kpi-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.57rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 99px;
+  margin-top: 0.3rem;
+  width: fit-content;
+}
+.kpi-tag.green  { background: #DCF5E8; color: #166534; }
+.kpi-tag.amber  { background: #FEF3C7; color: #92400E; }
+.kpi-tag.teal   { background: var(--teal); color: var(--lime); }
+.kpi-tag.lime   { background: var(--lime); color: var(--teal); }
+.kpi-card.dark .kpi-tag.green { background: rgba(229,247,109,0.15); color: var(--lime); }
+
+.kpi-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0.35rem 0;
+}
+.kpi-card.dark .kpi-divider { border-color: rgba(255,255,255,0.1); }
+.kpi-card.lime-card .kpi-divider { border-color: rgba(26,60,52,0.12); }
+
+.dual-row { display: flex; gap: 1.2rem; margin-top: 0.15rem; }
+.dual-item .d-label {
+  font-size: 0.56rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255,255,255,0.45);
+  margin-bottom: 1px;
+}
+.dual-item .d-val {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--lime);
+  letter-spacing: -0.02em;
+}
+.dual-item .d-unit { font-size: 0.58rem; font-weight: 400; opacity: 0.7; }
+
+.section-divider {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: flex; align-items: center; gap: 10px;
+  max-width: 1100px; margin: 0 auto 1.25rem;
+}
+.section-divider::before, .section-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}

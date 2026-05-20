@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import CabFareCard from "./CabFareCard";
+import CabFareKPIs from "./CabFareKPIs";
 
 type State = "telangana" | "andhra" | "karnataka";
 
@@ -487,6 +488,8 @@ const CabFareSection = () => {
           <p className="text-lg text-muted-foreground mb-8">
             Curated outstation rentals for the modern explorer. Don't just book a cab, Book an experience with our handpicked outstation rides.
           </p>
+
+          <CabFareKPIs />
 
           <div className="flex flex-wrap justify-center gap-3">
             {(Object.keys(stateLabels) as State[]).map((state) => (

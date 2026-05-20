@@ -4,6 +4,7 @@ export interface BookingDetails {
   listingId?: string;
   listingType: "stay" | "vehicle" | "experience";
   listingCouponType?: "stays" | "hotels" | "resorts" | "cars" | "bikes" | "experiences";
+  bookingChannel?: "marketplace" | "link-in-bio";
   hostId?: string;
   listingTitle: string;
   listingImage?: string;

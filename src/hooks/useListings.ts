@@ -7,7 +7,7 @@ import {
   getUserBookings, getHostBookings, getBookingById, createBooking, updateBookingStatus,
   getListingReviews, createReview,
   getUserWishlist, addToWishlist, removeFromWishlist, isInWishlist,
-  getProfile, updateProfile,
+  getProfile, updateProfile, getHostProfile,
   getUserNotifications, getUnreadNotificationCount, markNotificationAsRead,
   getHostStays, getHostCars, getHostBikes, getHostExperiences, getHostHotels, getHostResorts,
   getManagedListings, updateMarketplaceRequest, updateMarketplaceVisibility,
@@ -240,6 +240,14 @@ export function useProfile(userId: string | undefined) {
   return useQuery({
     queryKey: ['profile', userId],
     queryFn: () => getProfile(userId!),
+    enabled: !!userId,
+  });
+}
+
+export function useHostProfile(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['host', 'profile', userId],
+    queryFn: () => getHostProfile(userId!),
     enabled: !!userId,
   });
 }

@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { createDiscountConfig, parseListingDiscountConfig } from "@/lib/discounts";
 import { toast } from "sonner";
+import { ListingImageUploader } from "@/components/dashboard/ListingImageUploader";
 
 type Section = "stays" | "hotels" | "resorts" | "cars" | "bikes" | "experiences";
 
@@ -68,7 +69,6 @@ export default function HostEditListing() {
     price: "",
     availability_status: true,
     images: [] as string[],
-    imageInput: "",
     hostDiscountPercent: "",
     max_guests: "",
     bedrooms: "",
@@ -170,12 +170,6 @@ export default function HostEditListing() {
 
   const set = (key: string, value: string | boolean | string[]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
-
-  const handleAddImage = () => {
-    const next = form.imageInput.trim();
-    if (!next) return;
-    setForm((prev) => ({ ...prev, images: [...prev.images, next], imageInput: "" }));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -437,25 +431,11 @@ export default function HostEditListing() {
 
           <Card>
             <CardHeader><CardTitle>Images</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input value={form.imageInput} onChange={(e) => set("imageInput", e.target.value)} placeholder="Paste image URL..." className="flex-1" />
-                <Button type="button" variant="outline" onClick={handleAddImage}><ImagePlus className="h-4 w-4 mr-1" />Add</Button>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {form.images.map((img, i) => (
-                  <div key={i} className="relative group rounded-lg overflow-hidden border border-border aspect-video">
-                    <img src={img} alt="" className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => set("images", form.images.filter((_, index) => index !== i))}
-                      className="absolute top-1 right-1 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+            <CardContent>
+              <ListingImageUploader 
+                images={form.images} 
+                onImagesChange={(images) => setForm(p => ({ ...p, images }))} 
+              />
             </CardContent>
           </Card>
         </div>

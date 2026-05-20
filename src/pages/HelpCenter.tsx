@@ -4,8 +4,24 @@ import Marquee from "@/components/Marquee";
 import { motion } from "framer-motion";
 import { Search, HelpCircle, MessageCircle, Phone, Mail } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const HelpCenter = () => {
+  const [supportPhone, setSupportPhone] = useState("+91 1800-123-4567");
+  const [supportEmail, setSupportEmail] = useState("support@xplorwing.com");
+
+  useEffect(() => {
+    async function fetchSettings() {
+      const { data, error } = await supabase.from('platform_settings').select('support_phone, support_email').maybeSingle();
+      if (!error && data) {
+        if (data.support_phone) setSupportPhone(data.support_phone);
+        if (data.support_email) setSupportEmail(data.support_email);
+      }
+    }
+    fetchSettings();
+  }, []);
+
   const faqs = [
     {
       question: "How do I book a homestay on Xplorwing?",
@@ -45,13 +61,13 @@ const HelpCenter = () => {
     {
       icon: Phone,
       title: "Call Us",
-      detail: "+91 1800-123-4567",
+      detail: supportPhone,
       description: "24/7 Support",
     },
     {
       icon: Mail,
       title: "Email Us",
-      detail: "support@xplorwing.com",
+      detail: supportEmail,
       description: "We'll respond within 24 hours",
     },
     {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Save, ImagePlus, X } from 'lucide-react';
+import { ArrowLeft, Save, ImagePlus, X, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCreateStay } from '@/hooks/useListings';
 import { toast } from 'sonner';
 import { createDiscountConfig } from '@/lib/discounts';
+import { ListingImageUploader } from './ListingImageUploader';
 
 const propertyTypes = ['Villa', 'Apartment', 'Cottage', 'Homestay', 'Farmhouse', 'Treehouse', 'Houseboat'];
 
@@ -169,23 +170,11 @@ export function AddStayForm() {
 
           <Card>
             <CardHeader><CardTitle>Images</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input value={form.imageInput} onChange={e => setForm(p => ({ ...p, imageInput: e.target.value }))} placeholder="Paste image URL..." className="flex-1" />
-                <Button type="button" variant="outline" onClick={handleAddImage}><ImagePlus className="h-4 w-4 mr-1" /> Add</Button>
-              </div>
-              {form.images.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {form.images.map((img, i) => (
-                    <div key={i} className="relative group rounded-lg overflow-hidden border border-border aspect-video">
-                      <img src={img} alt="" className="w-full h-full object-cover" />
-                      <button type="button" onClick={() => handleRemoveImage(i)} className="absolute top-1 right-1 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <CardContent>
+              <ListingImageUploader 
+                images={form.images} 
+                onImagesChange={(images) => setForm(p => ({ ...p, images }))} 
+              />
             </CardContent>
           </Card>
         </div>

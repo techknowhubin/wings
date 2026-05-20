@@ -1,110 +1,29 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronRight, X, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
-const offers = [
-  {
-    id: 1,
-    type: "Stay",
-    title: "Save up to ₹500 on\nyour first booking",
-    validity: "Valid till 30 Jun",
-    code: "WINGFIRST",
-    emoji: "🏕️",
-    category: "Stay",
-    terms: [
-      "Applicable only for first-time users on Xplorwing stays.",
-      "Minimum booking value of ₹2,500 is required.",
-      "Get 10% discount up to a maximum of ₹500.",
-      "Cannot be combined with any other promotional offers.",
-      "Valid on all homestays listed on the Xplorwing platform."
-    ],
-    colors: {
-      cardBg: "bg-[#f7d6da]",
-      badgeBg: "bg-[#9B1B30]",
-      badgeText: "text-white",
-      title: "text-[#4a0a14]",
-      validity: "text-[#7a2030]",
-      couponBorder: "border-[#9B1B30]",
-      couponText: "text-[#9B1B30]",
-    }
-  },
-  {
-    id: 2,
-    type: "Cab",
-    title: "Flat ₹200 off on\nairport transfers",
-    validity: "Valid till 31 May",
-    code: "CABSAVE200",
-    emoji: "🚙",
-    category: "Cab",
-    terms: [
-      "Flat ₹200 discount applicable on airport transfers.",
-      "Minimum ride value must be ₹1,500.",
-      "Applicable only on outstation cab bookings.",
-      "Tolls, parking fees, and state taxes are charged extra.",
-      "Cannot be clubbed with other active discount codes."
-    ],
-    colors: {
-      cardBg: "bg-[#fdedc4]",
-      badgeBg: "bg-[#E07B00]",
-      badgeText: "text-white",
-      title: "text-[#5a3000]",
-      validity: "text-[#a05800]",
-      couponBorder: "border-[#E07B00]",
-      couponText: "text-[#E07B00]",
-    }
-  },
-  {
-    id: 3,
-    type: "Tour",
-    title: "Get 15% off on\ncurated treks",
-    validity: "Valid till 15 Jun",
-    code: "TREK15",
-    emoji: "🏔️",
-    category: "Tour",
-    terms: [
-      "Get 15% discount on curated trekking experiences.",
-      "Maximum discount limit is ₹1,000 per booking.",
-      "Valid for booking of minimum 2 travelers.",
-      "Must book at least 48 hours prior to the trek start time.",
-      "Discount is non-refundable upon booking cancellation."
-    ],
-    colors: {
-      cardBg: "bg-[#d0dcf5]",
-      badgeBg: "bg-[#1A3A6B]",
-      badgeText: "text-white",
-      title: "text-[#0a1e40]",
-      validity: "text-[#2a4a8a]",
-      couponBorder: "border-[#1A3A6B]",
-      couponText: "text-[#1A3A6B]",
-    }
-  },
-  {
-    id: 4,
-    type: "Stay",
-    title: "₹300 off on plantation\nstay packages",
-    validity: "Valid till 30 Jun",
-    code: "GREEN300",
-    emoji: "🍃",
-    category: "Stay",
-    terms: [
-      "Flat ₹300 discount on selected plantation stay bookings.",
-      "Minimum stay duration of 2 nights is required.",
-      "Only valid on stays categorized under 'Plantation Stays'.",
-      "Subject to room availability and host confirmation.",
-      "Standard cancellation policies apply."
-    ],
-    colors: {
-      cardBg: "bg-[#c8e6c4]",
-      badgeBg: "bg-[#1C3D1E]",
-      badgeText: "text-[#a3e635]",
-      title: "text-[#0e200f]",
-      validity: "text-[#2a5a2c]",
-      couponBorder: "border-[#1C3D1E]",
-      couponText: "text-[#1C3D1E]",
-    }
-    }
-];
+const categoryColorMap: Record<string, any> = {
+  Stay: { cardBg: "bg-[#f7d6da]", badgeBg: "bg-[#9B1B30]", badgeText: "text-white", title: "text-[#4a0a14]", validity: "text-[#7a2030]", couponBorder: "border-[#9B1B30]", couponText: "text-[#9B1B30]" },
+  Cab: { cardBg: "bg-[#fdedc4]", badgeBg: "bg-[#E07B00]", badgeText: "text-white", title: "text-[#5a3000]", validity: "text-[#a05800]", couponBorder: "border-[#E07B00]", couponText: "text-[#E07B00]" },
+  Tour: { cardBg: "bg-[#d0dcf5]", badgeBg: "bg-[#1A3A6B]", badgeText: "text-white", title: "text-[#0a1e40]", validity: "text-[#2a4a8a]", couponBorder: "border-[#1A3A6B]", couponText: "text-[#1A3A6B]" },
+  Default: { cardBg: "bg-[#c8e6c4]", badgeBg: "bg-[#1C3D1E]", badgeText: "text-white", title: "text-[#0e200f]", validity: "text-[#2a5a2c]", couponBorder: "border-[#1C3D1E]", couponText: "text-[#1C3D1E]" }
+};
+
+const mapListingTypeToCategory = (types: string[] | null) => {
+  if (!types || types.length === 0) return 'Stay';
+  if (types.includes('stays')) return 'Stay';
+  if (types.includes('cars') || types.includes('bikes')) return 'Cab';
+  if (types.includes('experiences')) return 'Tour';
+  return 'Stay';
+};
+
+const getValidityText = (endsAt: string | null) => {
+  if (!endsAt) return "Valid indefinitely";
+  const date = new Date(endsAt);
+  return `Valid till ${date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
+};
 
 const filters = ["All", "Stay", "Cab", "Tour"];
 
@@ -130,6 +49,40 @@ const outstationCabOffer = {
 const OffersSection = ({ variant = "default" }: OffersSectionProps) => {
   const [activeFilter, setActiveFilter] = useState("All");
   const [selectedOffer, setSelectedOffer] = useState<any | null>(null);
+  const [offers, setOffers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchOffers() {
+      const { data, error } = await supabase
+        .from('host_coupons')
+        .select('*')
+        .eq('is_platform_offer', true)
+        .eq('is_active', true);
+        
+      if (!error && data) {
+        const mappedOffers = data.map((dbOffer, idx) => {
+          const cat = mapListingTypeToCategory(dbOffer.listing_types);
+          // Distribute colors across items if they share same category
+          const colorSet = idx % 2 === 0 && cat === 'Stay' ? categoryColorMap['Default'] : categoryColorMap[cat] || categoryColorMap['Default'];
+          return {
+            id: dbOffer.id,
+            type: cat,
+            title: dbOffer.title || `${dbOffer.discount_percent}% off`,
+            validity: getValidityText(dbOffer.ends_at),
+            code: dbOffer.code,
+            emoji: dbOffer.emoji || "🏷️",
+            category: cat,
+            terms: dbOffer.terms || ["Standard T&C Apply"],
+            colors: colorSet
+          };
+        });
+        setOffers(mappedOffers);
+      }
+      setLoading(false);
+    }
+    fetchOffers();
+  }, []);
 
   if (variant === "outstation-cabs") {
     return (
@@ -267,7 +220,12 @@ const OffersSection = ({ variant = "default" }: OffersSectionProps) => {
           ))}
         </div>
 
-        <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[14px]">
+        {loading ? (
+          <div className="flex justify-center items-center h-32">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        ) : (
+          <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[14px]">
           <AnimatePresence>
             {filteredOffers.map((offer) => (
               <motion.div
@@ -328,6 +286,7 @@ const OffersSection = ({ variant = "default" }: OffersSectionProps) => {
             ))}
           </AnimatePresence>
         </motion.div>
+        )}
 
         {/* Custom Terms & Conditions Modal */}
         <AnimatePresence>

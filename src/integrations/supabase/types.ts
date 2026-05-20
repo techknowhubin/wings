@@ -238,8 +238,10 @@ export type Database = {
       }
       bookings: {
         Row: {
+          booking_channel: string | null
           booking_status: Database["public"]["Enums"]["booking_status"] | null
           cancellation_reason: string | null
+          commission_amount: number | null
           created_at: string
           currency: string | null
           end_date: string
@@ -259,8 +261,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          booking_channel?: string | null
           booking_status?: Database["public"]["Enums"]["booking_status"] | null
           cancellation_reason?: string | null
+          commission_amount?: number | null
           created_at?: string
           currency?: string | null
           end_date: string
@@ -280,8 +284,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          booking_channel?: string | null
           booking_status?: Database["public"]["Enums"]["booking_status"] | null
           cancellation_reason?: string | null
+          commission_amount?: number | null
           created_at?: string
           currency?: string | null
           end_date?: string
@@ -561,13 +567,17 @@ export type Database = {
           code: string
           created_at: string
           discount_percent: number
+          emoji: string | null
           ends_at: string | null
-          host_id: string
+          host_id: string | null
           id: string
           is_active: boolean
+          is_platform_offer: boolean | null
           listing_types: string[]
           one_time_per_user: boolean
           starts_at: string | null
+          terms: string[] | null
+          title: string | null
           updated_at: string
           usage_limit: number | null
           used_count: number
@@ -576,13 +586,17 @@ export type Database = {
           code: string
           created_at?: string
           discount_percent: number
+          emoji?: string | null
           ends_at?: string | null
-          host_id: string
+          host_id?: string | null
           id?: string
           is_active?: boolean
+          is_platform_offer?: boolean | null
           listing_types?: string[]
           one_time_per_user?: boolean
           starts_at?: string | null
+          terms?: string[] | null
+          title?: string | null
           updated_at?: string
           usage_limit?: number | null
           used_count?: number
@@ -591,13 +605,17 @@ export type Database = {
           code?: string
           created_at?: string
           discount_percent?: number
+          emoji?: string | null
           ends_at?: string | null
-          host_id?: string
+          host_id?: string | null
           id?: string
           is_active?: boolean
+          is_platform_offer?: boolean | null
           listing_types?: string[]
           one_time_per_user?: boolean
           starts_at?: string | null
+          terms?: string[] | null
+          title?: string | null
           updated_at?: string
           usage_limit?: number | null
           used_count?: number
@@ -611,11 +629,15 @@ export type Database = {
           bank_account_holder: string | null
           bank_account_number: string | null
           bank_ifsc: string | null
+          bank_name: string | null
           business_name: string | null
           business_type: string | null
           created_at: string
           gst_number: string | null
+          host_type: string | null
           id: string
+          msme_number: string | null
+          onboarding_status: string | null
           pan_number: string | null
           service_types: string[] | null
           updated_at: string
@@ -626,11 +648,15 @@ export type Database = {
           bank_account_holder?: string | null
           bank_account_number?: string | null
           bank_ifsc?: string | null
+          bank_name?: string | null
           business_name?: string | null
           business_type?: string | null
           created_at?: string
           gst_number?: string | null
+          host_type?: string | null
           id: string
+          msme_number?: string | null
+          onboarding_status?: string | null
           pan_number?: string | null
           service_types?: string[] | null
           updated_at?: string
@@ -641,11 +667,15 @@ export type Database = {
           bank_account_holder?: string | null
           bank_account_number?: string | null
           bank_ifsc?: string | null
+          bank_name?: string | null
           business_name?: string | null
           business_type?: string | null
           created_at?: string
           gst_number?: string | null
+          host_type?: string | null
           id?: string
+          msme_number?: string | null
+          onboarding_status?: string | null
           pan_number?: string | null
           service_types?: string[] | null
           updated_at?: string

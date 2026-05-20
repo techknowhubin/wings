@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCreateExperience } from '@/hooks/useListings';
 import { toast } from 'sonner';
 import { createDiscountConfig } from '@/lib/discounts';
+import { ListingImageUploader } from './ListingImageUploader';
 
 const categories = ['Adventure', 'Cultural', 'Food & Drink', 'Nature', 'Wellness', 'Photography', 'Water Sports', 'Trekking', 'Wildlife'];
 
@@ -25,15 +26,9 @@ export function AddExperienceForm() {
     title: '', description: '', location: '', price_per_person: '',
     category: '', duration: '', group_size: '',
     inclusions: [''] as string[], exclusions: [''] as string[],
-    availability_status: true, images: [] as string[], imageInput: '',
+    availability_status: true, images: [] as string[],
     hostDiscountPercent: '',
   });
-
-  const handleAddImage = () => {
-    if (form.imageInput.trim()) {
-      setForm(p => ({ ...p, images: [...p.images, p.imageInput.trim()], imageInput: '' }));
-    }
-  };
 
   const updateListItem = (key: 'inclusions' | 'exclusions', index: number, value: string) => {
     setForm(p => ({ ...p, [key]: p[key].map((item, i) => i === index ? value : item) }));
@@ -150,21 +145,11 @@ export function AddExperienceForm() {
 
           <Card>
             <CardHeader><CardTitle>Images</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input value={form.imageInput} onChange={e => set('imageInput', e.target.value)} placeholder="Paste image URL..." className="flex-1" />
-                <Button type="button" variant="outline" onClick={handleAddImage}><ImagePlus className="h-4 w-4 mr-1" /> Add</Button>
-              </div>
-              {form.images.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {form.images.map((img, i) => (
-                    <div key={i} className="relative group rounded-lg overflow-hidden border border-border aspect-video">
-                      <img src={img} alt="" className="w-full h-full object-cover" />
-                      <button type="button" onClick={() => setForm(p => ({ ...p, images: p.images.filter((_, idx) => idx !== i) }))} className="absolute top-1 right-1 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><X className="h-3 w-3" /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <CardContent>
+              <ListingImageUploader 
+                images={form.images} 
+                onImagesChange={(images) => setForm(p => ({ ...p, images }))} 
+              />
             </CardContent>
           </Card>
         </div>

@@ -166,7 +166,7 @@ export function useApproveKyc() {
     mutationFn: async ({ submissionId, userId, adminId }: { submissionId: string; userId: string; adminId: string }) => {
       const now = new Date().toISOString();
 
-      const [docRes, profileRes] = await Promise.all([
+      const [docRes, profileRes, hostRes] = await Promise.all([
         supabase.from('user_documents' as any).update({
           status: 'approved',
           reviewed_at: now,
@@ -175,6 +175,9 @@ export function useApproveKyc() {
         supabase.from('profiles').update({
           kyc_status: 'approved',
           updated_at: now,
+        }).eq('id', userId),
+        supabase.from('host_profiles').update({
+          onboarding_status: 'approved',
         }).eq('id', userId),
       ]);
 
@@ -197,9 +200,10 @@ export function useRejectKyc() {
       submissionId, userId, adminId, reason,
     }: { submissionId: string; userId: string; adminId: string; reason: string }) => {
       const now = new Date().toISOString();
-      const [k, p] = await Promise.all([
+      const [k, p, h] = await Promise.all([
         supabase.from('user_documents' as any).update({ status: 'rejected', rejection_reason: reason, reviewed_at: now, reviewed_by: adminId }).eq('id', submissionId),
         supabase.from('profiles').update({ kyc_status: 'rejected', updated_at: now }).eq('id', userId),
+        supabase.from('host_profiles').update({ onboarding_status: 'rejected' }).eq('id', userId),
       ]);
       if (k.error) throw k.error;
       if (p.error) throw p.error;
@@ -215,9 +219,10 @@ export function useRequestReupload() {
       submissionId, userId, adminId, notes,
     }: { submissionId: string; userId: string; adminId: string; notes: string }) => {
       const now = new Date().toISOString();
-      const [k, p] = await Promise.all([
+      const [k, p, h] = await Promise.all([
         supabase.from('user_documents' as any).update({ status: 're_upload_requested', review_notes: notes, reviewed_at: now, reviewed_by: adminId }).eq('id', submissionId),
         supabase.from('profiles').update({ kyc_status: 're_upload_requested', updated_at: now }).eq('id', userId),
+        supabase.from('host_profiles').update({ onboarding_status: 'pending' }).eq('id', userId),
       ]);
       if (k.error) throw k.error;
       if (p.error) throw p.error;

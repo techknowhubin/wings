@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCreateResort } from '@/hooks/useListings';
 import { toast } from 'sonner';
 import { createDiscountConfig } from '@/lib/discounts';
+import { ListingImageUploader } from './ListingImageUploader';
 
 const propertyTypes = ['Resort', 'Beach Resort', 'Mountain Resort', 'Spa Resort', 'Eco Resort'];
 
@@ -23,11 +24,8 @@ export function AddResortForm() {
   const [form, setForm] = useState({
     title: '', description: '', location: '', price_per_night: '', max_guests: '', bedrooms: '', bathrooms: '',
     property_type: 'Resort', check_in_time: '14:00', check_out_time: '11:00', cancellation_policy: 'moderate',
-    availability_status: true, images: [] as string[], imageInput: '', hostDiscountPercent: '',
+    availability_status: true, images: [] as string[], hostDiscountPercent: '',
   });
-
-  const handleAddImage = () => form.imageInput.trim() && setForm(prev => ({ ...prev, images: [...prev.images, prev.imageInput.trim()], imageInput: '' }));
-  const handleRemoveImage = (index: number) => setForm(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,9 +84,11 @@ export function AddResortForm() {
             <div><Label>Bedrooms</Label><Input type="number" value={form.bedrooms} onChange={e => setForm(p => ({ ...p, bedrooms: e.target.value }))} /></div>
             <div><Label>Bathrooms</Label><Input type="number" value={form.bathrooms} onChange={e => setForm(p => ({ ...p, bathrooms: e.target.value }))} /></div>
           </CardContent></Card>
-          <Card><CardHeader><CardTitle>Images</CardTitle></CardHeader><CardContent className="space-y-4">
-            <div className="flex gap-2"><Input value={form.imageInput} onChange={e => setForm(p => ({ ...p, imageInput: e.target.value }))} className="flex-1" placeholder="Paste image URL..." /><Button type="button" variant="outline" onClick={handleAddImage}><ImagePlus className="h-4 w-4 mr-1" />Add</Button></div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{form.images.map((img, i) => <div key={i} className="relative group rounded-lg overflow-hidden border border-border aspect-video"><img src={img} alt="" className="w-full h-full object-cover" /><button type="button" onClick={() => handleRemoveImage(i)} className="absolute top-1 right-1 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><X className="h-3 w-3" /></button></div>)}</div>
+          <Card><CardHeader><CardTitle>Images</CardTitle></CardHeader><CardContent>
+            <ListingImageUploader 
+              images={form.images} 
+              onImagesChange={(images) => setForm(p => ({ ...p, images }))} 
+            />
           </CardContent></Card>
         </div>
         <div className="space-y-6">

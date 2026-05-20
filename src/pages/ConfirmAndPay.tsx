@@ -64,6 +64,22 @@ const ConfirmAndPay = () => {
   const [promoCode, setPromoCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<HostedCoupon | null>(null);
   const [globalCoupons, setGlobalCoupons] = useState<HostedCoupon[]>([]);
+  const [bookingFeeRate, setBookingFeeRate] = useState(10);
+
+  useEffect(() => {
+    async function fetchPlatformCommission() {
+      if (!booking) return;
+      const { data, error } = await supabase.from('platform_settings').select('marketplace_commission_pct, linkinbio_commission_pct').maybeSingle();
+      if (!error && data) {
+        if (booking.bookingChannel === 'link-in-bio' && data.linkinbio_commission_pct) {
+          setBookingFeeRate(Number(data.linkinbio_commission_pct));
+        } else if (data.marketplace_commission_pct) {
+          setBookingFeeRate(Number(data.marketplace_commission_pct));
+        }
+      }
+    }
+    fetchPlatformCommission();
+  }, [booking?.bookingChannel]);
 
   useEffect(() => {
     const prefillFromProfile = async () => {
@@ -207,16 +223,14 @@ const ConfirmAndPay = () => {
     return globalCoupons.length > 0 ? [...globalCoupons] : [...((booking?.availableCoupons as HostedCoupon[] | undefined) ?? [])];
   }, [globalCoupons, booking?.availableCoupons]);
 
-  const bookingFeeRate = 10;
-
   const baseTotal = useMemo(() => {
     if (!booking) return 0;
     return Math.max(booking.subtotal - hostDiscountAmount + booking.serviceFee, 0);
   }, [booking, hostDiscountAmount]);
 
   const normalBookingFee = useMemo(() => {
-    return baseTotal * 0.10;
-  }, [baseTotal]);
+    return baseTotal * (bookingFeeRate / 100);
+  }, [baseTotal, bookingFeeRate]);
 
   const couponDiscountAmount = useMemo(() => {
     if (!booking || !appliedCoupon) return 0;
@@ -331,6 +345,8 @@ const ConfirmAndPay = () => {
         payment_method: "razorpay",
         booking_status: "pending",
         guests_count: booking.quantity || 1,
+        booking_channel: booking.bookingChannel || "marketplace",
+        commission_amount: Number(normalBookingFee.toFixed(2)),
       };
       
       const { data: newBooking, error: bookingError } = await supabase
@@ -587,7 +603,7 @@ const ConfirmAndPay = () => {
                 <span className="font-medium text-foreground">{booking.currencySymbol}{formatAmount(booking.serviceFee)}</span>
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-dashed border-border">
-                <span className="text-muted-foreground">Booking Fee (10%)</span>
+                <span className="text-muted-foreground">Booking Fee ({bookingFeeRate}%)</span>
                 <span className="font-medium text-foreground">{booking.currencySymbol}{formatAmount(normalBookingFee)}</span>
               </div>
               {appliedCoupon ? (

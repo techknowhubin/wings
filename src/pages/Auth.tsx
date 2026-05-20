@@ -393,7 +393,8 @@ const Auth = () => {
     }
     localStorage.setItem("remember_me", rememberMe ? "true" : "false");
     setLoading(true);
-    const { error } = await signInWithPopup("google");
+    const roleToAssign = targetRole === 'host' ? 'host' : selectedRole;
+    const { error } = await signInWithPopup("google", roleToAssign);
     setLoading(false);
     if (error) {
       // If the email is already registered via email/password, guide user

@@ -17,6 +17,20 @@ export async function getProfile(userId: string) {
   return data;
 }
 
+export async function getHostProfile(userId: string) {
+  const { data, error } = await supabase
+    .from('host_profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+  
+  if (error) {
+    console.error('[getHostProfile] Error:', error.message);
+    return null;
+  }
+  return data;
+}
+
 export async function updateProfile(userId: string, updates: Partial<Profile>) {
   const { data, error } = await supabase
     .from('profiles')

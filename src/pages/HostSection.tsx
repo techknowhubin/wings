@@ -1,4 +1,8 @@
 import { Navigate, useParams, useSearchParams } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { useHostProfile } from "@/hooks/useListings";
+import { motion } from "framer-motion";
+import { Clock, ShieldAlert, Loader2 } from "lucide-react";
 import HostDashboard from "./HostDashboard";
 import HostStays from "./HostStays";
 import HostHotels from "./HostHotels";
@@ -25,6 +29,53 @@ export default function HostSection() {
   const isAddMode = searchParams.get("mode") === "add";
   const isEditMode = searchParams.get("mode") === "edit";
   const resolvedSection = section ?? "dashboard";
+
+  const { user } = useAuth();
+  const { data: profile, isLoading } = useHostProfile(user?.id);
+
+  if (isAddMode) {
+    if (isLoading) {
+      return (
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      );
+    }
+    
+    if (!profile || profile.onboarding_status !== 'approved') {
+      return (
+        <div className="flex items-center justify-center p-6 md:p-12 min-h-[60vh]">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="max-w-md w-full bg-white/80 backdrop-blur-xl border border-white/20 shadow-2xl rounded-3xl p-8 text-center"
+          >
+            <div className="mx-auto w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mb-6 shadow-inner">
+              {profile?.onboarding_status === 'rejected' ? (
+                <ShieldAlert className="w-8 h-8 text-red-600" />
+              ) : (
+                <Clock className="w-8 h-8 text-amber-600" />
+              )}
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 mb-3">
+              {profile?.onboarding_status === 'rejected' ? 'Verification Failed' : 'Verification Pending'}
+            </h2>
+            <p className="text-slate-600 mb-6 leading-relaxed">
+              {profile?.onboarding_status === 'rejected' 
+                ? 'Your host profile verification was rejected. Please check your email or contact support.' 
+                : 'Your host profile is currently under review by our team. You can create listings once your account is fully verified. This usually takes 2-4 hours.'}
+            </p>
+            <button 
+              onClick={() => window.history.back()}
+              className="w-full py-3 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 transition-colors"
+            >
+              Go Back
+            </button>
+          </motion.div>
+        </div>
+      );
+    }
+  }
 
   switch (resolvedSection) {
     case "dashboard":

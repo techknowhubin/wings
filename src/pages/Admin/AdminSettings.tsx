@@ -25,7 +25,7 @@ export default function AdminSettings() {
   const [maxKycAttempts, setMaxKycAttempts] = useState('5');
   const [platformName, setPlatformName] = useState('Xplorwing');
   const [supportEmail, setSupportEmail] = useState('support@xplorwing.com');
-  const [supportPhone, setSupportPhone] = useState('+91 1800-123-4567');
+  const [supportPhone, setSupportPhone] = useState('+91 9422799420');
   const [configLoading, setConfigLoading] = useState(true);
   const [savingCommission, setSavingCommission] = useState(false);
   const [savingPlatform, setSavingPlatform] = useState(false);
@@ -56,7 +56,7 @@ export default function AdminSettings() {
         setMaxKycAttempts(String(data.max_kyc_attempts ?? 5));
         setPlatformName(data.platform_name ?? 'Xplorwing');
         setSupportEmail(data.support_email ?? 'support@xplorwing.com');
-        setSupportPhone(data.support_phone ?? '+91 1800-123-4567');
+        setSupportPhone(data.support_phone ?? '+91 9422799420');
       }
       setConfigLoading(false);
     };

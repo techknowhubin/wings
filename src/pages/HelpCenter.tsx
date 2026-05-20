@@ -8,7 +8,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 const HelpCenter = () => {
-  const [supportPhone, setSupportPhone] = useState("+91 1800-123-4567");
+  const [supportPhone, setSupportPhone] = useState("+91 9422799420");
   const [supportEmail, setSupportEmail] = useState("support@xplorwing.com");
 
   useEffect(() => {

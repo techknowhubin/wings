@@ -186,23 +186,23 @@ const LandingPage = () => {
     : categories;
 
   const fetchStays = async () => {
-    const { data } = await supabase.from("stays").select("*").eq("availability_status", true).eq("marketplace_visible", true).order("featured", { ascending: false }).order("created_at", { ascending: false });
+    const { data } = await supabase.from("stays").select("*").eq("availability_status", true).eq("marketplace_visible", true).eq("approval_status", "approved").order("featured", { ascending: false }).order("created_at", { ascending: false });
     return data || [];
   };
   const fetchBikes = async () => {
-    const { data } = await supabase.from("bikes").select("*").eq("availability_status", true).eq("marketplace_visible", true).order("featured", { ascending: false }).order("created_at", { ascending: false });
+    const { data } = await supabase.from("bikes").select("*").eq("availability_status", true).eq("marketplace_visible", true).eq("approval_status", "approved").order("featured", { ascending: false }).order("created_at", { ascending: false });
     return data || [];
   };
   const fetchCars = async () => {
-    const { data } = await supabase.from("cars").select("*").eq("availability_status", true).eq("marketplace_visible", true).order("featured", { ascending: false }).order("created_at", { ascending: false }).limit(4);
+    const { data } = await supabase.from("cars").select("*").eq("availability_status", true).eq("marketplace_visible", true).eq("approval_status", "approved").order("featured", { ascending: false }).order("created_at", { ascending: false }).limit(4);
     return data || [];
   };
   const fetchHotels = async () => {
-    const { data } = await supabase.from("hotels").select("*").eq("availability_status", true).eq("marketplace_visible", true).order("featured", { ascending: false }).order("created_at", { ascending: false });
+    const { data } = await supabase.from("hotels").select("*").eq("availability_status", true).eq("marketplace_visible", true).eq("approval_status", "approved").order("featured", { ascending: false }).order("created_at", { ascending: false });
     return data || [];
   };
   const fetchResorts = async () => {
-    const { data } = await supabase.from("resorts").select("*").eq("availability_status", true).eq("marketplace_visible", true).order("featured", { ascending: false }).order("created_at", { ascending: false });
+    const { data } = await supabase.from("experiences").select("*").eq("availability_status", true).eq("marketplace_visible", true).eq("approval_status", "approved").order("featured", { ascending: false }).order("created_at", { ascending: false });
     return data || [];
   };
   const fetchBlogs = async () => {

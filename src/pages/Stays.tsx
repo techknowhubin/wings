@@ -37,6 +37,7 @@ const Stays = () => {
           .select("*")
           .eq("availability_status", true)
           .eq("marketplace_visible", true)
+          .eq("approval_status", "approved")
           .order("featured", { ascending: false })
           .order("created_at", { ascending: false });
 

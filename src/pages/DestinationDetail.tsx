@@ -94,6 +94,7 @@ const DestinationDetail = () => {
           .select("id, title, location, price_per_night, currency, rating, images, slug, property_type")
           .eq("availability_status", true)
           .eq("marketplace_visible", true)
+          .eq("approval_status", "approved")
           .ilike("location", `%${displayName}%`);
 
         stays?.forEach((s, i) => {
@@ -116,6 +117,7 @@ const DestinationDetail = () => {
           .select("id, title, location, price_per_night, currency, rating, images, slug, property_type")
           .eq("availability_status", true)
           .eq("marketplace_visible", true)
+          .eq("approval_status", "approved")
           .ilike("location", `%${displayName}%`);
 
         hotels?.forEach((h, i) => {
@@ -138,6 +140,7 @@ const DestinationDetail = () => {
           .select("id, title, location, price_per_night, currency, rating, images, slug, property_type")
           .eq("availability_status", true)
           .eq("marketplace_visible", true)
+          .eq("approval_status", "approved")
           .ilike("location", `%${displayName}%`);
 
         resorts?.forEach((r, i) => {
@@ -160,6 +163,7 @@ const DestinationDetail = () => {
           .select("id, title, location, price_per_day, currency, rating, images, slug")
           .eq("availability_status", true)
           .eq("marketplace_visible", true)
+          .eq("approval_status", "approved")
           .ilike("location", `%${displayName}%`);
 
         cars?.forEach((c, i) => {
@@ -182,6 +186,7 @@ const DestinationDetail = () => {
           .select("id, title, location, price_per_day, currency, rating, images, slug")
           .eq("availability_status", true)
           .eq("marketplace_visible", true)
+          .eq("approval_status", "approved")
           .ilike("location", `%${displayName}%`);
 
         bikes?.forEach((b, i) => {
@@ -204,6 +209,7 @@ const DestinationDetail = () => {
           .select("id, title, location, price_per_person, currency, rating, images, slug")
           .eq("availability_status", true)
           .eq("marketplace_visible", true)
+          .eq("approval_status", "approved")
           .ilike("location", `%${displayName}%`);
 
         experiences?.forEach((e, i) => {

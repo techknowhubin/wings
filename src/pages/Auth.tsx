@@ -187,6 +187,10 @@ const Auth = () => {
   const [searchParams] = useSearchParams();
   const targetRole = (isHostSignupPath || isHostSigninPath) ? "host" : searchParams.get("role");
 
+  const [selectedRole, setSelectedRole] = useState<'user' | 'host'>(
+    targetRole === 'host' ? 'host' : 'user'
+  );
+
   // Set initial mode based on path
   useEffect(() => {
     if (isHostSigninPath) {
@@ -315,6 +319,8 @@ const Auth = () => {
     e?.preventDefault();
     if (targetRole) {
       localStorage.setItem("pending_role", targetRole);
+    } else {
+      localStorage.setItem("pending_role", selectedRole);
     }
     if (waNumber.replace(/\D/g, "").length !== 10) {
       toast({ variant: "destructive", title: "Invalid Number", description: "Please enter a valid 10-digit number." });
@@ -383,6 +389,8 @@ const Auth = () => {
   const handleGoogleSignIn = async () => {
     if (targetRole) {
       localStorage.setItem("pending_role", targetRole);
+    } else {
+      localStorage.setItem("pending_role", selectedRole);
     }
     localStorage.setItem("remember_me", rememberMe ? "true" : "false");
     setLoading(true);
@@ -411,6 +419,8 @@ const Auth = () => {
     e.preventDefault();
     if (targetRole) {
       localStorage.setItem("pending_role", targetRole);
+    } else {
+      localStorage.setItem("pending_role", selectedRole);
     }
     localStorage.setItem("remember_me", rememberMe ? "true" : "false");
     setLoading(true);
@@ -427,9 +437,17 @@ const Auth = () => {
     } else {
       try {
         signupSchema.parse({ fullName, email, password });
-        const roleToAssign = targetRole === 'host' ? 'host' : 'user';
+        const roleToAssign = targetRole === 'host' ? 'host' : selectedRole;
         const { data, error } = await signUp(email, password, fullName, roleToAssign);
         if (error) throw error;
+
+        // If email enumeration protection is active, Supabase does not return an error
+        // but returns an empty identities array for existing users.
+        const userExists = data?.user && data.user.identities && data.user.identities.length === 0;
+        if (userExists) {
+          throw new Error("User already exists");
+        }
+
         if (data.session) {
           toast({ title: "Account Created!", description: "Welcome to Xplorwing." });
         } else {
@@ -684,17 +702,51 @@ const Auth = () => {
               ) : (
                 <form onSubmit={handleEmailAuth} className="flex flex-col justify-center space-y-3" style={{ minHeight: "250px" }}>
                   {!isLoginMode && (
-                    <div className="relative">
-                      <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
-                      <input
-                        type="text"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        className="auth-input"
-                        placeholder="Full Name"
-                        required
-                      />
-                    </div>
+                    <>
+                      <div className="flex bg-white/50 p-1 rounded-xl border-[1.5px] border-gray-200/80 shadow-inner relative" style={{ marginBottom: '0.25rem' }}>
+                        <div
+                          className="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-[#115f10] rounded-[10px] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-sm"
+                          style={{
+                            transform: selectedRole === 'host' ? 'translateX(100%)' : 'translateX(0)'
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRole('user')}
+                          className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-[13px] font-bold z-10 transition-colors duration-300 ${
+                            selectedRole === 'user' ? 'text-white' : 'text-gray-500 hover:text-gray-700'
+                          }`}
+                        >
+                          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Traveller
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRole('host')}
+                          className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-[13px] font-bold z-10 transition-colors duration-300 ${
+                            selectedRole === 'host' ? 'text-[#e5f76e]' : 'text-gray-500 hover:text-gray-700'
+                          }`}
+                        >
+                          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                          </svg>
+                          Host
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
+                        <input
+                          type="text"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          className="auth-input"
+                          placeholder="Full Name"
+                          required
+                        />
+                      </div>
+                    </>
                   )}
                   <div className="relative">
                     <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />

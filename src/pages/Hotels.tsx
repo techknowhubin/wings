@@ -38,6 +38,7 @@ const Hotels = () => {
           .select("id, title, location, price_per_night, currency, rating, images, slug, property_type, host_id")
           .eq("availability_status", true)
           .eq("marketplace_visible", true)
+          .eq("approval_status", "approved")
           .order("featured", { ascending: false })
           .order("created_at", { ascending: false })
           .limit(20);

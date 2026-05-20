@@ -292,95 +292,124 @@ const ConfirmAndPay = () => {
     }
 
     setIsProcessing(true);
+
+    let dbListingType = "stay";
+    if (booking.listingType === "stay") {
+      if (booking.listingCouponType === "hotels") {
+        dbListingType = "hotel";
+      } else if (booking.listingCouponType === "resorts") {
+        dbListingType = "resort";
+      } else {
+        dbListingType = "stay";
+      }
+    } else if (booking.listingType === "experience") {
+      dbListingType = "experience";
+    } else if (booking.listingType === "vehicle") {
+      if (booking.listingCouponType === "bikes") {
+        dbListingType = "bike";
+      } else {
+        dbListingType = "car";
+      }
+    }
+
+    let pendingBookingId = "";
+    try {
+      const bookingData = {
+        user_id: user?.id,
+        listing_id: booking.listingId || "00000000-0000-0000-0000-000000000000",
+        listing_type: dbListingType,
+        host_id: booking.hostId || user?.id || "00000000-0000-0000-0000-000000000000",
+        start_date: new Date(booking.startDate).toISOString(),
+        end_date: new Date(booking.endDate).toISOString(),
+        total_price: Number(totalPayable.toFixed(2)),
+        currency: booking.currencySymbol === "₹" ? "INR" : "USD",
+        payment_status: "pending",
+        payment_method: "razorpay",
+        booking_status: "pending",
+        guests_count: booking.quantity || 1,
+      };
+      
+      const { data: newBooking, error: bookingError } = await supabase
+        .from("bookings")
+        .insert(bookingData)
+        .select()
+        .single();
+        
+      if (bookingError || !newBooking) {
+        console.error("Error creating booking:", bookingError);
+        toast.error("Failed to initialize booking.");
+        setIsProcessing(false);
+        return;
+      }
+      pendingBookingId = newBooking.id;
+    } catch (err) {
+      console.error("Failed to insert booking record:", err);
+      toast.error("An error occurred during booking initialization.");
+      setIsProcessing(false);
+      return;
+    }
+
     await initiateRazorpayPayment({
       amount: totalPayable,
       title: booking.listingTitle,
       description: booking.description,
       prefill: { name, email, contact: phone },
       onSuccess: async (response) => {
-        setIsProcessing(false);
-
-        let dbListingType = "stay";
-        if (booking.listingType === "stay") {
-          if (booking.listingCouponType === "hotels") {
-            dbListingType = "hotel";
-          } else if (booking.listingCouponType === "resorts") {
-            dbListingType = "resort";
-          } else {
-            dbListingType = "stay";
-          }
-        } else if (booking.listingType === "experience") {
-          dbListingType = "experience";
-        } else if (booking.listingType === "vehicle") {
-          if (booking.listingCouponType === "bikes") {
-            dbListingType = "bike";
-          } else {
-            dbListingType = "car";
-          }
-        }
-
         try {
-          const bookingData = {
-            user_id: user?.id,
-            listing_id: booking.listingId || "00000000-0000-0000-0000-000000000000",
-            listing_type: dbListingType,
-            host_id: booking.hostId || user?.id || "00000000-0000-0000-0000-000000000000",
-            start_date: new Date(booking.startDate).toISOString(),
-            end_date: new Date(booking.endDate).toISOString(),
-            total_price: Number(totalPayable.toFixed(2)),
-            currency: booking.currencySymbol === "₹" ? "INR" : "USD",
-            payment_status: "completed",
-            payment_method: "razorpay",
-            booking_status: "confirmed",
-            transaction_id: response.razorpay_payment_id,
-            guests_count: booking.quantity || 1,
-          };
+          const { data, error } = await supabase.functions.invoke('verify-razorpay-payment', {
+            body: {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              booking_id: pendingBookingId,
+              coupon_id: appliedCoupon?.id
+            }
+          });
           
-          const { error: bookingError } = await supabase
-            .from("bookings")
-            .insert(bookingData);
-            
-          if (bookingError) {
-            console.error("Error creating booking:", bookingError);
-            toast.error("Payment successful, but failed to save booking to database.");
-          } else {
-            toast.success("Booking confirmed and saved!");
-          }
-        } catch (err) {
-          console.error("Failed to insert booking record:", err);
-        }
-
-        if (appliedCoupon?.id && user && booking.hostId) {
-          void supabase
-            .from("host_coupon_redemptions" as any)
-            .insert({
-              coupon_id: appliedCoupon.id,
-              host_id: booking.hostId,
-              user_id: user.id,
-              booking_context: {
-                listingTitle: booking.listingTitle,
-                listingType: booking.listingCouponType || booking.listingType,
-                paymentId: response.razorpay_payment_id,
-                amount: totalPayable,
+          if (error || !data?.success) {
+            console.error("Payment signature verification failed:", error);
+            toast.error("Payment verification failed. Invalid signature.");
+            setIsProcessing(false);
+            navigate("/transaction-failed", {
+              state: {
+                booking: {
+                  ...booking,
+                  discount: hostDiscountAmount + couponDiscountAmount,
+                  total: totalPayable,
+                },
               },
             });
-          void supabase
-            .from("host_coupons" as any)
-            .update({ used_count: (appliedCoupon.usedCount ?? 0) + 1 })
-            .eq("id", appliedCoupon.id);
+            return;
+          }
+          
+          toast.success("Booking confirmed securely!");
+          
+          const finalizedBooking = {
+            ...booking,
+            discount: hostDiscountAmount + couponDiscountAmount,
+            total: totalPayable,
+          };
+          setIsProcessing(false);
+          navigate("/booking-confirmation", {
+            state: {
+              booking: finalizedBooking,
+              paymentId: response.razorpay_payment_id,
+              customerName: name,
+            },
+          });
+        } catch (err) {
+          console.error("Edge function verification error:", err);
+          setIsProcessing(false);
+          navigate("/transaction-failed", {
+            state: {
+              booking: {
+                ...booking,
+                discount: hostDiscountAmount + couponDiscountAmount,
+                total: totalPayable,
+              },
+            },
+          });
         }
-        const finalizedBooking: BookingDetails = {
-          ...booking,
-          discount: hostDiscountAmount + couponDiscountAmount,
-          total: totalPayable,
-        };
-        navigate("/booking-confirmation", {
-          state: {
-            booking: finalizedBooking,
-            paymentId: response.razorpay_payment_id,
-            customerName: name,
-          },
-        });
       },
       onFailure: () => {
         setIsProcessing(false);

@@ -47,6 +47,7 @@ export async function getStays(options?: {
   query = query
     .eq('availability_status', true)
     .eq('marketplace_visible', true)
+    .eq('approval_status', 'approved')
     .order('created_at', { ascending: false });
   
   const { data, error } = await query;
@@ -92,6 +93,7 @@ export async function getCars(options?: {
   query = query
     .eq('availability_status', true)
     .eq('marketplace_visible', true)
+    .eq('approval_status', 'approved')
     .order('created_at', { ascending: false });
   
   const { data, error } = await query;
@@ -137,6 +139,7 @@ export async function getBikes(options?: {
   query = query
     .eq('availability_status', true)
     .eq('marketplace_visible', true)
+    .eq('approval_status', 'approved')
     .order('created_at', { ascending: false });
   
   const { data, error } = await query;
@@ -184,6 +187,7 @@ export async function getExperiences(options?: {
   query = query
     .eq('availability_status', true)
     .eq('marketplace_visible', true)
+    .eq('approval_status', 'approved')
     .order('created_at', { ascending: false });
   
   const { data, error } = await query;

@@ -34,6 +34,7 @@ const Experiences = () => {
           .select("id, title, location, price_per_person, currency, rating, images, host_id")
           .eq("availability_status", true)
           .eq("marketplace_visible", true)
+          .eq("approval_status", "approved")
           .order("featured", { ascending: false })
           .order("created_at", { ascending: false });
 

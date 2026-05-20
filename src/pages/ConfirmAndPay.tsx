@@ -290,6 +290,10 @@ const ConfirmAndPay = () => {
       toast.error("Please accept the privacy and cancellation policy to continue.");
       return;
     }
+    if (!booking.hostId) {
+      toast.error("Booking host details are missing. Please go back and book again.");
+      return;
+    }
 
     setIsProcessing(true);
 
@@ -318,7 +322,7 @@ const ConfirmAndPay = () => {
         user_id: user?.id,
         listing_id: booking.listingId || "00000000-0000-0000-0000-000000000000",
         listing_type: dbListingType,
-        host_id: booking.hostId || user?.id || "00000000-0000-0000-0000-000000000000",
+        host_id: booking.hostId,
         start_date: new Date(booking.startDate).toISOString(),
         end_date: new Date(booking.endDate).toISOString(),
         total_price: Number(totalPayable.toFixed(2)),

@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { Plus, Minus } from "lucide-react";
 
-const faqCategories = [
+const defaultFaqCategories = [
   {
     label: "Booking",
     questions: [
@@ -65,9 +65,69 @@ const faqCategories = [
   },
 ];
 
-const HomeFAQ = () => {
+const outstationCabFaqCategories = [
+  {
+    label: "Booking",
+    questions: [
+      {
+        q: "How do I book an outstation cab on Xplorwing?",
+        a: "Choose your state, select the route card, and click Book Now. You will be redirected to WhatsApp with the route and fare pre-filled for quick confirmation.",
+      },
+      {
+        q: "Are fares one-way or round trip?",
+        a: "The fares shown on the Outstation Cabs page are for round trips, as indicated on each fare card.",
+      },
+      {
+        q: "Can I schedule a pickup for a future date and time?",
+        a: "Yes. During booking confirmation, share your preferred pickup date, time, and address, and our team will schedule your cab accordingly.",
+      },
+    ],
+  },
+  {
+    label: "Pricing",
+    questions: [
+      {
+        q: "Will I see discounted fare if available?",
+        a: "Yes. When a discounted fare is available in our fare sheet, the original amount is shown struck through and the discounted price is displayed as the final payable fare.",
+      },
+      {
+        q: "What is included in the displayed fare?",
+        a: "Displayed fare covers the base route price. Any additional tolls, parking, permit charges, or extra waiting (if applicable) are confirmed at booking time.",
+      },
+      {
+        q: "Do fares change based on season or demand?",
+        a: "Yes, fares can be revised periodically. The latest rates shown on the Outstation Cabs page reflect the current pricing configured for each route.",
+      },
+    ],
+  },
+  {
+    label: "Trip Support",
+    questions: [
+      {
+        q: "Can I change my destination after booking?",
+        a: "Yes, route changes are possible subject to availability. Fare difference, if any, will be communicated before confirming the update.",
+      },
+      {
+        q: "What if I need to cancel my outstation trip?",
+        a: "Cancellation requests are supported. Applicable cancellation charges depend on notice period and route logistics and are shared before final cancellation.",
+      },
+      {
+        q: "How do I contact support during the trip?",
+        a: "You can reach our support team directly on the same WhatsApp booking thread for real-time assistance during your journey.",
+      },
+    ],
+  },
+];
+
+interface HomeFAQProps {
+  variant?: "default" | "outstation-cabs";
+}
+
+const HomeFAQ = ({ variant = "default" }: HomeFAQProps) => {
   const [activeCategory, setActiveCategory] = useState(0);
   const [openIndex, setOpenIndex] = useState<number | null>(0);
+  const faqCategories =
+    variant === "outstation-cabs" ? outstationCabFaqCategories : defaultFaqCategories;
 
   const questions = faqCategories[activeCategory].questions;
 

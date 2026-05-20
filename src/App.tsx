@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AuthProvider } from "./contexts/AuthContext";
+import { isSupabaseConfigured } from "@/integrations/supabase/client";
+import MissingSupabaseConfig from "@/components/MissingSupabaseConfig";
 import ScrollToTop from "./components/ScrollToTop";
 import AuthRedirectHandler from "./components/AuthRedirectHandler";
 import LandingPage from "./pages/LandingPage";
@@ -64,10 +66,13 @@ import AdminBlogPosts from "./pages/Admin/AdminBlogPosts";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-    <ThemeProvider defaultTheme="light">
+const App = () =>
+  !isSupabaseConfigured ? (
+    <MissingSupabaseConfig />
+  ) : (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ThemeProvider defaultTheme="light">
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -85,11 +90,11 @@ const App = () => (
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/stays" element={<Stays />} />
-            <Route path="/stays/:id" element={<StayDetail />} />
+            <Route path="/stays/:id" element={<StayDetail tableType="stays" />} />
             <Route path="/hotels" element={<Hotels />} />
-            <Route path="/hotels/:id" element={<StayDetail />} />
+            <Route path="/hotels/:id" element={<StayDetail tableType="hotels" />} />
             <Route path="/resorts" element={<Resorts />} />
-            <Route path="/resorts/:id" element={<StayDetail />} />
+            <Route path="/resorts/:id" element={<StayDetail tableType="resorts" />} />
             <Route path="/experiences" element={<Experiences />} />
             <Route path="/experiences/:id" element={<ExperienceDetail />} />
             <Route path="/outstation-cabs" element={<Navigate to="/" replace />} />
@@ -164,9 +169,9 @@ const App = () => (
           <WhatsAppButton />
         </BrowserRouter>
       </TooltipProvider>
-    </ThemeProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+        </ThemeProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
 
 export default App;

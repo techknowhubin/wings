@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 
-const testimonials = [
+const defaultTestimonials = [
   {
     name: "Amit V.",
     title: "Traveler from Bangalore",
@@ -39,7 +39,53 @@ const testimonials = [
   }
 ];
 
-const CustomerTestimonials = () => {
+const outstationCabTestimonials = [
+  {
+    name: "Vikram R.",
+    title: "Weekend Traveler",
+    text: "Booked Hyderabad to Warangal in minutes. Fare was exactly what was shown and the cab arrived on time. Super smooth trip.",
+    avatar: "🚕",
+  },
+  {
+    name: "Neha K.",
+    title: "Family Traveler",
+    text: "We took an outstation SUV to Tirupati. Clean vehicle, polite driver, and easy WhatsApp booking flow. Very convenient for family travel.",
+    avatar: "👨‍👩‍👧",
+  },
+  {
+    name: "Arjun M.",
+    title: "Business Commuter",
+    text: "Frequent work trips to Vijayawada are now hassle-free. Transparent pricing and quick confirmations made a big difference.",
+    avatar: "💼",
+  },
+  {
+    name: "Sowmya P.",
+    title: "Solo Traveler",
+    text: "Used the cab service for Hyderabad to Nizamabad. Felt safe, fare was fair, and support on WhatsApp was responsive.",
+    avatar: "🛣️",
+  },
+  {
+    name: "Harish N.",
+    title: "Road Trip Enthusiast",
+    text: "Our Bangalore route booking was seamless. Loved seeing discounted fares directly on the card before booking.",
+    avatar: "🚘",
+  },
+  {
+    name: "Pooja S.",
+    title: "Frequent Explorer",
+    text: "Great outstation cab experience to Khammam. No hidden charges and the ride quality was excellent throughout the journey.",
+    avatar: "✨",
+  },
+];
+
+interface CustomerTestimonialsProps {
+  variant?: "default" | "outstation-cabs";
+}
+
+const CustomerTestimonials = ({ variant = "default" }: CustomerTestimonialsProps) => {
+  const testimonials =
+    variant === "outstation-cabs" ? outstationCabTestimonials : defaultTestimonials;
+
   return (
     <section className="testi-section-home py-24 overflow-hidden bg-[#f8f6f0]">
       <style dangerouslySetInnerHTML={{ __html: `

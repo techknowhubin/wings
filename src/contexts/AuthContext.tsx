@@ -1,6 +1,33 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
+
+function getWhatsappOtpEndpoint(): { url: string; headers: Record<string, string> } | null {
+  const url = (import.meta.env.VITE_SUPABASE_URL ?? '').trim();
+  const key = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '').trim();
+  if (!url || !key) return null;
+  return {
+    url: `${url}/functions/v1/send-whatsapp-otp`,
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: key,
+    },
+  };
+}
+
+async function safeJson(res: Response): Promise<{ data: any; parseError: string | null }> {
+  const text = await res.text();
+  try {
+    return { data: JSON.parse(text), parseError: null };
+  } catch {
+    const preview = text.slice(0, 80).replace(/\n/g, ' ');
+    console.error('[OTP] Non-JSON response from Edge Function:', preview);
+    return {
+      data: null,
+      parseError: `Edge Function returned non-JSON (${res.status}). Check if the function is deployed.`,
+    };
+  }
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +59,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasInitialized = useRef(false);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      if (!hasInitialized.current) {
+        hasInitialized.current = true;
+        setLoading(false);
+      }
+      return;
+    }
+
     // Set up ONE auth state listener for the entire app.
     // The INITIAL_SESSION event fires immediately with the persisted session
     // (or null if none), making a redundant getSession() call unnecessary.
@@ -101,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       provider,
       options: {
         redirectTo: `${window.location.origin}/auth`,
-        queryParams: { prompt: 'select_account' },
+        queryParams: { prompt: 'select_account', role },
       },
     });
     return { error };
@@ -116,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: {
         redirectTo: `${window.location.origin}/auth`,
         skipBrowserRedirect: true,
-        queryParams: { prompt: 'select_account' },
+        queryParams: { prompt: 'select_account', role },
       },
     });
 
@@ -157,34 +192,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── WhatsApp OTP ─────────────────────────────────────────────────────────────
 
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://uhtwkajqpuazxpnbaojx.supabase.co';
-  const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVodHdrYWpxcHVhenhwbmJhb2p4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE2NzY1NTcsImV4cCI6MjA3NzI1MjU1N30.RPdeJk13uqnFssQXUyA0acsf53xgceR-59VLzoB7Wfg';
-  const WA_OTP_URL = `${SUPABASE_URL}/functions/v1/send-whatsapp-otp`;
-  const WA_OTP_HEADERS = {
-    'Content-Type': 'application/json',
-    'apikey': SUPABASE_ANON_KEY,
-  };
-
-  // Safe JSON parser — gives a clear error when server returns HTML (e.g. 404)
-  const safeJson = async (res: Response): Promise<{ data: any; parseError: string | null }> => {
-    const text = await res.text();
-    try {
-      return { data: JSON.parse(text), parseError: null };
-    } catch {
-      const preview = text.slice(0, 80).replace(/\n/g, ' ');
-      console.error('[OTP] Non-JSON response from Edge Function:', preview);
+  const signInWithOtp = async (phone: string): Promise<{ error: Error | null }> => {
+    const otp = getWhatsappOtpEndpoint();
+    if (!otp) {
       return {
-        data: null,
-        parseError: `Edge Function returned non-JSON (${res.status}). Check if the function is deployed.`,
+        error: new Error(
+          'Missing Supabase configuration. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to your .env file.',
+        ),
       };
     }
-  };
-
-  const signInWithOtp = async (phone: string): Promise<{ error: Error | null }> => {
     try {
-      const res = await fetch(WA_OTP_URL, {
+      const res = await fetch(otp.url, {
         method: 'POST',
-        headers: WA_OTP_HEADERS,
+        headers: otp.headers,
         body: JSON.stringify({ action: 'send', phone }),
       });
       const { data, parseError } = await safeJson(res);
@@ -197,10 +217,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const verifyOtp = async (phone: string, token: string) => {
+    const otp = getWhatsappOtpEndpoint();
+    if (!otp) {
+      return {
+        data: null,
+        error: new Error(
+          'Missing Supabase configuration. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to your .env file.',
+        ),
+      };
+    }
     try {
-      const res = await fetch(WA_OTP_URL, {
+      const res = await fetch(otp.url, {
         method: 'POST',
-        headers: WA_OTP_HEADERS,
+        headers: otp.headers,
         body: JSON.stringify({ action: 'verify', phone, otp: token }),
       });
       const { data, parseError } = await safeJson(res);

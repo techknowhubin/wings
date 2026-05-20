@@ -26,7 +26,7 @@ import Marquee from "@/components/Marquee";
 
 interface LinkInBioSettings {
   businessName: string; tagline: string; bio: string;
-  theme: "forest" | "minimal" | "sunset" | "ocean";
+  theme: "forest" | "minimal" | "luxury" | "electric";
   showEmail: boolean; showPhone: boolean; showLocation: boolean;
   instagram: string; facebook: string; twitter: string; website: string;
   youtube: string; email: string;

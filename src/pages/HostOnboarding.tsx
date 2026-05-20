@@ -377,11 +377,91 @@ export default function HostOnboarding() {
     return true;
   };
 
+  const uploadHostDocument = async (file: File, docType: string, side: "front" | "back" = "front") => {
+    if (!user) throw new Error("User not found");
+    const ext = file.name.split(".").pop() || "bin";
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const filePath = `${user.id}/host/${docType}/${side}/${fileName}`;
+    const { error } = await supabase.storage.from("user-documents").upload(filePath, file);
+    if (error) throw error;
+    return filePath;
+  };
+
 
   const handleComplete = async () => {
     if (!user) return;
+    setLoading(true);
 
     try {
+      // Upload host onboarding documents to storage and track paths
+      const aadhaarFrontPath = identity.aadhaarFrontFile
+        ? await uploadHostDocument(identity.aadhaarFrontFile, "aadhaar", "front")
+        : null;
+      const aadhaarBackPath = identity.aadhaarBackFile
+        ? await uploadHostDocument(identity.aadhaarBackFile, "aadhaar", "back")
+        : null;
+      const panPath = identity.panFile
+        ? await uploadHostDocument(identity.panFile, "pan", "front")
+        : null;
+      const gstPath = identity.gstCertFile
+        ? await uploadHostDocument(identity.gstCertFile, "gst_certificate", "front")
+        : null;
+      const businessRegPath = identity.businessRegFile
+        ? await uploadHostDocument(identity.businessRegFile, "business_registration", "front")
+        : null;
+      const chequePath = bank.chequeFile
+        ? await uploadHostDocument(bank.chequeFile, "cancelled_cheque", "front")
+        : null;
+
+      // Persist core verification docs in user_documents
+      if (aadhaarFrontPath) {
+        const { error: aadhaarDocErr } = await supabase.from("user_documents" as any).upsert({
+          user_id: user.id,
+          document_type: "aadhaar",
+          document_number: identity.aadhaarNumber || null,
+          document_front_url: aadhaarFrontPath,
+          document_back_url: aadhaarBackPath,
+          status: "pending",
+          submitted_at: new Date().toISOString(),
+          attempt_number: 1,
+        }, { onConflict: "user_id,document_type" });
+        if (aadhaarDocErr) throw aadhaarDocErr;
+      }
+
+      if (panPath && identity.panNumber) {
+        const { error: panDocErr } = await supabase.from("user_documents" as any).upsert({
+          user_id: user.id,
+          document_type: "pan",
+          document_number: identity.panNumber,
+          document_front_url: panPath,
+          document_back_url: null,
+          status: "pending",
+          submitted_at: new Date().toISOString(),
+          attempt_number: 1,
+        }, { onConflict: "user_id,document_type" });
+        if (panDocErr) throw panDocErr;
+      }
+
+      // Insert/refresh KYC submission queue record for admin review
+      if (aadhaarFrontPath) {
+        const hostDocNotes = [
+          panPath ? `pan:${panPath}` : null,
+          gstPath ? `gst:${gstPath}` : null,
+          businessRegPath ? `biz_reg:${businessRegPath}` : null,
+          chequePath ? `cheque:${chequePath}` : null,
+        ].filter(Boolean).join(" | ");
+        const { error: kycErr } = await supabase.from("kyc_submissions" as any).insert({
+          user_id: user.id,
+          document_type: "aadhaar",
+          document_front_url: aadhaarFrontPath,
+          document_back_url: aadhaarBackPath,
+          status: "pending",
+          attempt_number: 1,
+          review_notes: hostDocNotes || null,
+        });
+        if (kycErr) throw kycErr;
+      }
+
       const addressString = [biz.street, biz.city, biz.state, biz.pin].filter(Boolean).join(", ");
 
       const { error: profileError } = await supabase
@@ -408,6 +488,7 @@ export default function HostOnboarding() {
         .update({
           full_name: biz.hostType === "business" ? biz.businessName : biz.fullName,
           phone: biz.phone || null,
+          onboarding_completed: true,
         })
         .eq("id", user.id);
 
@@ -430,6 +511,8 @@ export default function HostOnboarding() {
     } catch (error) {
       console.error(error);
       toast.error("Could not complete onboarding. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 

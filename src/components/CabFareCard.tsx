@@ -8,7 +8,9 @@ interface CabFareCardProps {
   toCity: string;
   distance: string;
   sedanPrice: number;
+  sedanDiscountedPrice?: number;
   suvPrice: number;
+  suvDiscountedPrice?: number;
   delay?: number;
 }
 
@@ -19,9 +21,20 @@ const CabFareCard = ({
   toCity,
   distance,
   sedanPrice,
+  sedanDiscountedPrice,
   suvPrice,
+  suvDiscountedPrice,
   delay = 0,
 }: CabFareCardProps) => {
+  const effectiveSedanPrice =
+    sedanDiscountedPrice && sedanDiscountedPrice > 0 && sedanDiscountedPrice < sedanPrice
+      ? sedanDiscountedPrice
+      : sedanPrice;
+  const effectiveSuvPrice =
+    suvDiscountedPrice && suvDiscountedPrice > 0 && suvDiscountedPrice < suvPrice
+      ? suvDiscountedPrice
+      : suvPrice;
+
   const buildWhatsAppUrl = (vehicleType: string, fare: number) => {
     const message = `Hi, I'd like to book a cab.\n\n*From:* ${fromCity} (${fromCode})\n*To:* ${toCity} (${toCode})\n*Distance:* ${distance}\n*Trip Type:* \n*Vehicle Type:* ${vehicleType}\n*Fare:* ₹${fare.toLocaleString()}\n*Booking Person:* `;
     return `https://wa.me/919492986412?text=${encodeURIComponent(message)}`;
@@ -57,9 +70,16 @@ const CabFareCard = ({
         <div className="p-2 md:p-5 min-w-[100px] md:min-w-[160px] self-stretch flex flex-col justify-center text-center bg-[#064e3b] border-l border-emerald-900 shadow-inner shrink-0">
           <div className="mb-0.5 md:mb-1">
             <p className="text-[8px] md:text-xs text-emerald-100/70 uppercase tracking-wider font-medium">Sedan</p>
-            <p className="text-xs md:text-xl font-bold text-[#FFFFF0]">₹{sedanPrice.toLocaleString()}</p>
+            <p
+              className={`text-[9px] md:text-sm text-emerald-100/70 line-through h-[14px] md:h-[18px] ${
+                effectiveSedanPrice !== sedanPrice ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              ₹{sedanPrice.toLocaleString()}
+            </p>
+            <p className="text-xs md:text-xl font-bold text-[#FFFFF0]">₹{effectiveSedanPrice.toLocaleString()}</p>
             <a
-              href={buildWhatsAppUrl("Sedan", sedanPrice)}
+              href={buildWhatsAppUrl("Sedan", effectiveSedanPrice)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block mt-0.5 md:mt-1 px-2 md:px-3 py-0.5 md:py-1 bg-[#E5F76E] text-gray-900 text-[7px] md:text-[10px] font-semibold rounded-full hover:bg-[#d4e85e] transition-colors"
@@ -70,9 +90,16 @@ const CabFareCard = ({
           <div className="h-[1px] bg-[#FFFFF0] w-full mb-0.5 md:mb-1 opacity-20" />
           <div>
             <p className="text-[8px] md:text-xs text-emerald-100/70 uppercase tracking-wider font-medium">SUV</p>
-            <p className="text-xs md:text-xl font-bold text-[#FFFFF0]">₹{suvPrice.toLocaleString()}</p>
+            <p
+              className={`text-[9px] md:text-sm text-emerald-100/70 line-through h-[14px] md:h-[18px] ${
+                effectiveSuvPrice !== suvPrice ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              ₹{suvPrice.toLocaleString()}
+            </p>
+            <p className="text-xs md:text-xl font-bold text-[#FFFFF0]">₹{effectiveSuvPrice.toLocaleString()}</p>
             <a
-              href={buildWhatsAppUrl("SUV", suvPrice)}
+              href={buildWhatsAppUrl("SUV", effectiveSuvPrice)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block mt-0.5 md:mt-1 px-2 md:px-3 py-0.5 md:py-1 bg-[#E5F76E] text-gray-900 text-[7px] md:text-[10px] font-semibold rounded-full hover:bg-[#d4e85e] transition-colors"

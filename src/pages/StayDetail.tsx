@@ -68,7 +68,11 @@ interface Stay {
   images: string[];
 }
 
-const StayDetail = () => {
+interface StayDetailProps {
+  tableType?: "stays" | "hotels" | "resorts";
+}
+
+const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
   const { id } = useParams();
   const [stay, setStay] = useState<Stay | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,14 +84,10 @@ const StayDetail = () => {
   useEffect(() => {
     const fetchStay = async () => {
       if (!id) return;
-      
-      const isHotelRoute = window.location.pathname.includes("/hotels");
-      const isResortRoute = window.location.pathname.includes("/resorts");
-      const tableName = isHotelRoute ? "hotels" : isResortRoute ? "resorts" : "stays";
-      
+
       try {
         const { data, error } = await supabase
-          .from(tableName)
+          .from(tableType)
           .select("*")
           .eq("id", id)
           .single();
@@ -111,7 +111,7 @@ const StayDetail = () => {
       }
     };
     fetchStay();
-  }, [id, toast]);
+  }, [id, toast, tableType]);
 
   if (loading) {
     return (
@@ -152,8 +152,8 @@ const StayDetail = () => {
   const currencySymbol = stay.currency === 'INR' ? '₹' : '$';
   const discountConfig = parseListingDiscountConfig(stay.discounts);
 
-  const isHotel = window.location.pathname.includes("/hotels");
-  const isResort = window.location.pathname.includes("/resorts");
+  const isHotel = tableType === "hotels";
+  const isResort = tableType === "resorts";
   
   let categoryName = "Homestays";
   let categoryLink = "/stays";

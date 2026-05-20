@@ -330,7 +330,7 @@ const OutstationCabs = () => {
 
 
       <main className="flex-grow flex flex-col">
-        <div className="pt-8 md:pt-16">
+        <div className="pt-2 md:pt-16">
           <CabFareSection />
         </div>
 
@@ -338,10 +338,10 @@ const OutstationCabs = () => {
       </main>
 
       {/* Offers Section */}
-      <OffersSection />
+      <OffersSection variant="outstation-cabs" />
 
       {/* What's New Section */}
-      <WhatsNewSection />
+      <WhatsNewSection variant="outstation-cabs" />
 
 
 
@@ -402,10 +402,10 @@ const OutstationCabs = () => {
       </section>}
 
       {/* Customer Testimonials */}
-      <CustomerTestimonials />
+      <CustomerTestimonials variant="outstation-cabs" />
 
       {/* FAQ Section */}
-      <HomeFAQ />
+      <HomeFAQ variant="outstation-cabs" />
 
       {/* Footer CTA */}
       <section className="container mx-auto px-4 py-24">

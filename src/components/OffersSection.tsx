@@ -108,9 +108,135 @@ const offers = [
 
 const filters = ["All", "Stay", "Cab", "Tour"];
 
-const OffersSection = () => {
+interface OffersSectionProps {
+  variant?: "default" | "outstation-cabs";
+}
+
+const outstationCabOffer = {
+  title: "₹500 off on your\nfirst outstation cab",
+  validity: "Valid till 30 Jun",
+  emoji: "🚙",
+  modalTitle: "Outstation Cab Offer",
+  modalSub: "₹500 off · First booking",
+  terms: [
+    "Offer valid only on your first outstation cab booking via Xplorwing.",
+    "Minimum booking value of ₹1,000 required to avail this discount.",
+    "Valid till 30 June 2026. Cannot be clubbed with other offers.",
+    "Discount applies to base fare only. Taxes & toll charges are excluded.",
+    "Xplorwing reserves the right to modify or withdraw this offer at any time.",
+  ],
+};
+
+const OffersSection = ({ variant = "default" }: OffersSectionProps) => {
   const [activeFilter, setActiveFilter] = useState("All");
   const [selectedOffer, setSelectedOffer] = useState<any | null>(null);
+
+  if (variant === "outstation-cabs") {
+    return (
+      <section className="container mx-auto px-4 py-8 md:py-12 bg-white">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          viewport={{ once: true }}
+        >
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-3xl font-bold text-foreground">Offers for you</h2>
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.25 }}
+            onClick={() => setSelectedOffer(outstationCabOffer)}
+            className="relative overflow-hidden rounded-[18px] p-[18px_16px_16px] w-full sm:w-[260px] min-h-[172px] bg-[#fce8eb] cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(155,27,48,0.12)]"
+          >
+            <div className="inline-block rounded-full px-3.5 py-1 text-xs font-bold bg-[#9B1B30] text-white mb-3">
+              Cab
+            </div>
+
+            <h3 className="text-[15px] font-extrabold text-[#2a0a0a] leading-[1.35] whitespace-pre-line mb-1.5">
+              {outstationCabOffer.title}
+            </h3>
+
+            <p className="text-[11.5px] text-[#7a2030] mb-3.5">{outstationCabOffer.validity}</p>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedOffer(outstationCabOffer);
+              }}
+              className="text-[10.5px] text-[#9B1B30] font-semibold underline underline-offset-2 bg-transparent border-none p-0 cursor-pointer hover:opacity-75"
+            >
+              *Terms &amp; Conditions apply
+            </button>
+
+            <div className="absolute -right-2.5 -bottom-2.5 w-[90px] h-[90px] rounded-full bg-[rgba(155,27,48,0.06)] pointer-events-none" />
+            <div className="absolute right-3.5 bottom-3.5 text-[54px] leading-none pointer-events-none select-none">
+              {outstationCabOffer.emoji}
+            </div>
+          </motion.div>
+
+          <AnimatePresence>
+            {selectedOffer && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45"
+                onClick={() => setSelectedOffer(null)}
+              >
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.94 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.94 }}
+                  transition={{ duration: 0.2 }}
+                  className="relative bg-white rounded-[20px] p-[28px_24px] max-w-[340px] w-[90%] shadow-[0_24px_60px_rgba(0,0,0,0.18)]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() => setSelectedOffer(null)}
+                    className="absolute top-3.5 right-4 w-7 h-7 rounded-full bg-[#f5efe4] border-none cursor-pointer flex items-center justify-center text-[#555] hover:bg-[#ead8c0]"
+                    aria-label="Close modal"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+
+                  <div className="flex items-center gap-2.5 mb-4">
+                    <div className="w-[38px] h-[38px] rounded-[10px] bg-[#fce8eb] flex items-center justify-center text-xl">
+                      {selectedOffer.emoji}
+                    </div>
+                    <div>
+                      <div className="text-sm font-extrabold text-[#2a0a0a] mb-0.5">{selectedOffer.modalTitle}</div>
+                      <div className="text-[11px] text-[#9B1B30] font-semibold">{selectedOffer.modalSub}</div>
+                    </div>
+                  </div>
+
+                  <div className="h-px bg-[#f0e8e8] mb-3.5" />
+
+                  <div className="flex flex-col gap-2.5 mb-5">
+                    {selectedOffer.terms.map((term: string, idx: number) => (
+                      <div key={idx} className="flex gap-2 items-start text-xs text-[#444] leading-[1.7]">
+                        <span className="text-[#9B1B30] font-bold shrink-0">{idx + 1}.</span>
+                        <span>{term}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedOffer(null)}
+                    className="w-full bg-[#9B1B30] rounded-full py-3 text-[13px] font-bold text-white border-none cursor-pointer hover:opacity-90"
+                  >
+                    Got it
+                  </button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </section>
+    );
+  }
 
   const filteredOffers = offers.filter(
     offer => activeFilter === "All" || offer.category === activeFilter

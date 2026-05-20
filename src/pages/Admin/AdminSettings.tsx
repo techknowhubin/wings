@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAdminTeam } from '@/hooks/useAdmin';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +25,10 @@ export default function AdminSettings() {
   const [maxKycAttempts, setMaxKycAttempts] = useState('5');
   const [platformName, setPlatformName] = useState('Xplorwing');
   const [supportEmail, setSupportEmail] = useState('support@xplorwing.com');
+  const [supportPhone, setSupportPhone] = useState('+91 1800-123-4567');
+  const [configLoading, setConfigLoading] = useState(true);
+  const [savingCommission, setSavingCommission] = useState(false);
+  const [savingPlatform, setSavingPlatform] = useState(false);
 
   // Admin team
   const { data: admins, isLoading: aLoading, refetch } = useAdminTeam();
@@ -32,12 +36,72 @@ export default function AdminSettings() {
   const [addingAdmin, setAddingAdmin] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
-  const handleSaveCommission = () => {
-    toast({ title: 'Commission rates saved.', description: 'Changes will apply to new bookings.' });
+  useEffect(() => {
+    const loadSettings = async () => {
+      const { data, error } = await supabase
+        .from('platform_settings' as any)
+        .select('*')
+        .limit(1)
+        .maybeSingle();
+      if (error) {
+        toast({ variant: 'destructive', title: 'Failed to load settings', description: error.message });
+        setConfigLoading(false);
+        return;
+      }
+      if (data) {
+        setMarketplace(String(data.marketplace_commission_pct ?? 20));
+        setLinkInBio(String(data.linkinbio_commission_pct ?? 10));
+        setHubCommission(String(data.hub_commission_pct ?? 5));
+        setKycSla(String(data.kyc_sla_hours ?? 2));
+        setMaxKycAttempts(String(data.max_kyc_attempts ?? 5));
+        setPlatformName(data.platform_name ?? 'Xplorwing');
+        setSupportEmail(data.support_email ?? 'support@xplorwing.com');
+        setSupportPhone(data.support_phone ?? '+91 1800-123-4567');
+      }
+      setConfigLoading(false);
+    };
+    void loadSettings();
+  }, [toast]);
+
+  const upsertSettings = async () => {
+    const { error } = await supabase.from('platform_settings' as any).upsert({
+      id: '00000000-0000-0000-0000-000000000001',
+      marketplace_commission_pct: Number(marketplace),
+      linkinbio_commission_pct: Number(linkInBio),
+      hub_commission_pct: Number(hubCommission),
+      kyc_sla_hours: Number(kycSla),
+      max_kyc_attempts: Number(maxKycAttempts),
+      platform_name: platformName,
+      support_email: supportEmail,
+      support_phone: supportPhone,
+      updated_at: new Date().toISOString(),
+      updated_by: (await supabase.auth.getUser()).data.user?.id ?? null,
+    });
+    if (error) throw error;
   };
 
-  const handleSavePlatform = () => {
-    toast({ title: 'Platform configuration saved.' });
+  const handleSaveCommission = async () => {
+    setSavingCommission(true);
+    try {
+      await upsertSettings();
+      toast({ title: 'Commission rates saved.', description: 'Changes will apply to new bookings.' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Failed to save commission', description: e.message });
+    } finally {
+      setSavingCommission(false);
+    }
+  };
+
+  const handleSavePlatform = async () => {
+    setSavingPlatform(true);
+    try {
+      await upsertSettings();
+      toast({ title: 'Platform configuration saved.' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Failed to save configuration', description: e.message });
+    } finally {
+      setSavingPlatform(false);
+    }
   };
 
   const handleAddAdmin = async () => {
@@ -97,6 +161,10 @@ export default function AdminSettings() {
           <CardDescription>These rates apply to all new bookings on the respective channels.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {configLoading ? (
+            <Skeleton className="h-24 w-full" />
+          ) : (
+            <>
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1">
               <Label>Marketplace (%)</Label>
@@ -111,9 +179,11 @@ export default function AdminSettings() {
               <Input type="number" min="0" max="100" value={hubCommission} onChange={(e) => setHubCommission(e.target.value)} />
             </div>
           </div>
-          <Button onClick={handleSaveCommission} className="bg-[#013220] text-white hover:bg-[#013220]/90">
+          <Button onClick={handleSaveCommission} disabled={savingCommission} className="bg-[#013220] text-white hover:bg-[#013220]/90">
             <Save className="h-4 w-4 mr-2" /> Save Commission Rates
           </Button>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -123,6 +193,10 @@ export default function AdminSettings() {
           <CardTitle className="text-base flex items-center gap-2"><Settings2 className="h-4 w-4" /> Platform Configuration</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {configLoading ? (
+            <Skeleton className="h-24 w-full" />
+          ) : (
+            <>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label>KYC Review SLA (hours)</Label>
@@ -140,10 +214,16 @@ export default function AdminSettings() {
               <Label>Support Email</Label>
               <Input type="email" value={supportEmail} onChange={(e) => setSupportEmail(e.target.value)} />
             </div>
+            <div className="space-y-1">
+              <Label>Support Phone</Label>
+              <Input value={supportPhone} onChange={(e) => setSupportPhone(e.target.value)} />
+            </div>
           </div>
-          <Button onClick={handleSavePlatform} className="bg-[#013220] text-white hover:bg-[#013220]/90">
+          <Button onClick={handleSavePlatform} disabled={savingPlatform} className="bg-[#013220] text-white hover:bg-[#013220]/90">
             <Save className="h-4 w-4 mr-2" /> Save Configuration
           </Button>
+            </>
+          )}
         </CardContent>
       </Card>
 

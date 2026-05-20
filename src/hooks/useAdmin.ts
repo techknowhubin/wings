@@ -54,7 +54,7 @@ export function useAdminMetrics() {
         pendingKyc,
         registeredTravelers,
         wingIdsIssued,
-        staysPending, carsPending, bikesPending, expPending,
+        staysPending, hotelsPending, resortsPending, carsPending, bikesPending, expPending,
         activeProvidersCount,
       ] = await Promise.all([
         safeQuery(() => supabase.from('bookings').select('total_price').eq('payment_status', 'completed')),
@@ -62,17 +62,25 @@ export function useAdminMetrics() {
         safeCount(() => supabase.from('user_documents' as any).select('*', { count: 'exact', head: true }).eq('status', 'pending')),
         safeCount(() => supabase.from('user_roles').select('*', { count: 'exact', head: true }).eq('role', 'user')),
         safeCount(() => supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'approved')),
-        safeQuery(() => supabase.from('stays').select('id').eq('is_verified', false)),
-        safeQuery(() => supabase.from('cars').select('id').eq('is_verified', false)),
-        safeQuery(() => supabase.from('bikes').select('id').eq('is_verified', false)),
-        safeQuery(() => supabase.from('experiences').select('id').eq('is_verified', false)),
+        safeQuery(() => supabase.from('stays').select('id').eq('approval_status', 'pending')),
+        safeQuery(() => supabase.from('hotels' as any).select('id').eq('approval_status', 'pending')),
+        safeQuery(() => supabase.from('resorts' as any).select('id').eq('approval_status', 'pending')),
+        safeQuery(() => supabase.from('cars').select('id').eq('approval_status', 'pending')),
+        safeQuery(() => supabase.from('bikes').select('id').eq('approval_status', 'pending')),
+        safeQuery(() => supabase.from('experiences').select('id').eq('approval_status', 'pending')),
         safeCount(() => supabase.from('user_roles').select('*', { count: 'exact', head: true }).eq('role', 'host')),
       ]);
 
       const totalGmv = (gmvData as any[] ?? []).reduce((s: number, r: any) => s + Number(r.total_price || 0), 0);
       // Commission is computed as 20% of GMV (no dedicated column)
       const platformRevenue = Math.round(totalGmv * 0.2);
-      const pendingListings = ((staysPending as any[])?.length ?? 0) + ((carsPending as any[])?.length ?? 0) + ((bikesPending as any[])?.length ?? 0) + ((expPending as any[])?.length ?? 0);
+      const pendingListings =
+        ((staysPending as any[])?.length ?? 0) +
+        ((hotelsPending as any[])?.length ?? 0) +
+        ((resortsPending as any[])?.length ?? 0) +
+        ((carsPending as any[])?.length ?? 0) +
+        ((bikesPending as any[])?.length ?? 0) +
+        ((expPending as any[])?.length ?? 0);
 
       return {
         totalGmv,

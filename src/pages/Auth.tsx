@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, User, PhoneCall } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
@@ -50,7 +49,7 @@ const styles = `
     height: 2.75rem;
     width: 100%;
     padding: 0 1rem 0 2.75rem;
-    border-radius: 0.875rem;
+    border-radius: 9999px;
     border: 1.5px solid rgba(0,0,0,0.08);
     background: rgba(255,255,255,0.5);
     color: #111;
@@ -75,7 +74,7 @@ const styles = `
   .auth-btn {
     width: 100%;
     height: 3rem;
-    border-radius: 0.875rem;
+    border-radius: 9999px;
     font-weight: 700;
     font-size: 0.95rem;
     border: none;
@@ -96,7 +95,7 @@ const styles = `
     align-items: center;
     justify-content: center;
     height: 2.75rem;
-    border-radius: 0.75rem;
+    border-radius: 9999px;
     border: 1.5px solid rgba(0,0,0,0.08);
     background: #ffffff;
     cursor: pointer;
@@ -590,13 +589,25 @@ const Auth = () => {
 
           {/* Header */}
           <div className="text-center mb-7">
-            <h1 className="text-[1.5rem] font-extrabold text-[#115f10] tracking-tight leading-tight">
+            <h1
+              className={
+                authMethod === "email"
+                  ? "text-[1.5rem] font-extrabold text-[#064E3B] tracking-tight leading-tight"
+                  : "text-[1.5rem] font-extrabold text-[#115f10] tracking-tight leading-tight"
+              }
+            >
               {authMethod === "whatsapp"
                 ? (isOtpSent ? "Enter verification code" : "Sign in with WhatsApp")
                 : isLoginMode ? "Sign in with email" : "Create your account"
               }
             </h1>
-            <p className="text-[#115f10] mt-1.5 text-[13px] leading-relaxed max-w-[260px] mx-auto">
+            <p
+              className={
+                authMethod === "email"
+                  ? "text-[#064E3B] mt-1.5 text-[13px] leading-relaxed max-w-[260px] mx-auto"
+                  : "text-[#115f10] mt-1.5 text-[13px] leading-relaxed max-w-[260px] mx-auto"
+              }
+            >
               {authMethod === "whatsapp"
                 ? (isOtpSent
                   ? "A 6-digit code was sent to your WhatsApp."
@@ -703,9 +714,9 @@ const Auth = () => {
                 <form onSubmit={handleEmailAuth} className="flex flex-col justify-center space-y-3" style={{ minHeight: "250px" }}>
                   {!isLoginMode && (
                     <>
-                      <div className="flex bg-white/50 p-1 rounded-xl border-[1.5px] border-gray-200/80 shadow-inner relative" style={{ marginBottom: '0.25rem' }}>
+                      <div className="flex bg-white/60 p-1 rounded-full border-[1.5px] border-gray-200/80 shadow-inner relative" style={{ marginBottom: '0.25rem' }}>
                         <div
-                          className="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-[#115f10] rounded-[10px] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-sm"
+                          className="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-[#064E3B] rounded-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-sm"
                           style={{
                             transform: selectedRole === 'host' ? 'translateX(100%)' : 'translateX(0)'
                           }}
@@ -713,7 +724,7 @@ const Auth = () => {
                         <button
                           type="button"
                           onClick={() => setSelectedRole('user')}
-                          className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-[13px] font-bold z-10 transition-colors duration-300 ${
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-bold z-10 transition-colors duration-300 ${
                             selectedRole === 'user' ? 'text-white' : 'text-gray-500 hover:text-gray-700'
                           }`}
                         >
@@ -725,7 +736,7 @@ const Auth = () => {
                         <button
                           type="button"
                           onClick={() => setSelectedRole('host')}
-                          className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-[13px] font-bold z-10 transition-colors duration-300 ${
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-bold z-10 transition-colors duration-300 ${
                             selectedRole === 'host' ? 'text-[#e5f76e]' : 'text-gray-500 hover:text-gray-700'
                           }`}
                         >

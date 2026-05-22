@@ -41,6 +41,9 @@ const loginSchema = z.object({
 
 /* ─── inline styles to keep auth page self-contained ─── */
 const styles = `
+  * {
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  }
   .auth-bg {
     position: absolute; inset: 0;
     background-size: cover; background-position: center;
@@ -197,7 +200,8 @@ const Auth = () => {
   const [confirmationSuccess, setConfirmationSuccess] = useState(false);
   const [successCountdown, setSuccessCountdown] = useState(5);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [showRoleSelection, setShowRoleSelection] = useState(!isLoginMode && !targetRole);
+  const [roleConfirmed, setRoleConfirmed] = useState(false);
+  const showRoleSelection = !isLoginMode && !roleConfirmed;
 
   // WhatsApp fallback modal
   const [showWaModal, setShowWaModal] = useState(false);
@@ -210,20 +214,19 @@ const Auth = () => {
     setSelectedRole(targetRole === 'host' ? 'host' : 'user');
   }, [targetRole]);
 
-  // Set initial mode based on path and role selection stage
+  // Set initial mode based on path
   useEffect(() => {
     if (isHostSigninPath) {
       setIsLoginMode(true);
-      setShowRoleSelection(false);
     } else if (isHostSignupPath) {
       setIsLoginMode(false);
-      setShowRoleSelection(false);
-    } else if (!isLoginMode) {
-      setShowRoleSelection(!targetRole);
-    } else {
-      setShowRoleSelection(false);
     }
-  }, [isHostSigninPath, isHostSignupPath, isLoginMode, targetRole]);
+  }, [isHostSigninPath, isHostSignupPath]);
+
+  // Reset role confirmation when path changes
+  useEffect(() => {
+    setRoleConfirmed(false);
+  }, [location.pathname]);
 
   /* ─── routing ─── */
   const handleSuccessRoleRouting = async (currentUser = user) => {
@@ -430,12 +433,10 @@ const Auth = () => {
       return;
     }
 
+    setRoleConfirmed(true);
     if (selectedRole === 'host') {
       navigate('/host/signup');
-      return;
     }
-
-    setShowRoleSelection(false);
   };
 
   const handleVerifyWaOtp = async (value: string) => {
@@ -866,20 +867,20 @@ const Auth = () => {
                 </div>
               ) : showRoleSelection ? (
                 <div className="space-y-5 py-4">
-                  <div className="text-center">
-                    <p className="text-sm font-semibold text-[#064E3B] uppercase tracking-[0.24em]">Choose your role</p>
-                    <p className="text-xs text-gray-500 mt-2">Your role determines the experience we will tailor for you.</p>
+                  <div className="text-center mb-6">
+                    <p className="text-[1.5rem] font-extrabold text-[#064E3B] tracking-tight leading-tight">Choose your role</p>
+                    <p className="text-[#064E3B] mt-1.5 text-[13px] leading-relaxed max-w-[260px] mx-auto">Your role determines the experience we will tailor for you.</p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <button
                       type="button"
                       onClick={() => setSelectedRole('user')}
-                      className={`rounded-3xl border p-5 text-left transition-all ${selectedRole === 'user' ? 'border-[#e5f76e] bg-[#e5f76e]/10 shadow-sm' : 'border-gray-200 bg-white/80 hover:border-gray-300'}`}
+                      className={`rounded-3xl border-2 p-5 text-left transition-all ${selectedRole === 'user' ? 'border-[#115f10] bg-[#fafde2] shadow-md scale-[1.02]' : 'border-gray-200 bg-white hover:border-gray-300 hover:scale-[1.01]'}`}
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-bold text-gray-900">Traveller</p>
-                          <p className="text-xs text-gray-500 mt-2">Book stays, bikes, cars and experiences with confidence.</p>
+                          <p className={`text-sm font-extrabold ${selectedRole === 'user' ? 'text-[#064E3B]' : 'text-gray-900'}`}>Traveller</p>
+                          <p className={`text-xs mt-2 ${selectedRole === 'user' ? 'text-gray-800 font-medium' : 'text-gray-600'}`}>Book stays, bikes, cars and experiences with confidence.</p>
                         </div>
                         <div className="rounded-full bg-[#064E3B] p-2 text-white">
                           <User className="w-4 h-4" />
@@ -889,12 +890,12 @@ const Auth = () => {
                     <button
                       type="button"
                       onClick={() => setSelectedRole('host')}
-                      className={`rounded-3xl border p-5 text-left transition-all ${selectedRole === 'host' ? 'border-[#e5f76e] bg-[#e5f76e]/10 shadow-sm' : 'border-gray-200 bg-white/80 hover:border-gray-300'}`}
+                      className={`rounded-3xl border-2 p-5 text-left transition-all ${selectedRole === 'host' ? 'border-[#115f10] bg-[#fafde2] shadow-md scale-[1.02]' : 'border-gray-200 bg-white hover:border-gray-300 hover:scale-[1.01]'}`}
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-bold text-gray-900">Host</p>
-                          <p className="text-xs text-gray-500 mt-2">List your space or vehicle and welcome travellers.</p>
+                          <p className={`text-sm font-extrabold ${selectedRole === 'host' ? 'text-[#064E3B]' : 'text-gray-900'}`}>Host</p>
+                          <p className={`text-xs mt-2 ${selectedRole === 'host' ? 'text-gray-800 font-medium' : 'text-gray-600'}`}>List your space or vehicle and welcome travellers.</p>
                         </div>
                         <div className="rounded-full bg-[#115f10] p-2 text-white">
                           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
@@ -1030,7 +1031,7 @@ const Auth = () => {
                           } else {
                             const nextIsLogin = !isLoginMode;
                             setIsLoginMode(nextIsLogin);
-                            setShowRoleSelection(!nextIsLogin && !targetRole);
+                            setRoleConfirmed(false);
                           }
                         }}
                         className="text-[11px] text-[#fafafa] font-semibold hover:opacity-80 transition-opacity"

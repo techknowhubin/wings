@@ -182,17 +182,15 @@ const CabFareCard = ({
   }
 
   // ────────────────────────────────────────────────────────────────
-  // NEW TICKETS STYLE RENDERER (variant === "ticket")
+  // TICKET STYLE RENDERER (variant === "ticket")
   // ────────────────────────────────────────────────────────────────
   const [isOpen, setIsOpen] = useState(false);
-  const [tripType, setTripType] = useState<"one-way" | "round-trip">("round-trip");
 
-  // Determine effective pricing
+  // Round-trip effective pricing
   const effectiveSedanRound =
     sedanDiscountedPrice && sedanDiscountedPrice > 0 && sedanDiscountedPrice < sedanPrice
       ? sedanDiscountedPrice
       : sedanPrice;
-  
   const displaySedanRoundOriginal =
     sedanDiscountedPrice && sedanDiscountedPrice > 0
       ? sedanPrice
@@ -202,29 +200,30 @@ const CabFareCard = ({
     suvDiscountedPrice && suvDiscountedPrice > 0 && suvDiscountedPrice < suvPrice
       ? suvDiscountedPrice
       : suvPrice;
-
   const displaySuvRoundOriginal =
     suvDiscountedPrice && suvDiscountedPrice > 0
       ? suvPrice
       : Math.round(effectiveSuvRound * 1.15 / 10) * 10;
 
-  // Calculate One Way as 70% of Round Trip
+  // One-way = 70% of round-trip
   const effectiveSedanOneWay = Math.round((effectiveSedanRound * 0.7) / 10) * 10;
   const displaySedanOneWayOriginal = Math.round((displaySedanRoundOriginal * 0.7) / 10) * 10;
-
   const effectiveSuvOneWay = Math.round((effectiveSuvRound * 0.7) / 10) * 10;
   const displaySuvOneWayOriginal = Math.round((displaySuvRoundOriginal * 0.7) / 10) * 10;
 
-  // Dynamic values for the Accordion
+  // Distance values
   const numericDistance = parseInt(distance) || 300;
   const bufferDistance = 50;
+  const oneWayDistance = Math.round(numericDistance / 2);
+  const oneWayBuffer = Math.round(bufferDistance / 2);
   const totalCovered = numericDistance + bufferDistance;
   const minToll = Math.max(150, Math.round((numericDistance * 0.5) / 50) * 50);
   const maxToll = minToll + 150;
 
-  const buildWhatsAppUrl = (vehicleType: string, fare: number) => {
-    const typeLabel = tripType === "one-way" ? "One Way" : "Round Trip";
-    const message = `Hi Xplorwing! I would like to book a Cab booking.\n\n🚗 *Booking Details:*\n• *Route:* ${fromCity} (${fromCode}) to ${toCity} (${toCode})\n• *Trip Type:* ${typeLabel}\n• *Vehicle Type:* ${vehicleType}\n• *Distance:* ${distance}\n• *Fare:* ₹${fare.toLocaleString()}* (Excl. tolls & night charges)\n\nPlease verify availability. Thank you!`;
+  const buildWhatsAppUrl = (vehicleType: string) => {
+    const owFare = vehicleType === "Sedan" ? effectiveSedanOneWay : effectiveSuvOneWay;
+    const rtFare = vehicleType === "Sedan" ? effectiveSedanRound : effectiveSuvRound;
+    const message = `Hi Xplorwing! I would like to book a Cab.\n\n🚗 *Booking Details:*\n• *Route:* ${fromCity} (${fromCode}) → ${toCity} (${toCode})\n• *Vehicle:* ${vehicleType}\n• *One Way:* ₹${owFare.toLocaleString()}* | *Round Trip:* ₹${rtFare.toLocaleString()}*\n\nPlease confirm trip type and availability. Thank you!`;
     return `https://wa.me/919492986412?text=${encodeURIComponent(message)}`;
   };
 
@@ -251,53 +250,39 @@ const CabFareCard = ({
         <div className="ticket-right">
           {/* ROUTE */}
           <div className="route-row">
-            <div className="city-block">
+            <div className="city-block" style={{ alignSelf: "flex-start" }}>
               <div className="city-c">{fromCode}</div>
               <div className="city-n">{fromCity}</div>
             </div>
             <div className="route-mid">
+              <span className="dist-chip-ow">
+                One Way · {oneWayDistance} km <span className="dist-buf">+{oneWayBuffer}</span>
+              </span>
               <div className="route-line">
                 <div className="rdot"></div>
                 <div className="rline"></div>
                 <svg className="car-svg" viewBox="0 0 32 16" fill="none">
                   <path
                     d="M4 10h24M7 10V7.5L10 4h12l3 3.5V10"
-                    stroke="#0d6e6e"
+                    stroke="#1a5c3a"
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
-                  <circle cx="9" cy="11.5" r="1.8" fill="#0d6e6e" />
-                  <circle cx="23" cy="11.5" r="1.8" fill="#0d6e6e" />
+                  <circle cx="9" cy="11.5" r="1.8" fill="#1a5c3a" />
+                  <circle cx="23" cy="11.5" r="1.8" fill="#1a5c3a" />
                 </svg>
                 <div className="rline"></div>
                 <div className="rdot"></div>
               </div>
-              <div className="dist-row">
-                <span className="dist-num">{distance}</span>
-                <span className="buf-chip">+{bufferDistance} km buffer</span>
-              </div>
+              <span className="dist-chip-rt">
+                Round Trip · {numericDistance} km <span className="dist-buf">+{bufferDistance}</span>
+              </span>
             </div>
-            <div className="city-block right">
+            <div className="city-block right" style={{ alignSelf: "flex-end" }}>
               <div className="city-c">{toCode}</div>
               <div className="city-n">{toCity}</div>
             </div>
-          </div>
-
-          {/* TRIP TYPE TOGGLE */}
-          <div className="trip-toggle">
-            <button
-              onClick={() => setTripType("one-way")}
-              className={`trip-tab ${tripType === "one-way" ? "active" : ""}`}
-            >
-              One Way
-            </button>
-            <button
-              onClick={() => setTripType("round-trip")}
-              className={`trip-tab ${tripType === "round-trip" ? "active" : ""}`}
-            >
-              Round Trip
-            </button>
           </div>
 
           {/* VEHICLE CARDS */}
@@ -306,34 +291,18 @@ const CabFareCard = ({
             <div className="v-card">
               <div className="v-type">Sedan</div>
               <div className="v-prices-inner">
-                {/* One Way */}
-                <div className={`v-price-col ${tripType !== "one-way" ? "inactive" : ""}`}>
+                <div className="v-price-col">
                   <div className="v-trip-label">One Way</div>
                   <div className="v-price-struck">₹{displaySedanOneWayOriginal.toLocaleString()}</div>
-                  <div className="v-price">
-                    ₹{effectiveSedanOneWay.toLocaleString()}
-                    <sup>*</sup>
-                  </div>
+                  <div className="v-price">₹{effectiveSedanOneWay.toLocaleString()}<sup>*</sup></div>
                 </div>
-                {/* Round Trip */}
-                <div className={`v-price-col ${tripType !== "round-trip" ? "inactive" : ""}`}>
+                <div className="v-price-col">
                   <div className="v-trip-label">Round Trip</div>
                   <div className="v-price-struck">₹{displaySedanRoundOriginal.toLocaleString()}</div>
-                  <div className="v-price">
-                    ₹{effectiveSedanRound.toLocaleString()}
-                    <sup>*</sup>
-                  </div>
+                  <div className="v-price">₹{effectiveSedanRound.toLocaleString()}<sup>*</sup></div>
                 </div>
               </div>
-              <a
-                href={buildWhatsAppUrl(
-                  "Sedan",
-                  tripType === "one-way" ? effectiveSedanOneWay : effectiveSedanRound
-                )}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="v-btn block"
-              >
+              <a href={buildWhatsAppUrl("Sedan")} target="_blank" rel="noopener noreferrer" className="v-btn">
                 Book Now
               </a>
             </div>
@@ -342,34 +311,18 @@ const CabFareCard = ({
             <div className="v-card">
               <div className="v-type">SUV</div>
               <div className="v-prices-inner">
-                {/* One Way */}
-                <div className={`v-price-col ${tripType !== "one-way" ? "inactive" : ""}`}>
+                <div className="v-price-col">
                   <div className="v-trip-label">One Way</div>
                   <div className="v-price-struck">₹{displaySuvOneWayOriginal.toLocaleString()}</div>
-                  <div className="v-price">
-                    ₹{effectiveSuvOneWay.toLocaleString()}
-                    <sup>*</sup>
-                  </div>
+                  <div className="v-price">₹{effectiveSuvOneWay.toLocaleString()}<sup>*</sup></div>
                 </div>
-                {/* Round Trip */}
-                <div className={`v-price-col ${tripType !== "round-trip" ? "inactive" : ""}`}>
+                <div className="v-price-col">
                   <div className="v-trip-label">Round Trip</div>
                   <div className="v-price-struck">₹{displaySuvRoundOriginal.toLocaleString()}</div>
-                  <div className="v-price">
-                    ₹{effectiveSuvRound.toLocaleString()}
-                    <sup>*</sup>
-                  </div>
+                  <div className="v-price">₹{effectiveSuvRound.toLocaleString()}<sup>*</sup></div>
                 </div>
               </div>
-              <a
-                href={buildWhatsAppUrl(
-                  "SUV",
-                  tripType === "one-way" ? effectiveSuvOneWay : effectiveSuvRound
-                )}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="v-btn block"
-              >
+              <a href={buildWhatsAppUrl("SUV")} target="_blank" rel="noopener noreferrer" className="v-btn">
                 Book Now
               </a>
             </div>
@@ -378,13 +331,9 @@ const CabFareCard = ({
           {/* FOOTER */}
           <div className="ticket-footer">
             <span className="footer-note">* Excl. tolls & driver night charges</span>
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="acc-toggle"
-              aria-label="Show details"
-            >
+            <button onClick={() => setIsOpen(!isOpen)} className="acc-toggle" aria-label="Show details">
               <span className="plus-icon">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
                   <path d="M6 1v10M1 6h10" strokeWidth="1.8" strokeLinecap="round" fill="none" />
                 </svg>
               </span>
@@ -398,61 +347,32 @@ const CabFareCard = ({
         <div className="acc-inner">
           <div>
             <div className="acc-section-title">Fare Breakdown</div>
-            <div className="acc-row">
-              <span className="acc-key">Base distance</span>
-              <span className="acc-val">{distance}</span>
-            </div>
-            <div className="acc-row">
-              <span className="acc-key">Buffer included</span>
-              <span className="acc-val">+{bufferDistance} km</span>
-            </div>
-            <div className="acc-row">
-              <span className="acc-key">Total covered</span>
-              <span className="acc-val">{totalCovered} km</span>
-            </div>
-            <div className="acc-row">
-              <span className="acc-key">Extra KM · Sedan</span>
-              <span className="acc-val">₹14 / km</span>
-            </div>
-            <div className="acc-row">
-              <span className="acc-key">Extra KM · SUV</span>
-              <span className="acc-val">₹18 / km</span>
-            </div>
+            <div className="acc-trip-header">One Way</div>
+            <div className="acc-row"><span className="acc-key">Distance</span><span className="acc-val">{oneWayDistance} km</span></div>
+            <div className="acc-row"><span className="acc-key">Buffer</span><span className="acc-val">+{oneWayBuffer} km</span></div>
+            <div className="acc-row"><span className="acc-key">Total</span><span className="acc-val">{oneWayDistance + oneWayBuffer} km</span></div>
+            <div className="acc-trip-header">Round Trip</div>
+            <div className="acc-row"><span className="acc-key">Distance</span><span className="acc-val">{numericDistance} km</span></div>
+            <div className="acc-row"><span className="acc-key">Buffer</span><span className="acc-val">+{bufferDistance} km</span></div>
+            <div className="acc-row"><span className="acc-key">Total</span><span className="acc-val">{totalCovered} km</span></div>
+            <div className="acc-trip-header">Extra KM</div>
+            <div className="acc-row"><span className="acc-key">Sedan</span><span className="acc-val">₹14 / km</span></div>
+            <div className="acc-row"><span className="acc-key">SUV</span><span className="acc-val">₹18 / km</span></div>
           </div>
           <div>
             <div className="acc-section-title">What's Included</div>
-            <div className="acc-row">
-              <span className="acc-key">Fuel</span>
-              <span className="acc-val">✓ Included</span>
-            </div>
-            <div className="acc-row">
-              <span className="acc-key">GST</span>
-              <span className="acc-val">✓ Included</span>
-            </div>
-            <div className="acc-row">
-              <span className="acc-key">Driver night</span>
-              <span className="acc-val">₹300 / night</span>
-            </div>
-            <div className="acc-row">
-              <span className="acc-key">Toll est.</span>
-              <span className="acc-val">
-                ₹{minToll}–₹{maxToll}
-              </span>
-            </div>
-          </div>
-          <div className="acc-divider"></div>
-          <div>
-            <div className="acc-section-title">Policy</div>
-            <div className="acc-note">
-              Fixed pricing · No surge · No mid-trip disputes · Beyond buffer billed at base rate transparently
-            </div>
+            <div className="acc-row"><span className="acc-key">Fuel</span><span className="acc-val">✓ Included</span></div>
+            <div className="acc-row"><span className="acc-key">GST</span><span className="acc-val">✓ Included</span></div>
+            <div className="acc-row"><span className="acc-key">Driver night</span><span className="acc-val">₹300 / night</span></div>
+            <div className="acc-row"><span className="acc-key">Toll est.</span><span className="acc-val">₹{minToll}–₹{maxToll}</span></div>
+            <div className="acc-section-title" style={{ marginTop: "10px" }}>Policy</div>
+            <div className="acc-note">Fixed · No surge · No disputes · Beyond buffer at base rate</div>
             <div className="acc-highlight">✓ No penalty charges</div>
           </div>
-          <div>
+          <div className="acc-divider"></div>
+          <div className="acc-full">
             <div className="acc-section-title">Cancellation</div>
-            <div className="acc-note">
-              Free up to 2 hrs before pickup · 50% within 2 hrs · Full charge on no-show
-            </div>
+            <div className="acc-note">Free up to 24 hrs before pickup · 50% within 12 hrs · Full charge on no-show</div>
           </div>
         </div>
       </div>

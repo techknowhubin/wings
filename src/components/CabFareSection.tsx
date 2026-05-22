@@ -478,8 +478,8 @@ const CabFareSection = ({ variant = "previous" }: CabFareSectionProps) => {
   }, []);
 
   return (
-    <section className="py-8 md:py-16 px-4 bg-muted/30">
-      <div className="container mx-auto max-w-6xl">
+    <section className="py-8 md:py-16 px-[5%] md:px-4 bg-muted/30">
+      <div className="md:container md:mx-auto md:max-w-6xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -513,23 +513,73 @@ const CabFareSection = ({ variant = "previous" }: CabFareSectionProps) => {
         </motion.div>
 
         <AnimatePresence mode="wait">
-          <motion.div
-            key={selectedState}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3 }}
-            className="grid grid-cols-1 lg:grid-cols-2 gap-4"
-          >
-            {cabFares[selectedState].map((fare, index) => (
-              <CabFareCard
-                key={`${selectedState}-${fare.toCode}`}
-                {...fare}
-                delay={index * 0.05}
-                variant={variant}
-              />
-            ))}
-          </motion.div>
+          {variant === "ticket" ? (
+            /* Two independent flex columns so opening one card doesn't shift the other column */
+            <motion.div
+              key={selectedState}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+              className="flex flex-col lg:flex-row gap-4"
+            >
+              {/* Desktop: left column (even indices) */}
+              <div className="hidden lg:flex flex-col gap-4 flex-1">
+                {cabFares[selectedState]
+                  .filter((_, i) => i % 2 === 0)
+                  .map((fare, index) => (
+                    <CabFareCard
+                      key={`${selectedState}-${fare.toCode}`}
+                      {...fare}
+                      delay={index * 0.05}
+                      variant={variant}
+                    />
+                  ))}
+              </div>
+              {/* Desktop: right column (odd indices) */}
+              <div className="hidden lg:flex flex-col gap-4 flex-1">
+                {cabFares[selectedState]
+                  .filter((_, i) => i % 2 !== 0)
+                  .map((fare, index) => (
+                    <CabFareCard
+                      key={`${selectedState}-${fare.toCode}`}
+                      {...fare}
+                      delay={index * 0.05}
+                      variant={variant}
+                    />
+                  ))}
+              </div>
+              {/* Mobile: all cards in a single column */}
+              <div className="flex flex-col gap-4 flex-1 lg:hidden">
+                {cabFares[selectedState].map((fare, index) => (
+                  <CabFareCard
+                    key={`${selectedState}-${fare.toCode}-mobile`}
+                    {...fare}
+                    delay={index * 0.05}
+                    variant={variant}
+                  />
+                ))}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key={selectedState}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+              className="grid grid-cols-1 lg:grid-cols-2 lg:items-start gap-4"
+            >
+              {cabFares[selectedState].map((fare, index) => (
+                <CabFareCard
+                  key={`${selectedState}-${fare.toCode}`}
+                  {...fare}
+                  delay={index * 0.05}
+                  variant={variant}
+                />
+              ))}
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
     </section>

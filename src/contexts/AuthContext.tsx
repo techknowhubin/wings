@@ -128,19 +128,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error };
 
-    const user = data?.user;
-    const provider = user?.raw_app_meta_data?.provider ?? 'email';
-    const emailVerified = Boolean(user?.email_confirmed_at);
-    const phoneVerified = Boolean(user?.phone_confirmed_at);
+    // When Supabase email-enumeration-protection is ON it returns no error but also no
+    // user/session for a non-existent email — treat that as "no account found".
+    if (!data.user || !data.session) {
+      return { error: new Error('No account found with this email address') };
+    }
+
+    const user = data.user;
+    const provider = user.raw_app_meta_data?.provider ?? 'email';
+    const emailVerified = Boolean(user.email_confirmed_at);
+    const phoneVerified = Boolean(user.phone_confirmed_at);
 
     if (provider === 'email' && !emailVerified) {
       await supabase.auth.signOut();
-      return { error: new Error('Email verification required') };
+      return { error: new Error('email_not_verified') };
     }
 
     if (provider === 'phone' && !phoneVerified) {
       await supabase.auth.signOut();
-      return { error: new Error('Email verification required') };
+      return { error: new Error('email_not_verified') };
     }
 
     return { error: null };

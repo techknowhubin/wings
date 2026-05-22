@@ -493,11 +493,23 @@ export default function UserOnboarding() {
     if (!user) return;
     setSaving(true);
     try {
+      // Assign role explicitly. For Google/OAuth users the DB trigger intentionally skips
+      // creating user_roles (to block sign-in-without-account), so we create it here
+      // when the user deliberately completes onboarding (genuine signup intent).
+      const savedRole = (localStorage.getItem("pending_role") ?? "user") as "user" | "host";
+      const roleToAssign = savedRole === "host" ? "host" : "user";
+      await supabase.from("user_roles").upsert(
+        { user_id: user.id, role: roleToAssign },
+        { onConflict: "user_id,role" }
+      );
+      localStorage.removeItem("pending_role");
+
       await supabase.from("profiles").update({
         onboarding_completed: true,
         onboarding_step: 6,
         kyc_status: "pending",
       }).eq("id", user.id);
+
       toast.success("Welcome to Xplorwing! Your journey begins now.");
       navigate("/");
     } catch (err: any) {

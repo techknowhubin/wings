@@ -23,20 +23,6 @@
   min-height: 160px;
 }
 
-@media (max-width: 640px) {
-  /* Stack image on top, content below */
-  .ticket { flex-direction: column; }
-
-  .ticket-left {
-    width: 100%;
-    height: 180px;
-    min-height: unset;
-    flex-shrink: 0;
-  }
-
-  .divider-line { display: none; }
-}
-
 .ticket-left img {
   position: absolute;
   inset: 0;
@@ -86,15 +72,35 @@
 }
 
 @media (max-width: 640px) {
-  /* Hide right city block — destination already shown on the photo panel */
-  .city-block.right { display: none; }
+  /* Stack: image on top, content below */
+  .ticket { flex-direction: column; }
+
+  /* padding-bottom trick: reliable cross-browser responsive aspect ratio */
+  .ticket-left {
+    width: 100% !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    padding-bottom: 60%;
+    flex-shrink: 0;
+  }
+
+  .ticket-left img {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    object-position: center top !important;
+    display: block !important;
+  }
+
+  .divider-line { display: none; }
 
   .city-n { font-size: 9px; }
 
   /* Full-width right panel after stacked image */
   .ticket-right { padding: 12px 12px 0 12px; }
 
-  /* Restore city block visibility since they're no longer squeezed */
   .city-block.right { display: block; }
 
   /* Route mid */

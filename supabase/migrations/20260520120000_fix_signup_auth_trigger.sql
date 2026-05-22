@@ -47,7 +47,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- Create the robust trigger to observe any changes
+-- Create the robust trigger to observe confirmation changes
 CREATE TRIGGER on_auth_user_confirmed
-  AFTER INSERT OR UPDATE ON auth.users
+  AFTER INSERT OR UPDATE OF email_confirmed_at, phone_confirmed_at ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();

@@ -117,6 +117,7 @@ const App = () =>
             <Route path="/onboarding" element={<Navigate to="/onboarding/user" replace />} />
             <Route path="/onboarding/user" element={<UserOnboarding />} />
             <Route path="/onboarding/host" element={<HostOnboarding />} />
+            <Route path="/host/onboarding" element={<HostOnboarding />} />
             <Route path="/profile" element={<UserProfile />} />
             <Route path="/profile/:section" element={<UserProfile />} />
             <Route path="/confirm-and-pay" element={<ConfirmAndPay />} />

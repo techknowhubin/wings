@@ -35,7 +35,7 @@ interface AuthContextValue {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string, role?: 'user' | 'host') => Promise<{ data: any; error: any }>;
+  signUp: (email: string, password: string, fullName: string, mobileNumber: string, role?: 'user' | 'host') => Promise<{ data: any; error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signInWithProvider: (provider: 'google' | 'apple' | 'facebook' | 'linkedin_oidc', role?: 'user' | 'host') => Promise<{ error: any }>;
   signInWithPopup: (provider: 'google' | 'apple' | 'facebook' | 'linkedin_oidc', role?: 'user' | 'host') => Promise<{ error: any }>;
@@ -104,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string,
     fullName: string,
+    mobileNumber: string,
     role: 'user' | 'host' = 'user',
   ) => {
     const redirectUrl = `${window.location.origin}/auth`;
@@ -112,20 +113,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       options: {
         emailRedirectTo: redirectUrl,
-        data: { full_name: fullName, role },
+        data: {
+          full_name: fullName,
+          role,
+          phone: mobileNumber,
+        },
       },
     });
-
-    // Manual insert removed: Profiles and roles are created by the 'handle_new_user' trigger.
-    // This avoids creating records for unconfirmed users prematurely.
-
 
     return { data, error };
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error };
+
+    const user = data?.user;
+    const provider = user?.raw_app_meta_data?.provider ?? 'email';
+    const emailVerified = Boolean(user?.email_confirmed_at);
+    const phoneVerified = Boolean(user?.phone_confirmed_at);
+
+    if (provider === 'email' && !emailVerified) {
+      await supabase.auth.signOut();
+      return { error: new Error('Email verification required') };
+    }
+
+    if (provider === 'phone' && !phoneVerified) {
+      await supabase.auth.signOut();
+      return { error: new Error('Email verification required') };
+    }
+
+    return { error: null };
   };
 
   const signInWithProvider = async (

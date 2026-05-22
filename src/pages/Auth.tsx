@@ -17,10 +17,22 @@ import {
 } from "@/components/ui/dialog";
 
 /* ─── validation ─── */
+const passwordRules = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 const signupSchema = z.object({
-  fullName: z.string().min(2, "Name must be at least 2 characters"),
+  fullName: z.string().min(2, "Full name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  mobileNumber: z.string().regex(/^[0-9]{10}$/, "Mobile number must be 10 digits"),
+  password: z.string().min(8, "Password must be at least 8 characters").regex(passwordRules, "Password must include uppercase, lowercase, number, and special character"),
+  confirmPassword: z.string().min(8, "Confirm password is required"),
+  role: z.enum(['user','host']),
+}).superRefine((values, ctx) => {
+  if (values.password !== values.confirmPassword) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['confirmPassword'],
+      message: 'Passwords do not match',
+    });
+  }
 });
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -168,36 +180,50 @@ const Auth = () => {
   const [otpValue, setOtpValue] = useState("");
   const [countdown, setCountdown] = useState(60);
 
+  const [searchParams] = useSearchParams();
+  const targetRole = (isHostSignupPath || isHostSigninPath) ? "host" : searchParams.get("role");
+
   // Email state
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
   const [fullName, setFullName] = useState("");
   const [verificationPending, setVerificationPending] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(0);
   const [confirmationSuccess, setConfirmationSuccess] = useState(false);
   const [successCountdown, setSuccessCountdown] = useState(5);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [showRoleSelection, setShowRoleSelection] = useState(!isLoginMode && !targetRole);
 
   // WhatsApp fallback modal
   const [showWaModal, setShowWaModal] = useState(false);
-
-  const [searchParams] = useSearchParams();
-  const targetRole = (isHostSignupPath || isHostSigninPath) ? "host" : searchParams.get("role");
 
   const [selectedRole, setSelectedRole] = useState<'user' | 'host'>(
     targetRole === 'host' ? 'host' : 'user'
   );
 
-  // Set initial mode based on path
+  useEffect(() => {
+    setSelectedRole(targetRole === 'host' ? 'host' : 'user');
+  }, [targetRole]);
+
+  // Set initial mode based on path and role selection stage
   useEffect(() => {
     if (isHostSigninPath) {
       setIsLoginMode(true);
+      setShowRoleSelection(false);
     } else if (isHostSignupPath) {
       setIsLoginMode(false);
+      setShowRoleSelection(false);
+    } else if (!isLoginMode) {
+      setShowRoleSelection(!targetRole);
+    } else {
+      setShowRoleSelection(false);
     }
-  }, [isHostSigninPath, isHostSignupPath]);
+  }, [isHostSigninPath, isHostSignupPath, isLoginMode, targetRole]);
 
   /* ─── routing ─── */
   const handleSuccessRoleRouting = async (currentUser = user) => {
@@ -222,12 +248,12 @@ const Auth = () => {
       if (hostProfile) {
         navigate("/host");
       } else {
-        navigate("/onboarding/host");
+        navigate("/host/onboarding");
       }
     } else if (targetRole === "host" || savedRole === "host") {
       // User specifically clicked "Become a host"
       localStorage.removeItem("pending_role");
-      navigate("/onboarding/host");
+      navigate("/host/onboarding");
     } else {
       // Regular user — check if onboarding is done
       const { data: profile } = await supabase
@@ -338,6 +364,20 @@ const Auth = () => {
     }
   };
 
+  const handleContinueRoleSelection = () => {
+    if (!selectedRole) {
+      toast({ variant: "destructive", title: "Role selection required", description: "Please choose Traveller or Host to continue." });
+      return;
+    }
+
+    if (selectedRole === 'host') {
+      navigate('/host/signup');
+      return;
+    }
+
+    setShowRoleSelection(false);
+  };
+
   const handleVerifyWaOtp = async (value: string) => {
     if (value.length !== 6) return;
     setLoading(true);
@@ -355,7 +395,7 @@ const Auth = () => {
         const savedRole = localStorage.getItem("pending_role");
         if (targetRole === 'host' || savedRole === 'host') {
           localStorage.removeItem("pending_role");
-          navigate("/onboarding/host");
+          navigate("/host/onboarding");
         } else {
           navigate("/onboarding/user");
         }
@@ -417,6 +457,7 @@ const Auth = () => {
   /* ─── Email ─── */
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormErrors({});
     if (targetRole) {
       localStorage.setItem("pending_role", targetRole);
     } else {
@@ -424,6 +465,7 @@ const Auth = () => {
     }
     localStorage.setItem("remember_me", rememberMe ? "true" : "false");
     setLoading(true);
+
     if (isLoginMode) {
       try {
         loginSchema.parse({ email, password });
@@ -431,47 +473,70 @@ const Auth = () => {
         if (error) throw error;
         toast({ title: "Welcome back!", description: "Signed in successfully." });
       } catch (err: any) {
+        const msg = err instanceof z.ZodError ? err.errors[0].message : err.message;
+        toast({ variant: "destructive", title: "Login Failed", description: msg });
+      } finally {
         setLoading(false);
-        toast({ variant: "destructive", title: "Login Failed", description: err instanceof z.ZodError ? err.errors[0].message : err.message });
       }
-    } else {
-      try {
-        signupSchema.parse({ fullName, email, password });
-        const roleToAssign = targetRole === 'host' ? 'host' : selectedRole;
-        const { data, error } = await signUp(email, password, fullName, roleToAssign);
-        if (error) throw error;
+      return;
+    }
 
-        // If email enumeration protection is active, Supabase does not return an error
-        // but returns an empty identities array for existing users.
-        const userExists = data?.user && data.user.identities && data.user.identities.length === 0;
-        if (userExists) {
-          throw new Error("User already exists");
-        }
+    if (showRoleSelection) {
+      setLoading(false);
+      toast({ variant: "destructive", title: "Role selection required", description: "Please choose Traveller or Host before creating your account." });
+      return;
+    }
 
-        if (data.session) {
-          toast({ title: "Account Created!", description: "Welcome to Xplorwing." });
-        } else {
-          setVerificationPending(true);
-          setLoading(false);
+    try {
+      const parsed = signupSchema.parse({
+        fullName,
+        email,
+        mobileNumber,
+        password,
+        confirmPassword,
+        role: targetRole === 'host' ? 'host' : selectedRole,
+      });
+
+      const { data, error } = await signUp(parsed.email, parsed.password, parsed.fullName, parsed.mobileNumber, parsed.role);
+      if (error) throw error;
+
+      const userExists = data?.user && data.user.identities && data.user.identities.length === 0;
+      if (userExists) {
+        throw new Error("User already exists with this email");
+      }
+
+      if (data.session) {
+        toast({ title: "Account Created!", description: "Welcome to Xplorwing." });
+      } else {
+        setVerificationPending(true);
+        toast({ title: "Verify your email", description: "A confirmation link has been sent to your email address." });
+      }
+    } catch (err: any) {
+      const zodError = err instanceof z.ZodError ? err.errors[0] : null;
+      if (zodError) {
+        const path = zodError.path?.[0] as string | undefined;
+        if (path) {
+          setFormErrors((prev) => ({ ...prev, [path]: zodError.message }));
         }
-      } catch (err: any) {
-        setLoading(false);
-        const msg: string = err instanceof z.ZodError ? err.errors[0].message : err.message;
-        // Detect "email already registered" — guide user to sign in instead
-        const isConflict = msg?.toLowerCase().includes("already registered") ||
-          msg?.toLowerCase().includes("already exists") ||
-          msg?.toLowerCase().includes("user already");
+        toast({ variant: "destructive", title: "Validation Error", description: zodError.message });
+      } else {
+        const msg: string = err.message || "Something went wrong";
+        const isConflict = msg.toLowerCase().includes("already registered") ||
+          msg.toLowerCase().includes("already exists") ||
+          msg.toLowerCase().includes("user already");
         if (isConflict) {
           toast({
             variant: "destructive",
-            title: "Account already exists",
-            description: "An account with this email already exists. Sign in instead, or use Google if you registered with Google.",
+            title: "User already exists",
+            description: "An account with this email already exists. Sign in instead.",
           });
           setIsLoginMode(true);
         } else {
           toast({ variant: "destructive", title: "Signup Failed", description: msg });
         }
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -711,42 +776,57 @@ const Auth = () => {
                     </button>
                   </div>
                 </div>
+              ) : showRoleSelection ? (
+                <div className="space-y-5 py-4">
+                  <div className="text-center">
+                    <p className="text-sm font-semibold text-[#064E3B] uppercase tracking-[0.24em]">Choose your role</p>
+                    <p className="text-xs text-gray-500 mt-2">Your role determines the experience we will tailor for you.</p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRole('user')}
+                      className={`rounded-3xl border p-5 text-left transition-all ${selectedRole === 'user' ? 'border-[#e5f76e] bg-[#e5f76e]/10 shadow-sm' : 'border-gray-200 bg-white/80 hover:border-gray-300'}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-gray-900">Traveller</p>
+                          <p className="text-xs text-gray-500 mt-2">Book stays, bikes, cars and experiences with confidence.</p>
+                        </div>
+                        <div className="rounded-full bg-[#064E3B] p-2 text-white">
+                          <User className="w-4 h-4" />
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRole('host')}
+                      className={`rounded-3xl border p-5 text-left transition-all ${selectedRole === 'host' ? 'border-[#e5f76e] bg-[#e5f76e]/10 shadow-sm' : 'border-gray-200 bg-white/80 hover:border-gray-300'}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-gray-900">Host</p>
+                          <p className="text-xs text-gray-500 mt-2">List your space or vehicle and welcome travellers.</p>
+                        </div>
+                        <div className="rounded-full bg-[#115f10] p-2 text-white">
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleContinueRoleSelection}
+                    disabled={loading}
+                    className="auth-btn auth-btn-primary"
+                  >
+                    Continue to create account
+                  </button>
+                </div>
               ) : (
                 <form onSubmit={handleEmailAuth} className="flex flex-col justify-center space-y-3" style={{ minHeight: "250px" }}>
                   {!isLoginMode && (
                     <>
-                      <div className="flex bg-white/60 p-1 rounded-full border-[1.5px] border-gray-200/80 shadow-inner relative" style={{ marginBottom: '0.25rem' }}>
-                        <div
-                          className="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-[#064E3B] rounded-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-sm"
-                          style={{
-                            transform: selectedRole === 'host' ? 'translateX(100%)' : 'translateX(0)'
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setSelectedRole('user')}
-                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-bold z-10 transition-colors duration-300 ${
-                            selectedRole === 'user' ? 'text-white' : 'text-gray-500 hover:text-gray-700'
-                          }`}
-                        >
-                          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          Traveller
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedRole('host')}
-                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-bold z-10 transition-colors duration-300 ${
-                            selectedRole === 'host' ? 'text-[#e5f76e]' : 'text-gray-500 hover:text-gray-700'
-                          }`}
-                        >
-                          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                          </svg>
-                          Host
-                        </button>
-                      </div>
                       <div className="relative">
                         <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
                         <input
@@ -758,6 +838,7 @@ const Auth = () => {
                           required
                         />
                       </div>
+                      {formErrors.fullName && <p className="text-[11px] text-red-500">{formErrors.fullName}</p>}
                     </>
                   )}
                   <div className="relative">
@@ -771,6 +852,23 @@ const Auth = () => {
                       required
                     />
                   </div>
+                  {formErrors.email && <p className="text-[11px] text-red-500">{formErrors.email}</p>}
+                  {!isLoginMode && (
+                    <>
+                      <div className="relative">
+                        <PhoneCall className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
+                        <input
+                          type="tel"
+                          value={mobileNumber}
+                          onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                          className="auth-input"
+                          placeholder="Mobile Number"
+                          required
+                        />
+                      </div>
+                      {formErrors.mobileNumber && <p className="text-[11px] text-red-500">{formErrors.mobileNumber}</p>}
+                    </>
+                  )}
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
                     <input
@@ -790,6 +888,24 @@ const Auth = () => {
                       {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
                     </button>
                   </div>
+                  {formErrors.password && <p className="text-[11px] text-red-500">{formErrors.password}</p>}
+                  {!isLoginMode && (
+                    <>
+                      <div className="relative">
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="auth-input"
+                          style={{ paddingRight: "2.75rem" }}
+                          placeholder="Confirm Password"
+                          required
+                        />
+                      </div>
+                      {formErrors.confirmPassword && <p className="text-[11px] text-red-500">{formErrors.confirmPassword}</p>}
+                    </>
+                  )}
                   {isLoginMode && (
                     <div className="flex justify-between items-center">
                       <label className="flex items-center gap-2 text-[11px] font-bold text-[#115f10] cursor-pointer hover:opacity-80 transition-opacity">
@@ -812,7 +928,7 @@ const Auth = () => {
                     </div>
                   )}
                   <button type="submit" disabled={loading} className="auth-btn auth-btn-primary">
-                    {loading ? "Please wait…" : isLoginMode ? "Sign In" : "Get Started"}
+                    {loading ? "Please wait…" : isLoginMode ? "Sign In" : "Confirm Account"}
                   </button>
                   <div className="mt-auto pt-1">
                     <p className="text-center">
@@ -824,7 +940,9 @@ const Auth = () => {
                           } else if (isHostSigninPath) {
                             navigate("/host/signup");
                           } else {
-                            setIsLoginMode(!isLoginMode);
+                            const nextIsLogin = !isLoginMode;
+                            setIsLoginMode(nextIsLogin);
+                            setShowRoleSelection(!nextIsLogin && !targetRole);
                           }
                         }}
                         className="text-[11px] text-[#fafafa] font-semibold hover:opacity-80 transition-opacity"

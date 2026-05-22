@@ -42,6 +42,7 @@ import BookingConfirmation from "./pages/BookingConfirmation";
 import TransactionFailed from "./pages/TransactionFailed";
 import PublicLinkInBio from "./pages/PublicLinkInBio";
 import Terms from "./pages/Terms";
+import CabsBookingPage from "./pages/CabsBookingPage";
 import WhatsAppButton from "./components/WhatsAppButton";
 
 // Host Dashboard
@@ -98,6 +99,7 @@ const App = () =>
             <Route path="/experiences" element={<Experiences />} />
             <Route path="/experiences/:id" element={<ExperienceDetail />} />
             <Route path="/outstation-cabs" element={<Navigate to="/" replace />} />
+            <Route path="/cabs-booking" element={<CabsBookingPage />} />
             <Route path="/bikes" element={<Bikes />} />
             <Route path="/bikes/:id" element={<BikeDetail />} />
             <Route path="/cars" element={<Cars />} />

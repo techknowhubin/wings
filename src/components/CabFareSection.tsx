@@ -418,7 +418,11 @@ const parseGvizPayload = (payload: any): FareData[] => {
   }
 };
 
-const CabFareSection = () => {
+interface CabFareSectionProps {
+  variant?: "previous" | "ticket";
+}
+
+const CabFareSection = ({ variant = "previous" }: CabFareSectionProps) => {
   const [selectedState, setSelectedState] = useState<State>("telangana");
   const [cabFares, setCabFares] = useState<Record<State, FareData[]>>(fallbackCabFares);
 
@@ -522,6 +526,7 @@ const CabFareSection = () => {
                 key={`${selectedState}-${fare.toCode}`}
                 {...fare}
                 delay={index * 0.05}
+                variant={variant}
               />
             ))}
           </motion.div>

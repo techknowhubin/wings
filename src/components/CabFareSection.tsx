@@ -15,18 +15,23 @@ interface FareData {
   sedanDiscountedPrice?: number;
   suvPrice: number;
   suvDiscountedPrice?: number;
+  oneWaySedanPrice?: number;
+  oneWaySedanDiscountedPrice?: number;
+  oneWaySuvPrice?: number;
+  oneWaySuvDiscountedPrice?: number;
+  imageUrl?: string;
 }
 
 const fallbackCabFares: Record<State, FareData[]> = {
   telangana: [
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "WGL", toCity: "Warangal", distance: "350 km", sedanPrice: 7900, suvPrice: 10000 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "KHM", toCity: "Khammam", distance: "450 km", sedanPrice: 9700, suvPrice: 13000 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "NZB", toCity: "Nizamabad", distance: "400 km", sedanPrice: 9000, suvPrice: 12000 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "KRM", toCity: "Karimnagar", distance: "400 km", sedanPrice: 8700, suvPrice: 11700 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "MHB", toCity: "Mahbubnagar", distance: "250 km", sedanPrice: 7000, suvPrice: 8700 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "SDD", toCity: "Siddipet", distance: "250 km", sedanPrice: 7200, suvPrice: 9000 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "ADL", toCity: "Adilabad", distance: "650 km", sedanPrice: 14500, suvPrice: 20000 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "NLG", toCity: "Nalgonda", distance: "250 km", sedanPrice: 6900, suvPrice: 8600 },
+    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "MHB", toCity: "Mahbubnagar", distance: "250 km", sedanPrice: 5850, sedanDiscountedPrice: 4000, suvPrice: 6900, suvDiscountedPrice: 5400 },
+    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "SDD", toCity: "Siddipet",    distance: "250 km", sedanPrice: 5850, sedanDiscountedPrice: 4350, suvPrice: 6950, suvDiscountedPrice: 5450 },
+    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "NLG", toCity: "Nalgonda",    distance: "250 km", sedanPrice: 5850, sedanDiscountedPrice: 4350, suvPrice: 6950, suvDiscountedPrice: 5450 },
+    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "WGL", toCity: "Warangal",    distance: "350 km", sedanPrice: 7300, sedanDiscountedPrice: 5800, suvPrice: 8750, suvDiscountedPrice: 7250 },
+    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "NZB", toCity: "Nizamabad",   distance: "400 km", sedanPrice: 8250, sedanDiscountedPrice: 6750, suvPrice: 10000, suvDiscountedPrice: 8500 },
+    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "KRM", toCity: "Karimnagar",  distance: "400 km", sedanPrice: 9250, sedanDiscountedPrice: 7750, suvPrice: 11250, suvDiscountedPrice: 9750 },
+    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "KHM", toCity: "Khammam",     distance: "450 km", sedanPrice: 9600, sedanDiscountedPrice: 8100, suvPrice: 11700, suvDiscountedPrice: 10200 },
+    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "ADL", toCity: "Adilabad",    distance: "650 km", sedanPrice: 14000, sedanDiscountedPrice: 12500, suvPrice: 17150, suvDiscountedPrice: 15650 },
   ],
   andhra: [
     { fromCode: "HYD", fromCity: "Hyderabad", toCode: "VJA", toCity: "Vijayawada", distance: "600 km", sedanPrice: 12500, suvPrice: 16500 },
@@ -240,14 +245,19 @@ const mapRowToFare = (row: Record<string, string>): FareData => {
   const toCode =
     pick(row, ["tocode", "toshort", "destinationcode", "dropcode"]) || destinationSplit.code || cityToCode(toCity);
   const distance = toDistance(pick(row, ["distance", "distancekm", "kms", "km"]));
-  const sedanPrice = toPrice(pick(row, ["sedanprice", "sedan", "sedanfare", "price_sedan"]));
+  const sedanPrice = toPrice(pick(row, ["roundtripsedan", "rtsedan", "sedanprice", "sedan", "sedanfare", "price_sedan"]));
   const sedanDiscountedPrice = toPrice(
-    pick(row, ["sedandiscounted", "sedandiscountedprice", "sedandiscount", "sedan_offer"]),
+    pick(row, ["roundtripsedandiscount", "roundtripsedandiscounted", "sedandiscounted", "sedandiscountedprice", "sedandiscount", "sedan_offer"]),
   );
-  const suvPrice = toPrice(pick(row, ["suvprice", "suv", "suvfare", "price_suv"]));
+  const suvPrice = toPrice(pick(row, ["roundtripsuv", "rtsuv", "suvprice", "suv", "suvfare", "price_suv"]));
   const suvDiscountedPrice = toPrice(
-    pick(row, ["suvdiscounted", "suvdiscountedprice", "suvdiscount", "suv_offer"]),
+    pick(row, ["roundtripsuvdiscounted", "roundtripsuvdiscount", "suvdiscounted", "suvdiscountedprice", "suvdiscount", "suv_offer"]),
   );
+  const oneWaySedanPrice = toPrice(pick(row, ["onewaysedan", "onewaysedanprice", "sedanoneway", "owsedan"]));
+  const oneWaySedanDiscountedPrice = toPrice(pick(row, ["onewaysedandiscount", "onewaysedandiscounted", "owsedandiscount"]));
+  const oneWaySuvPrice = toPrice(pick(row, ["onewaysuv", "onewaysuvprice", "suvoneway", "owsuv"]));
+  const oneWaySuvDiscountedPrice = toPrice(pick(row, ["onewaysuvdiscount", "onewaysuvdiscounted", "onewaysuvdi", "owsuvdiscount"]));
+  const imageUrl = pick(row, ["imageurl", "image", "imgurl", "photo", "photourl", "imagelink"]);
 
   return {
     fromCode,
@@ -259,6 +269,11 @@ const mapRowToFare = (row: Record<string, string>): FareData => {
     sedanDiscountedPrice,
     suvPrice,
     suvDiscountedPrice,
+    oneWaySedanPrice,
+    oneWaySedanDiscountedPrice,
+    oneWaySuvPrice,
+    oneWaySuvDiscountedPrice,
+    imageUrl,
   };
 };
 
@@ -300,18 +315,25 @@ const parseFareCsv = (csv: string): FareData[] => {
     .slice(1)
     .map(parseCsvLine)
     .map((cols) => {
-      // Supports sheet format: SOURCE, KM, DESTINATION, SEDAN, Sedan discounted, SUV, Suv discounted
+      // Sheet format: SOURCE(0), #(1), KM(2), DESTINATION(3),
+      // one-way sedan(4), one-way sedan disc(5), round-trip sedan(6), round-trip sedan disc(7),
+      // one-way suv(8), one-way suv disc(9), round-trip suv(10), round-trip suv disc(11), image(12)
       const source = splitCodeAndCity(cols[0] ?? "");
-      const destination = splitCodeAndCity(cols[2] ?? "");
+      const destination = splitCodeAndCity(cols[3] ?? "");
       const fromCity = source.city;
       const toCity = destination.city;
       const fromCode = source.code || cityToCode(fromCity);
       const toCode = destination.code || cityToCode(toCity);
-      const distance = toDistance(cols[1] ?? "");
-      const sedanPrice = toPrice(cols[3] ?? "");
-      const sedanDiscountedPrice = toPrice(cols[4] ?? "");
-      const suvPrice = toPrice(cols[5] ?? "");
-      const suvDiscountedPrice = toPrice(cols[6] ?? "");
+      const distance = toDistance(cols[2] ?? "");
+      const oneWaySedanPrice = toPrice(cols[4] ?? "");
+      const oneWaySedanDiscountedPrice = toPrice(cols[5] ?? "");
+      const sedanPrice = toPrice(cols[6] ?? "");
+      const sedanDiscountedPrice = toPrice(cols[7] ?? "");
+      const oneWaySuvPrice = toPrice(cols[8] ?? "");
+      const oneWaySuvDiscountedPrice = toPrice(cols[9] ?? "");
+      const suvPrice = toPrice(cols[10] ?? "");
+      const suvDiscountedPrice = toPrice(cols[11] ?? "");
+      const imageUrl = cols[12] ?? "";
       return {
         fromCode,
         fromCity,
@@ -322,6 +344,11 @@ const parseFareCsv = (csv: string): FareData[] => {
         sedanDiscountedPrice,
         suvPrice,
         suvDiscountedPrice,
+        oneWaySedanPrice,
+        oneWaySedanDiscountedPrice,
+        oneWaySuvPrice,
+        oneWaySuvDiscountedPrice,
+        imageUrl,
       };
     })
     .filter(

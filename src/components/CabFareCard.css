@@ -24,16 +24,26 @@
 }
 
 @media (max-width: 640px) {
+  /* Stack image on top, content below */
+  .ticket { flex-direction: column; }
+
   .ticket-left {
-    width: 110px;
-    min-height: 140px;
+    width: 100%;
+    height: 180px;
+    min-height: unset;
+    flex-shrink: 0;
   }
+
+  .divider-line { display: none; }
 }
 
 .ticket-left img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   display: block;
 }
 
@@ -79,20 +89,16 @@
   /* Hide right city block — destination already shown on the photo panel */
   .city-block.right { display: none; }
 
-  /* Prevent origin city name from overflowing into the chips */
-  .city-n {
-    max-width: 64px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: 8px;   /* 10 → 8 */
-  }
+  .city-n { font-size: 9px; }
 
-  /* Tighten right panel padding so chips have more room */
-  .ticket-right { padding: 10px 8px 0 8px; }
+  /* Full-width right panel after stacked image */
+  .ticket-right { padding: 12px 12px 0 12px; }
 
-  /* Reduce gap between route-mid and city blocks */
-  .route-mid { padding: 0 5px; }
+  /* Restore city block visibility since they're no longer squeezed */
+  .city-block.right { display: block; }
+
+  /* Route mid */
+  .route-mid { padding: 0 8px; }
 
   /* City code */
   .city-c { font-size: 20px; }   /* 22 → 20 */
@@ -105,17 +111,23 @@
   .dist-chip-ow { font-size: 6px; }  /* 8 → 6 */
   .dist-chip-rt { font-size: 6px; }  /* 8 → 6 */
 
+  /* Stack SEDAN and SUV vertically on mobile */
+  .vehicle-row { flex-direction: column; gap: 5px; }
+
+  /* Side-by-side price columns within each stacked card */
+  .v-prices-inner { gap: 0; }
+
   /* Tighter vehicle cards */
-  .v-card { padding: 8px 8px 9px; }
+  .v-card { padding: 8px 10px 9px; }
 
-  .v-price-col { padding-right: 6px; }
-  .v-price-col:last-child { padding-left: 6px; }
+  .v-price-col { padding-right: 8px; }
+  .v-price-col:last-child { padding-left: 8px; }
 
-  .v-type       { font-size: 6px; }   /* 8  → 6  */
-  .v-trip-label { font-size: 6px; }   /* 7  → 6  (floor at 6) */
-  .v-price-struck { font-size: 7px; } /* 9  → 7  */
-  .v-price      { font-size: 11px; }  /* 13 → 11 */
-  .v-btn        { font-size: 7px; }   /* 9  → 7  */
+  .v-type       { font-size: 7px; }
+  .v-trip-label { font-size: 6px; }
+  .v-price-struck { font-size: 8px; }
+  .v-price      { font-size: 13px; }
+  .v-btn        { font-size: 8px; padding: 6px 0; }
 
   /* Footer */
   .footer-note  { font-size: 7px; }   /* 8.5 → 7 (floor at 7) */
@@ -243,9 +255,7 @@
 }
 
 @media (max-width: 380px) {
-  .vehicle-row {
-    flex-direction: column;
-  }
+  .ticket-left { width: 90px; min-height: 120px; }
 }
 
 .v-card {

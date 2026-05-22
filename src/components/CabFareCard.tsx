@@ -31,6 +31,11 @@ interface CabFareCardProps {
   sedanDiscountedPrice?: number;
   suvPrice: number;
   suvDiscountedPrice?: number;
+  oneWaySedanPrice?: number;
+  oneWaySedanDiscountedPrice?: number;
+  oneWaySuvPrice?: number;
+  oneWaySuvDiscountedPrice?: number;
+  imageUrl?: string;
   delay?: number;
   variant?: "previous" | "ticket";
 }
@@ -76,6 +81,23 @@ const getDestinationImage = (code: string) => {
   return destinationImages[code.toUpperCase()] || hyderabadImg;
 };
 
+const extractDriveId = (url: string) => {
+  const fileMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileMatch) return fileMatch[1];
+  const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idMatch && url.includes("drive.google.com")) return idMatch[1];
+  return null;
+};
+
+const resolveImageUrl = (url: string) => {
+  if (!url) return "";
+  const driveId = extractDriveId(url);
+  if (driveId) {
+    return `https://drive.google.com/thumbnail?id=${driveId}&sz=w600`;
+  }
+  return url;
+};
+
 const CabFareCard = ({
   fromCode,
   fromCity,
@@ -86,6 +108,11 @@ const CabFareCard = ({
   sedanDiscountedPrice,
   suvPrice,
   suvDiscountedPrice,
+  oneWaySedanPrice,
+  oneWaySedanDiscountedPrice,
+  oneWaySuvPrice,
+  oneWaySuvDiscountedPrice,
+  imageUrl,
   delay = 0,
   variant = "previous",
 }: CabFareCardProps) => {
@@ -205,11 +232,28 @@ const CabFareCard = ({
       ? suvPrice
       : Math.round(effectiveSuvRound * 1.15 / 10) * 10;
 
-  // One-way = 70% of round-trip
-  const effectiveSedanOneWay = Math.round((effectiveSedanRound * 0.7) / 10) * 10;
-  const displaySedanOneWayOriginal = Math.round((displaySedanRoundOriginal * 0.7) / 10) * 10;
-  const effectiveSuvOneWay = Math.round((effectiveSuvRound * 0.7) / 10) * 10;
-  const displaySuvOneWayOriginal = Math.round((displaySuvRoundOriginal * 0.7) / 10) * 10;
+  // One-way: use sheet values when available, otherwise fall back to 70% of round-trip
+  const effectiveSedanOneWay =
+    oneWaySedanDiscountedPrice && oneWaySedanDiscountedPrice > 0
+      ? oneWaySedanDiscountedPrice
+      : oneWaySedanPrice && oneWaySedanPrice > 0
+        ? oneWaySedanPrice
+        : Math.round((effectiveSedanRound * 0.7) / 10) * 10;
+  const displaySedanOneWayOriginal =
+    oneWaySedanPrice && oneWaySedanPrice > 0 && oneWaySedanDiscountedPrice && oneWaySedanDiscountedPrice > 0
+      ? oneWaySedanPrice
+      : Math.round((displaySedanRoundOriginal * 0.7) / 10) * 10;
+
+  const effectiveSuvOneWay =
+    oneWaySuvDiscountedPrice && oneWaySuvDiscountedPrice > 0
+      ? oneWaySuvDiscountedPrice
+      : oneWaySuvPrice && oneWaySuvPrice > 0
+        ? oneWaySuvPrice
+        : Math.round((effectiveSuvRound * 0.7) / 10) * 10;
+  const displaySuvOneWayOriginal =
+    oneWaySuvPrice && oneWaySuvPrice > 0 && oneWaySuvDiscountedPrice && oneWaySuvDiscountedPrice > 0
+      ? oneWaySuvPrice
+      : Math.round((displaySuvRoundOriginal * 0.7) / 10) * 10;
 
   // Distance values
   const numericDistance = parseInt(distance) || 300;
@@ -237,7 +281,23 @@ const CabFareCard = ({
       <div className="ticket">
         {/* LEFT PANEL */}
         <div className="ticket-left">
-          <img src={getDestinationImage(toCode)} alt={toCity} />
+          <img
+            src={resolveImageUrl(imageUrl || "") || getDestinationImage(toCode)}
+            alt={toCity}
+            onLoad={() => console.log(`[IMG] ${toCode} loaded | raw:`, imageUrl)}
+            onError={(e) => {
+              console.warn(`[IMG FAIL] ${toCode} | raw:`, imageUrl, `| attempted src:`, (e.target as HTMLImageElement).src);
+              const img = e.target as HTMLImageElement;
+              const driveId = imageUrl ? extractDriveId(imageUrl) : null;
+              if (driveId && !img.src.includes("lh3") && !img.src.includes("uc?export")) {
+                img.src = `https://lh3.googleusercontent.com/d/${driveId}`;
+              } else if (driveId && !img.src.includes("uc?export")) {
+                img.src = `https://drive.google.com/uc?export=view&id=${driveId}`;
+              } else {
+                img.src = getDestinationImage(toCode);
+              }
+            }}
+          />
           <div className="dest-label">
             <div className="dest-code">{toCode}</div>
             <div className="dest-city">{toCity}</div>

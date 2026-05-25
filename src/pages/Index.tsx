@@ -469,7 +469,7 @@ const LandingPage = () => {
       )}
 
       {/* Cab Fare Section */}
-      <CabFareSection />
+      <CabFareSection withContainer />
 
       {/* Hotels Section */}
       {hotels.length > 0 && (

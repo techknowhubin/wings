@@ -7,7 +7,7 @@ const CabFareKPIs: React.FC = () => {
       <div className="kpi-grid">
         {/* Card 1: Per KM Rate */}
         <div className="kpi-card dark">
-          <div className="kpi-label">Rate card</div>
+          <div className="kpi-label">Affordable Rate card</div>
           <div className="dual-row">
             <div className="dual-item">
               <div className="d-label">Sedan</div>
@@ -36,7 +36,7 @@ const CabFareKPIs: React.FC = () => {
         {/* Card 3: Buffer */}
         <div className="kpi-card lime-card">
           <div className="kpi-label">Buffer included</div>
-          <div className="kpi-value">+50 to +100 km</div>
+          <div className="kpi-value">+25 to +100 km</div>
           <div className="kpi-sub">Pre-added to fare · covers detours & city drop variance</div>
           <span className="kpi-tag teal">✓ No mid-trip disputes</span>
         </div>
@@ -44,7 +44,7 @@ const CabFareKPIs: React.FC = () => {
         {/* Card 4: Overage */}
         <div className="kpi-card">
           <div className="kpi-label">Beyond buffer?</div>
-          <div className="kpi-value">Base rate applies</div>
+          <div className="kpi-value">Per KM rate applies</div>
           <div className="kpi-sub">Sedan ₹14/km · SUV ₹18/km · billed transparently</div>
           <span className="kpi-tag lime">No penalty charges</span>
         </div>

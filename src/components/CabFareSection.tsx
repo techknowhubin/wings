@@ -447,9 +447,10 @@ const parseGvizPayload = (payload: any): FareData[] => {
 
 interface CabFareSectionProps {
   variant?: "previous" | "ticket";
+  withContainer?: boolean;
 }
 
-const CabFareSection = ({ variant = "previous" }: CabFareSectionProps) => {
+const CabFareSection = ({ variant = "previous", withContainer = false }: CabFareSectionProps) => {
   const [selectedState, setSelectedState] = useState<State>("telangana");
   const [cabFares, setCabFares] = useState<Record<State, FareData[]>>(fallbackCabFares);
 
@@ -506,7 +507,7 @@ const CabFareSection = ({ variant = "previous" }: CabFareSectionProps) => {
 
   return (
     <section className="py-8 md:py-16 px-[5%] md:px-4 bg-muted/30">
-      <div className="md:container md:mx-auto md:max-w-6xl">
+      <div className={withContainer ? "container mx-auto px-4" : "md:container md:mx-auto md:max-w-6xl"}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

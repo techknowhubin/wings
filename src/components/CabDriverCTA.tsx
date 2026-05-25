@@ -191,24 +191,24 @@ const CabDriverCTA = () => {
         }
 
         .drv-input, .drv-select {
-          height: 2.4rem;
-          background: rgba(255,255,255,0.14);
-          border: 1.5px solid rgba(255,255,255,0.28);
-          border-radius: 9999px;
-          color: #fff;
+          height: 2.5rem;
+          background: rgba(0,0,0,0.22);
+          border: 1px solid rgba(163,230,53,0.18);
+          border-radius: 12px;
+          color: #e8f5e9;
           font-size: 0.875rem;
-          font-weight: 500;
-          padding: 0 1.1rem;
+          font-weight: 400;
+          padding: 0 1rem;
           outline: none;
           transition: border-color .2s, background .2s, box-shadow .2s;
           min-width: 0;
           flex: 1;
         }
-        .drv-input::placeholder { color: rgba(255,255,255,0.5); }
+        .drv-input::placeholder { color: rgba(255,255,255,0.32); }
         .drv-input:focus, .drv-select:focus {
-          border-color: rgba(163,230,53,0.65);
-          background: rgba(255,255,255,0.2);
-          box-shadow: 0 0 0 3px rgba(163,230,53,0.12);
+          border-color: rgba(163,230,53,0.55);
+          background: rgba(0,0,0,0.32);
+          box-shadow: 0 0 0 3px rgba(163,230,53,0.08);
         }
         /* Custom location dropdown */
         .drv-loc-wrap {
@@ -216,15 +216,15 @@ const CabDriverCTA = () => {
           flex: 1;
         }
         .drv-loc-btn {
-          height: 2.4rem;
+          height: 2.5rem;
           width: 100%;
-          background: rgba(255,255,255,0.14);
-          border: 1.5px solid rgba(255,255,255,0.28);
-          border-radius: 9999px;
-          color: rgba(255,255,255,0.55);
+          background: rgba(0,0,0,0.22);
+          border: 1px solid rgba(163,230,53,0.18);
+          border-radius: 12px;
+          color: rgba(255,255,255,0.38);
           font-size: 0.875rem;
-          font-weight: 500;
-          padding: 0 2.2rem 0 1.1rem;
+          font-weight: 400;
+          padding: 0 2.2rem 0 1rem;
           outline: none;
           cursor: pointer;
           text-align: left;
@@ -234,12 +234,12 @@ const CabDriverCTA = () => {
           transition: border-color .2s, background .2s, box-shadow .2s;
           position: relative;
         }
-        .drv-loc-btn.filled { color: #fff; }
+        .drv-loc-btn.filled { color: #e8f5e9; }
         .drv-loc-btn.open,
         .drv-loc-btn:focus {
-          border-color: rgba(163,230,53,0.65);
-          background: rgba(255,255,255,0.2);
-          box-shadow: 0 0 0 3px rgba(163,230,53,0.12);
+          border-color: rgba(163,230,53,0.55);
+          background: rgba(0,0,0,0.32);
+          box-shadow: 0 0 0 3px rgba(163,230,53,0.08);
         }
         .drv-loc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .drv-loc-chevron {
@@ -446,7 +446,12 @@ const CabDriverCTA = () => {
             min-width: 0;
             flex: none;
             height: 2.75rem;
-            font-size: 0.9rem;
+            font-size: 0.875rem;
+            border-radius: 10px;
+          }
+          .drv-loc-btn {
+            height: 2.75rem;
+            border-radius: 10px;
           }
           .drv-btn {
             width: fit-content;

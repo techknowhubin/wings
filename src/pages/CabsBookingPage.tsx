@@ -3,6 +3,7 @@ import Footer from "@/components/Footer";
 import Marquee from "@/components/Marquee";
 import BackButton from "@/components/BackButton";
 import CabFareSection from "@/components/CabFareSection";
+import CabDriverCTA from "@/components/CabDriverCTA";
 import CustomerTestimonials from "@/components/CustomerTestimonials";
 import HomeFAQ from "@/components/HomeFAQ";
 import JourneyCTA from "@/components/JourneyCTA";
@@ -109,6 +110,7 @@ const CabsBookingPage = () => {
         <div className="pt-2 md:pt-16">
           <CabFareSection variant="ticket" />
         </div>
+        <CabDriverCTA />
       </main>
 
       {/* Testimonials */}

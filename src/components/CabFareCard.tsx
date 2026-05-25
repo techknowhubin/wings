@@ -284,9 +284,7 @@ const CabFareCard = ({
           <img
             src={resolveImageUrl(imageUrl || "") || getDestinationImage(toCode)}
             alt={toCity}
-            onLoad={() => console.log(`[IMG] ${toCode} loaded | raw:`, imageUrl)}
             onError={(e) => {
-              console.warn(`[IMG FAIL] ${toCode} | raw:`, imageUrl, `| attempted src:`, (e.target as HTMLImageElement).src);
               const img = e.target as HTMLImageElement;
               const driveId = imageUrl ? extractDriveId(imageUrl) : null;
               if (driveId && !img.src.includes("lh3") && !img.src.includes("uc?export")) {

@@ -329,45 +329,44 @@ const Auth = () => {
       localStorage.removeItem("google_auth_mode");
 
       const handleGoogleLoginCheck = async () => {
-        // Query user_roles: if a row exists, this is a real registered user.
-        const { data: roleData } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (roleData) {
-          // Existing registered user — proceed with normal routing.
-          handleSuccessRoleRouting(user);
-          return;
-        }
-
-        // No role → user was never properly registered. Block and clean up.
+        // Call the edge function (service-role key → bypasses RLS, checks user_roles):
+        //   403 → registered user (has role row) → sign in
+        //   200 → unregistered, account deleted → show error
+        //   anything else (404, 500, network) → fail OPEN → sign in
+        //   (don't block legitimate users if the function isn't deployed / has errors)
         try {
           const { data: { session: currentSession } } = await supabase.auth.getSession();
           if (currentSession?.access_token) {
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://uhtwkajqpuazxpnbaojx.supabase.co";
             const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVodHdrYWpxcHVhenhwbmJhb2p4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE2NzY1NTcsImV4cCI6MjA3NzI1MjU1N30.RPdeJk13uqnFssQXUyA0acsf53xgceR-59VLzoB7Wfg";
-            // Delete the auto-created auth.users entry using the service-role edge function.
-            await fetch(`${supabaseUrl}/functions/v1/delete-unregistered-user`, {
+            const resp = await fetch(`${supabaseUrl}/functions/v1/delete-unregistered-user`, {
               method: "POST",
               headers: {
                 Authorization: `Bearer ${currentSession.access_token}`,
                 apikey: anonKey,
               },
             });
+
+            if (resp.status === 200) {
+              // Account was deleted — definitively not registered.
+              await signOut();
+              hasRoutedRef.current = false;
+              toast({
+                variant: "destructive",
+                title: "No account found",
+                description: "No account found for this Google email. Please sign up first.",
+              });
+              return;
+            }
+
+            // 403 = registered, or any other status = fail open.
+            // Either way, let the user through.
           }
         } catch {
-          // Edge function optional — sign-out always runs.
-        } finally {
-          await signOut();
-          hasRoutedRef.current = false;
-          toast({
-            variant: "destructive",
-            title: "No account found",
-            description: "No account found for this Google email. Please sign up first.",
-          });
+          // Network/fetch error — fail open, don't block the user.
         }
+
+        handleSuccessRoleRouting(user);
       };
 
       handleGoogleLoginCheck();
@@ -871,11 +870,11 @@ const Auth = () => {
                     <p className="text-[1.5rem] font-extrabold text-[#064E3B] tracking-tight leading-tight">Choose your role</p>
                     <p className="text-[#064E3B] mt-1.5 text-[13px] leading-relaxed max-w-[260px] mx-auto">Your role determines the experience we will tailor for you.</p>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-3 sm:grid-cols-2 px-0.5 pb-0.5">
                     <button
                       type="button"
                       onClick={() => setSelectedRole('user')}
-                      className={`rounded-3xl border-2 p-5 text-left transition-all ${selectedRole === 'user' ? 'border-[#115f10] bg-[#fafde2] shadow-md scale-[1.02]' : 'border-gray-200 bg-white hover:border-gray-300 hover:scale-[1.01]'}`}
+                      className={`rounded-3xl border-2 p-5 text-left transition-all ${selectedRole === 'user' ? 'border-[#115f10] bg-[#fafde2] shadow-md' : 'border-gray-200 bg-white hover:border-gray-300'}`}
                     >
                       <div className="flex items-center justify-between">
                         <div>
@@ -890,7 +889,7 @@ const Auth = () => {
                     <button
                       type="button"
                       onClick={() => setSelectedRole('host')}
-                      className={`rounded-3xl border-2 p-5 text-left transition-all ${selectedRole === 'host' ? 'border-[#115f10] bg-[#fafde2] shadow-md scale-[1.02]' : 'border-gray-200 bg-white hover:border-gray-300 hover:scale-[1.01]'}`}
+                      className={`rounded-3xl border-2 p-5 text-left transition-all ${selectedRole === 'host' ? 'border-[#115f10] bg-[#fafde2] shadow-md' : 'border-gray-200 bg-white hover:border-gray-300'}`}
                     >
                       <div className="flex items-center justify-between">
                         <div>
@@ -898,7 +897,7 @@ const Auth = () => {
                           <p className={`text-xs mt-2 ${selectedRole === 'host' ? 'text-gray-800 font-medium' : 'text-gray-600'}`}>List your space or vehicle and welcome travellers.</p>
                         </div>
                         <div className="rounded-full bg-[#115f10] p-2 text-white">
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 001 1m-6 0h6" /></svg>
                         </div>
                       </div>
                     </button>

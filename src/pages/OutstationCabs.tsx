@@ -8,6 +8,7 @@ import ListingCard from "@/components/ListingCard";
 import CustomerTestimonials from "@/components/CustomerTestimonials";
 import HomeFAQ from "@/components/HomeFAQ";
 import CabFareSection from "@/components/CabFareSection";
+import CabDriverCTA from "@/components/CabDriverCTA";
 import OffersSection from "@/components/OffersSection";
 import WhatsNewSection from "@/components/WhatsNewSection";
 import JourneyCTA from "@/components/JourneyCTA";
@@ -333,8 +334,7 @@ const OutstationCabs = () => {
         <div className="pt-2 md:pt-16">
           <CabFareSection />
         </div>
-
-
+        <CabDriverCTA />
       </main>
 
       {/* Offers Section */}

@@ -29,7 +29,7 @@ const CabFareKPIs: React.FC = () => {
         <div className="kpi-card">
           <div className="kpi-label">Toll charges</div>
           <div className="kpi-value">Not included</div>
-          <div className="kpi-sub">Paid at plaza · shown before booking</div>
+          <div className="kpi-sub">Paid at plaza </div>
           <span className="kpi-tag amber">₹150–₹580 est. by route</span>
         </div>
 

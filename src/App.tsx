@@ -42,6 +42,7 @@ import BookingConfirmation from "./pages/BookingConfirmation";
 import TransactionFailed from "./pages/TransactionFailed";
 import PublicLinkInBio from "./pages/PublicLinkInBio";
 import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 import CabsBookingPage from "./pages/CabsBookingPage";
 import WhatsAppButton from "./components/WhatsAppButton";
 
@@ -124,6 +125,7 @@ const App = () =>
             <Route path="/booking-confirmation" element={<BookingConfirmation />} />
             <Route path="/transaction-failed" element={<TransactionFailed />} />
             <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
             
             {/* Host Dashboard — shared layout, only content transitions */}
             <Route 

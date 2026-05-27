@@ -211,7 +211,7 @@ function Footerdemo() {
             © {new Date().getFullYear()} WINGSNNESTS ECO SOLUTIONS PVT LTD. All rights reserved.
           </p>
           <nav className="flex gap-6 text-sm">
-            <Link to="/terms" className="text-muted-foreground transition-colors hover:text-primary-text">
+            <Link to="/privacy" className="text-muted-foreground transition-colors hover:text-primary-text">
               Privacy Policy
             </Link>
             <Link to="/terms" className="text-muted-foreground transition-colors hover:text-primary-text">

@@ -22,38 +22,7 @@ interface FareData {
   imageUrl?: string;
 }
 
-const fallbackCabFares: Record<State, FareData[]> = {
-  telangana: [
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "MHB", toCity: "Mahbubnagar", distance: "250 km", sedanPrice: 5850, sedanDiscountedPrice: 4000, suvPrice: 6900, suvDiscountedPrice: 5400 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "SDD", toCity: "Siddipet",    distance: "250 km", sedanPrice: 5850, sedanDiscountedPrice: 4350, suvPrice: 6950, suvDiscountedPrice: 5450 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "NLG", toCity: "Nalgonda",    distance: "250 km", sedanPrice: 5850, sedanDiscountedPrice: 4350, suvPrice: 6950, suvDiscountedPrice: 5450 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "WGL", toCity: "Warangal",    distance: "350 km", sedanPrice: 7300, sedanDiscountedPrice: 5800, suvPrice: 8750, suvDiscountedPrice: 7250 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "NZB", toCity: "Nizamabad",   distance: "400 km", sedanPrice: 8250, sedanDiscountedPrice: 6750, suvPrice: 10000, suvDiscountedPrice: 8500 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "KRM", toCity: "Karimnagar",  distance: "400 km", sedanPrice: 9250, sedanDiscountedPrice: 7750, suvPrice: 11250, suvDiscountedPrice: 9750 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "KHM", toCity: "Khammam",     distance: "450 km", sedanPrice: 9600, sedanDiscountedPrice: 8100, suvPrice: 11700, suvDiscountedPrice: 10200 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "ADL", toCity: "Adilabad",    distance: "650 km", sedanPrice: 14000, sedanDiscountedPrice: 12500, suvPrice: 17150, suvDiscountedPrice: 15650 },
-  ],
-  andhra: [
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "VJA", toCity: "Vijayawada", distance: "600 km", sedanPrice: 12500, suvPrice: 16500 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "VSK", toCity: "Visakhapatnam", distance: "1300 km", sedanPrice: 25500, suvPrice: 32000 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "TPT", toCity: "Tirupati", distance: "1200 km", sedanPrice: 22000, suvPrice: 28500 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "GNT", toCity: "Guntur", distance: "650 km", sedanPrice: 13000, suvPrice: 17200 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "NEL", toCity: "Nellore", distance: "1000 km", sedanPrice: 19500, suvPrice: 25000 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "KDP", toCity: "Kadapa", distance: "900 km", sedanPrice: 17500, suvPrice: 22500 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "RJM", toCity: "Rajahmundry", distance: "850 km", sedanPrice: 16800, suvPrice: 21500 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "KNL", toCity: "Kurnool", distance: "500 km", sedanPrice: 10500, suvPrice: 14000 },
-  ],
-  karnataka: [
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "BLR", toCity: "Bangalore", distance: "1200 km", sedanPrice: 23500, suvPrice: 29500 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "MYS", toCity: "Mysore", distance: "1500 km", sedanPrice: 27500, suvPrice: 35000 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "HBL", toCity: "Hubli", distance: "900 km", sedanPrice: 18000, suvPrice: 23500 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "BGM", toCity: "Belgaum", distance: "1100 km", sedanPrice: 21000, suvPrice: 27000 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "MNG", toCity: "Mangalore", distance: "1600 km", sedanPrice: 30500, suvPrice: 39000 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "GLP", toCity: "Gulbarga", distance: "500 km", sedanPrice: 10800, suvPrice: 14500 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "DVG", toCity: "Davangere", distance: "1000 km", sedanPrice: 19800, suvPrice: 26000 },
-    { fromCode: "HYD", fromCity: "Hyderabad", toCode: "BDR", toCity: "Bidar", distance: "350 km", sedanPrice: 7800, suvPrice: 10200 },
-  ],
-};
+const emptyFares: Record<State, FareData[]> = { telangana: [], andhra: [], karnataka: [] };
 
 const stateLabels: Record<State, string> = {
   telangana: "Telangana",
@@ -181,9 +150,9 @@ const loadGvizWithJsonp = (sheetUrl: string): Promise<any | null> => {
     })();
     const base = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq`;
     const query = gid
-      ? `tqx=responseHandler:${callbackName}&gid=${gid}`
-      : `tqx=responseHandler:${callbackName}`;
-    script.src = `${base}?${query}`;
+      ? `tqx=responseHandler:${callbackName}&gid=${gid}&tq=select%20*`
+      : `tqx=responseHandler:${callbackName}&tq=select%20*`;
+    script.src = `${base}?${query}&_=${Date.now()}`;
     script.async = true;
     script.onerror = () => {
       window.clearTimeout(timeoutId);
@@ -232,6 +201,27 @@ const splitCodeAndCity = (value: string) => {
   return { code: left.trim().toUpperCase(), city: rest.join("/").trim() };
 };
 
+// When a sheet uses only "discount" columns (leaving the base column empty),
+// promote the discount value to the base price so the card renders correctly.
+const normalizeFare = (fare: FareData): FareData => {
+  let { sedanPrice, sedanDiscountedPrice, suvPrice, suvDiscountedPrice,
+        oneWaySedanPrice, oneWaySedanDiscountedPrice, oneWaySuvPrice, oneWaySuvDiscountedPrice } = fare;
+  if (sedanPrice === 0 && (sedanDiscountedPrice ?? 0) > 0) {
+    sedanPrice = sedanDiscountedPrice!; sedanDiscountedPrice = 0;
+  }
+  if (suvPrice === 0 && (suvDiscountedPrice ?? 0) > 0) {
+    suvPrice = suvDiscountedPrice!; suvDiscountedPrice = 0;
+  }
+  if ((oneWaySedanPrice ?? 0) === 0 && (oneWaySedanDiscountedPrice ?? 0) > 0) {
+    oneWaySedanPrice = oneWaySedanDiscountedPrice!; oneWaySedanDiscountedPrice = 0;
+  }
+  if ((oneWaySuvPrice ?? 0) === 0 && (oneWaySuvDiscountedPrice ?? 0) > 0) {
+    oneWaySuvPrice = oneWaySuvDiscountedPrice!; oneWaySuvDiscountedPrice = 0;
+  }
+  return { ...fare, sedanPrice, sedanDiscountedPrice, suvPrice, suvDiscountedPrice,
+           oneWaySedanPrice, oneWaySedanDiscountedPrice, oneWaySuvPrice, oneWaySuvDiscountedPrice };
+};
+
 const mapRowToFare = (row: Record<string, string>): FareData => {
   const sourceCombined = pick(row, ["source", "from", "pickup", "sourcecity"]);
   const destinationCombined = pick(row, ["destination", "to", "drop", "destinationcity"]);
@@ -259,7 +249,7 @@ const mapRowToFare = (row: Record<string, string>): FareData => {
   const oneWaySuvDiscountedPrice = toPrice(pick(row, ["onewaysuvdiscount", "onewaysuvdiscounted", "onewaysuvdi", "owsuvdiscount"]));
   const imageUrl = pick(row, ["imageurl", "image", "imgurl", "photo", "photourl", "imagelink"]);
 
-  return {
+  return normalizeFare({
     fromCode,
     fromCity,
     toCode,
@@ -274,7 +264,7 @@ const mapRowToFare = (row: Record<string, string>): FareData => {
     oneWaySuvPrice,
     oneWaySuvDiscountedPrice,
     imageUrl,
-  };
+  });
 };
 
 const parseFareCsv = (csv: string): FareData[] => {
@@ -315,26 +305,26 @@ const parseFareCsv = (csv: string): FareData[] => {
     .slice(1)
     .map(parseCsvLine)
     .map((cols) => {
-      // Sheet format: SOURCE(0), #(1), KM(2), DESTINATION(3),
-      // one-way sedan(4), one-way sedan disc(5), round-trip sedan(6), round-trip sedan disc(7),
-      // one-way suv(8), one-way suv disc(9), round-trip suv(10), round-trip suv disc(11), image(12)
+      // Sheet format: SOURCE(0), KM(1), DESTINATION(2),
+      // one-way sedan(3), one-way sedan disc(4), round-trip sedan(5), round-trip sedan disc(6),
+      // one-way suv(7), one-way suv disc(8), round-trip suv(9), round-trip suv disc(10), image(11)
       const source = splitCodeAndCity(cols[0] ?? "");
-      const destination = splitCodeAndCity(cols[3] ?? "");
+      const destination = splitCodeAndCity(cols[2] ?? "");
       const fromCity = source.city;
       const toCity = destination.city;
       const fromCode = source.code || cityToCode(fromCity);
       const toCode = destination.code || cityToCode(toCity);
-      const distance = toDistance(cols[2] ?? "");
-      const oneWaySedanPrice = toPrice(cols[4] ?? "");
-      const oneWaySedanDiscountedPrice = toPrice(cols[5] ?? "");
-      const sedanPrice = toPrice(cols[6] ?? "");
-      const sedanDiscountedPrice = toPrice(cols[7] ?? "");
-      const oneWaySuvPrice = toPrice(cols[8] ?? "");
-      const oneWaySuvDiscountedPrice = toPrice(cols[9] ?? "");
-      const suvPrice = toPrice(cols[10] ?? "");
-      const suvDiscountedPrice = toPrice(cols[11] ?? "");
-      const imageUrl = cols[12] ?? "";
-      return {
+      const distance = toDistance(cols[1] ?? "");
+      const oneWaySedanPrice = toPrice(cols[3] ?? "");
+      const oneWaySedanDiscountedPrice = toPrice(cols[4] ?? "");
+      const sedanPrice = toPrice(cols[5] ?? "");
+      const sedanDiscountedPrice = toPrice(cols[6] ?? "");
+      const oneWaySuvPrice = toPrice(cols[7] ?? "");
+      const oneWaySuvDiscountedPrice = toPrice(cols[8] ?? "");
+      const suvPrice = toPrice(cols[9] ?? "");
+      const suvDiscountedPrice = toPrice(cols[10] ?? "");
+      const imageUrl = cols[11] ?? "";
+      return normalizeFare({
         fromCode,
         fromCity,
         toCode,
@@ -349,7 +339,7 @@ const parseFareCsv = (csv: string): FareData[] => {
         oneWaySuvPrice,
         oneWaySuvDiscountedPrice,
         imageUrl,
-      };
+      });
     })
     .filter(
       (row) =>
@@ -418,28 +408,78 @@ const parseGvizPayload = (payload: any): FareData[] => {
       normalizeHeader(String(c?.label || c?.id || "")),
     );
     const rows: any[] = table?.rows ?? [];
-    if (!cols.length || !rows.length) return [];
+    if (!rows.length) return [];
 
-    const mapped = rows.map((r) => {
-      const rowObj: Record<string, string> = {};
-      const cells: any[] = r?.c ?? [];
-      cols.forEach((header, idx) => {
-        const cell = cells[idx];
-        rowObj[header] = cell?.v === null || cell?.v === undefined ? "" : String(cell.v).trim();
+    const extractCell = (row: any, idx: number): string => {
+      const cell = row?.c?.[idx];
+      return cell?.v === null || cell?.v === undefined ? "" : String(cell.v).trim();
+    };
+
+    const isValid = (row: FareData) =>
+      !!row.fromCity && !!row.toCity && !!row.distance && row.sedanPrice > 0 && row.suvPrice > 0;
+
+    const makeRow = (r: any, destCol: number, kmCol: number, owSCol: number, owSDCol: number, rtSCol: number, rtSDCol: number, owUCol: number, owUDCol: number, rtUCol: number, rtUDCol: number, imgCol: number): FareData => {
+      const src  = splitCodeAndCity(extractCell(r, 0));
+      const dest = splitCodeAndCity(extractCell(r, destCol));
+      return normalizeFare({
+        fromCode: src.code  || cityToCode(src.city),  fromCity: src.city,
+        toCode:   dest.code || cityToCode(dest.city),  toCity:   dest.city,
+        distance:                   toDistance(extractCell(r, kmCol)),
+        oneWaySedanPrice:           toPrice(extractCell(r, owSCol)),
+        oneWaySedanDiscountedPrice: toPrice(extractCell(r, owSDCol)),
+        sedanPrice:                 toPrice(extractCell(r, rtSCol)),
+        sedanDiscountedPrice:       toPrice(extractCell(r, rtSDCol)),
+        oneWaySuvPrice:             toPrice(extractCell(r, owUCol)),
+        oneWaySuvDiscountedPrice:   toPrice(extractCell(r, owUDCol)),
+        suvPrice:                   toPrice(extractCell(r, rtUCol)),
+        suvDiscountedPrice:         toPrice(extractCell(r, rtUDCol)),
+        imageUrl:                   extractCell(r, imgCol),
       });
-      return rowObj;
-    });
+    };
 
-    return mapped
-      .map(mapRowToFare)
-      .filter(
-        (row) =>
-          row.fromCity &&
-          row.toCity &&
-          row.distance &&
-          row.sedanPrice > 0 &&
-          row.suvPrice > 0,
-      );
+    // Header-based parsing
+    if (cols.length > 0) {
+      console.log("[CabFareSection] gviz columns:", cols.join(" | "));
+      if (rows.length > 0) {
+        console.log("[CabFareSection] gviz first row:", (rows[0]?.c ?? []).map((c: any) => c?.v ?? "—").join(" | "));
+      }
+      const mapped = rows.map((r) => {
+        const rowObj: Record<string, string> = {};
+        (r?.c ?? []).forEach((cell: any, idx: number) => {
+          if (cols[idx]) rowObj[cols[idx]] = cell?.v === null || cell?.v === undefined ? "" : String(cell.v).trim();
+        });
+        return rowObj;
+      });
+      const headerParsed = mapped.map(mapRowToFare).filter(isValid);
+      if (headerParsed.length > 0) {
+        console.log(`[CabFareSection] header parse: ${headerParsed.length} rows`);
+        return headerParsed;
+      }
+      console.warn("[CabFareSection] header parse: 0 rows — trying positional layouts");
+    }
+
+    // Positional fallbacks — tried in order, first layout that yields valid rows wins
+    const layouts: Array<Parameters<typeof makeRow>> = [
+      // Layout D (12-col, actual sheet): SRC | KM | DEST | OW-S | OW-SD | RT-S | RT-SD | OW-U | OW-UD | RT-U | RT-UD | IMG
+      [null as any, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+      // Layout A (12-col, no "#"): SRC | DEST | KM | OW-S | OW-SD | RT-S | RT-SD | OW-U | OW-UD | RT-U | RT-UD | IMG
+      [null as any, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+      // Layout B (13-col, with "#"): SRC | # | KM | DEST | OW-S | OW-SD | RT-S | RT-SD | OW-U | OW-UD | RT-U | RT-UD | IMG
+      [null as any, 3, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      // Layout C (8-col, simple): SRC | DEST | KM | S | SD | U | UD | IMG
+      [null as any, 1, 2, 0, 0, 3, 4, 0, 0, 5, 6, 7],
+    ];
+
+    for (const [, destCol, kmCol, owSCol, owSDCol, rtSCol, rtSDCol, owUCol, owUDCol, rtUCol, rtUDCol, imgCol] of layouts) {
+      const result = rows.map((r) => makeRow(r, destCol, kmCol, owSCol, owSDCol, rtSCol, rtSDCol, owUCol, owUDCol, rtUCol, rtUDCol, imgCol)).filter(isValid);
+      if (result.length > 0) {
+        console.log(`[CabFareSection] positional parse (dest@${destCol}, rtS@${rtSCol}, rtU@${rtUCol}): ${result.length} rows`);
+        return result;
+      }
+    }
+
+    console.warn("[CabFareSection] all positional layouts returned 0 rows");
+    return [];
   } catch {
     return [];
   }
@@ -452,7 +492,8 @@ interface CabFareSectionProps {
 
 const CabFareSection = ({ variant = "previous", withContainer = false }: CabFareSectionProps) => {
   const [selectedState, setSelectedState] = useState<State>("telangana");
-  const [cabFares, setCabFares] = useState<Record<State, FareData[]>>(fallbackCabFares);
+  const [cabFares, setCabFares] = useState<Record<State, FareData[]>>(emptyFares);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadSheetFares = async () => {
@@ -460,7 +501,7 @@ const CabFareSection = ({ variant = "previous", withContainer = false }: CabFare
         (Object.keys(sheetUrls) as State[]).map(async (state) => {
           const exportUrl = toCsvExportUrl(sheetUrls[state]);
           const gvizUrl = toGvizUrl(sheetUrls[state]);
-          if (!exportUrl && !gvizUrl) return [state, fallbackCabFares[state]] as const;
+          if (!exportUrl && !gvizUrl) return [state, [] as FareData[]] as const;
 
           try {
             let parsed: FareData[] = [];
@@ -468,28 +509,39 @@ const CabFareSection = ({ variant = "previous", withContainer = false }: CabFare
             const jsonpPayload = await loadGvizWithJsonp(sheetUrls[state]);
             if (jsonpPayload) {
               parsed = parseGvizPayload(jsonpPayload);
+              console.log(`[CabFareSection] JSONP ${state}: ${parsed.length} rows`);
+            } else {
+              console.warn(`[CabFareSection] JSONP ${state}: no payload`);
             }
 
             if (parsed.length === 0 && gvizUrl) {
-              const gvizRes = await fetch(`${gvizUrl}&_=${Date.now()}`, { cache: "no-store" });
-              if (gvizRes.ok) {
-                const raw = await gvizRes.text();
-                parsed = parseGvizJson(raw);
+              try {
+                const gvizRes = await fetch(`${gvizUrl}&_=${Date.now()}`, { cache: "no-store" });
+                if (gvizRes.ok) {
+                  parsed = parseGvizJson(await gvizRes.text());
+                  console.log(`[CabFareSection] gviz fetch ${state}: ${parsed.length} rows`);
+                }
+              } catch {
+                console.warn(`[CabFareSection] gviz fetch ${state}: CORS blocked`);
               }
             }
 
             if (parsed.length === 0 && exportUrl) {
-              const csvRes = await fetch(`${exportUrl}&_=${Date.now()}`, { cache: "no-store" });
-              if (csvRes.ok) {
-                const csv = await csvRes.text();
-                parsed = parseFareCsv(csv);
+              try {
+                const csvRes = await fetch(`${exportUrl}&_=${Date.now()}`, { cache: "no-store" });
+                if (csvRes.ok) {
+                  parsed = parseFareCsv(await csvRes.text());
+                  console.log(`[CabFareSection] CSV ${state}: ${parsed.length} rows`);
+                }
+              } catch {
+                console.warn(`[CabFareSection] CSV ${state}: CORS blocked`);
               }
             }
 
-            return [state, parsed.length > 0 ? parsed : fallbackCabFares[state]] as const;
+            return [state, parsed] as const;
           } catch (error) {
-            console.error(`[CabFareSection] Failed to load ${state} fares from sheet`, error);
-            return [state, fallbackCabFares[state]] as const;
+            console.error(`[CabFareSection] ${state} failed`, error);
+            return [state, [] as FareData[]] as const;
           }
         }),
       );
@@ -498,6 +550,7 @@ const CabFareSection = ({ variant = "previous", withContainer = false }: CabFare
         ...current,
         ...(Object.fromEntries(entries) as Record<State, FareData[]>),
       }));
+      setLoading(false);
     };
 
     loadSheetFares();
@@ -540,8 +593,23 @@ const CabFareSection = ({ variant = "previous", withContainer = false }: CabFare
           </div>
         </motion.div>
 
+        {loading && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-28 rounded-2xl bg-muted/50 animate-pulse" />
+            ))}
+          </div>
+        )}
+
+        {!loading && cabFares[selectedState].length === 0 && (
+          <div className="text-center py-16 text-muted-foreground">
+            <p className="text-lg font-medium mb-1">No fares available</p>
+            <p className="text-sm">Could not load fare data from the sheet. Please check the sheet is shared publicly.</p>
+          </div>
+        )}
+
         <AnimatePresence mode="wait">
-          {variant === "ticket" ? (
+          {!loading && cabFares[selectedState].length > 0 && variant === "ticket" ? (
             /* Two independent flex columns so opening one card doesn't shift the other column */
             <motion.div
               key={selectedState}
@@ -589,7 +657,7 @@ const CabFareSection = ({ variant = "previous", withContainer = false }: CabFare
                 ))}
               </div>
             </motion.div>
-          ) : (
+          ) : !loading && cabFares[selectedState].length > 0 ? (
             <motion.div
               key={selectedState}
               initial={{ opacity: 0, y: 10 }}
@@ -607,7 +675,7 @@ const CabFareSection = ({ variant = "previous", withContainer = false }: CabFare
                 />
               ))}
             </motion.div>
-          )}
+          ) : null}
         </AnimatePresence>
       </div>
     </section>

@@ -222,6 +222,12 @@ All colors MUST be HSL.
     font-size: 18px;
   }
 
+  /* Shift up when the cookie consent banner is visible */
+  .wa--shifted {
+    bottom: 100px;
+    transition: bottom .3s ease, transform .25s, box-shadow .25s;
+  }
+
   @media (max-width: 640px) {
     .wa {
       padding: 8px 14px;
@@ -231,6 +237,9 @@ All colors MUST be HSL.
       right: 16px;
     }
     .wa-ic { font-size: 14px; }
+    .wa--shifted {
+      bottom: 160px;
+    }
   }
 
   @keyframes fadeU {

@@ -217,7 +217,7 @@ function Footerdemo() {
             <Link to="/terms" className="text-muted-foreground transition-colors hover:text-primary-text">
               Terms of Service
             </Link>
-            <Link to="/terms" className="text-muted-foreground transition-colors hover:text-primary-text">
+            <Link to="/cookie-settings" className="text-muted-foreground transition-colors hover:text-primary-text">
               Cookie Settings
             </Link>
           </nav>

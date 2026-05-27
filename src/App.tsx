@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AuthProvider } from "./contexts/AuthContext";
+import { CookieConsentProvider } from "./contexts/CookieConsentContext";
+import CookieBanner from "./components/CookieBanner";
 import { isSupabaseConfigured } from "@/integrations/supabase/client";
 import MissingSupabaseConfig from "@/components/MissingSupabaseConfig";
 import ScrollToTop from "./components/ScrollToTop";
@@ -43,6 +45,7 @@ import TransactionFailed from "./pages/TransactionFailed";
 import PublicLinkInBio from "./pages/PublicLinkInBio";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
+import CookieSettings from "./pages/CookieSettings";
 import CabsBookingPage from "./pages/CabsBookingPage";
 import WhatsAppButton from "./components/WhatsAppButton";
 
@@ -74,6 +77,7 @@ const App = () =>
   ) : (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <CookieConsentProvider>
         <ThemeProvider defaultTheme="light">
       <TooltipProvider>
         <Toaster />
@@ -126,6 +130,7 @@ const App = () =>
             <Route path="/transaction-failed" element={<TransactionFailed />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/cookie-settings" element={<CookieSettings />} />
             
             {/* Host Dashboard — shared layout, only content transitions */}
             <Route 
@@ -172,9 +177,11 @@ const App = () =>
             <Route path="*" element={<NotFound />} />
           </Routes>
           <WhatsAppButton />
+          <CookieBanner />
         </BrowserRouter>
       </TooltipProvider>
         </ThemeProvider>
+        </CookieConsentProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

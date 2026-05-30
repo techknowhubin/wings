@@ -164,7 +164,7 @@ const styles = `
 
 const Auth = () => {
   const [loading, setLoading] = useState(false);
-  const { signUp, signIn, signOut, resendEmail, signInWithProvider, signInWithPopup, signInWithOtp, verifyOtp, user, getUserRole } = useAuth();
+  const { signUp, signIn, signOut, resendEmail, signInWithPopup, signInWithOtp, verifyOtp, user, getUserRole } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -201,7 +201,7 @@ const Auth = () => {
   const [successCountdown, setSuccessCountdown] = useState(5);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [roleConfirmed, setRoleConfirmed] = useState(false);
-  const showRoleSelection = !isLoginMode && !roleConfirmed;
+  const showRoleSelection = !isLoginMode && !roleConfirmed && !isHostSignupPath;
 
   // WhatsApp fallback modal
   const [showWaModal, setShowWaModal] = useState(false);
@@ -231,7 +231,10 @@ const Auth = () => {
   /* ─── routing ─── */
   const handleSuccessRoleRouting = async (currentUser = user) => {
     setLoading(true);
-    const r = await getUserRole();
+    let r = await getUserRole();
+    if (!r && currentUser) {
+      r = currentUser.user_metadata?.role;
+    }
     const savedRole = localStorage.getItem("pending_role");
 
     const pendingBooking = localStorage.getItem("pending_booking");
@@ -261,10 +264,10 @@ const Auth = () => {
       // Regular user — check if onboarding is done
       const { data: profile } = await supabase
         .from('profiles')
-        .select('onboarding_completed')
+        .select('full_name')
         .eq('id', currentUser?.id)
         .maybeSingle();
-      if (!profile?.onboarding_completed) {
+      if (!profile?.full_name) {
         navigate("/onboarding/user");
       } else {
         navigate("/");
@@ -296,13 +299,6 @@ const Auth = () => {
       setConfirmationSuccess(true);
       setVerificationPending(false);
       setSuccessCountdown(5);
-      
-      // If we landed here with a session, clear it as we want the user to manually login 
-      // after seeing the success message (as requested for better UX flow)
-      if (user) {
-        console.log("[Auth] Clearing temporary session after confirmation");
-        signOut();
-      }
       return;
     }
 
@@ -384,15 +380,21 @@ const Auth = () => {
     if (!confirmationSuccess || successCountdown <= 0) {
       if (confirmationSuccess && successCountdown <= 0) {
         setConfirmationSuccess(false);
-        setIsLoginMode(true);
-        setAuthMethod("email");
-        navigate("/auth");
+        const checkAndRoute = async () => {
+          let activeUser = user;
+          if (!activeUser) {
+            const { data: { session } } = await supabase.auth.getSession();
+            activeUser = session?.user || null;
+          }
+          handleSuccessRoleRouting(activeUser);
+        };
+        checkAndRoute();
       }
       return;
     }
     const id = setInterval(() => setSuccessCountdown((c) => c - 1), 1000);
     return () => clearInterval(id);
-  }, [confirmationSuccess, successCountdown, navigate]);
+  }, [confirmationSuccess, successCountdown, navigate, user]);
 
   /* ─── countdown ─── */
   useEffect(() => {
@@ -544,7 +546,10 @@ const Auth = () => {
             msg.toLowerCase().includes('invalid credentials') ||
             msg.toLowerCase().includes('user not found') ||
             msg.toLowerCase().includes('no user');
-          const isUnverified = msg === 'email_not_verified';
+          const isUnverified =
+            msg === 'email_not_verified' ||
+            msg.toLowerCase().includes('email not confirmed') ||
+            msg.toLowerCase().includes('email_not_confirmed');
 
           if (isNoAccount) {
             // Stay on sign-in page — do NOT switch to signup mode (that causes unintended signUp calls).
@@ -556,7 +561,7 @@ const Auth = () => {
           } else if (isUnverified) {
             toast({
               variant: "destructive",
-              title: "Email not verified",
+              title: "Email not confirmed",
               description: "Please check your inbox and click the verification link before signing in.",
             });
           } else {
@@ -810,13 +815,13 @@ const Auth = () => {
                   <div className="space-y-2">
                     <h3 className="text-xl font-bold text-gray-900">Signup Successful!</h3>
                     <p className="text-sm text-gray-500">
-                      Your email has been verified. You can now sign in to your account.
+                      Your email has been verified. Redirecting to your dashboard...
                     </p>
                   </div>
                   
                   <div className="flex flex-col items-center gap-4 w-full pt-2">
                     <div className="text-xs font-medium text-gray-400">
-                      Redirecting to sign in in <span className="text-[#115f10] font-bold text-base">{successCountdown}s</span>
+                      Redirecting to dashboard in <span className="text-[#115f10] font-bold text-base">{successCountdown}s</span>
                     </div>
                     
                     <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
@@ -827,10 +832,18 @@ const Auth = () => {
                     </div>
 
                     <button
-                      onClick={() => { setConfirmationSuccess(false); setIsLoginMode(true); }}
+                      onClick={async () => {
+                        setConfirmationSuccess(false);
+                        let activeUser = user;
+                        if (!activeUser) {
+                          const { data: { session } } = await supabase.auth.getSession();
+                          activeUser = session?.user || null;
+                        }
+                        handleSuccessRoleRouting(activeUser);
+                      }}
                       className="text-xs font-bold text-[#115f10] hover:underline underline-offset-4"
                     >
-                      Sign in now
+                      Go to dashboard now
                     </button>
                   </div>
                 </div>

@@ -477,7 +477,6 @@ export default function UserOnboarding() {
         full_name: basicInfo.full_name,
         phone: basicInfo.phone,
         city: basicInfo.city,
-        onboarding_step: 2,
       }).eq("id", user.id);
       if (error) throw error;
     } catch (err: any) {
@@ -505,8 +504,6 @@ export default function UserOnboarding() {
       localStorage.removeItem("pending_role");
 
       await supabase.from("profiles").update({
-        onboarding_completed: true,
-        onboarding_step: 6,
         kyc_status: "pending",
       }).eq("id", user.id);
 

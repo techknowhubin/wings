@@ -58,12 +58,12 @@ serve(async (req) => {
       }
     }
 
-    // Payment is valid! Update booking status to completed
+    // Payment is valid — mark payment complete and booking confirmed (host still needs to deliver)
     const { data: booking, error: updateError } = await supabaseClient
       .from('bookings')
       .update({
           payment_status: 'completed',
-          booking_status: 'completed',
+          booking_status: 'confirmed',
           transaction_id: razorpay_payment_id
       })
       .eq('id', booking_id)

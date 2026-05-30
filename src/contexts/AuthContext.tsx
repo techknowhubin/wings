@@ -134,21 +134,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: new Error('No account found with this email address') };
     }
 
-    const user = data.user;
-    const provider = user.raw_app_meta_data?.provider ?? 'email';
-    const emailVerified = Boolean(user.email_confirmed_at);
-    const phoneVerified = Boolean(user.phone_confirmed_at);
-
-    if (provider === 'email' && !emailVerified) {
-      await supabase.auth.signOut();
-      return { error: new Error('email_not_verified') };
-    }
-
-    if (provider === 'phone' && !phoneVerified) {
-      await supabase.auth.signOut();
-      return { error: new Error('email_not_verified') };
-    }
-
     return { error: null };
   };
 

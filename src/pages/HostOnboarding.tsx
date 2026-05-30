@@ -20,7 +20,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/components/ThemeProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { DynamicLogo } from "@/components/DynamicLogo";
 
 // ======================== Types ========================
@@ -464,6 +463,17 @@ export default function HostOnboarding() {
 
       const addressString = [biz.street, biz.city, biz.state, biz.pin].filter(Boolean).join(", ");
 
+      // Upsert profiles row first — host_profiles has a FK to profiles so this must exist
+      const { error: primaryProfileError } = await supabase
+        .from("profiles")
+        .upsert({
+          id: user.id,
+          full_name: biz.hostType === "business" ? biz.businessName : biz.fullName,
+          phone: biz.phone || null,
+        }, { onConflict: "id" });
+
+      if (primaryProfileError) throw primaryProfileError;
+
       const { error: profileError } = await supabase
         .from("host_profiles")
         .upsert({
@@ -474,10 +484,6 @@ export default function HostOnboarding() {
           bank_account_holder: bank.accountHolderName,
           bank_account_number: bank.accountNumber,
           bank_ifsc: bank.ifscCode,
-          bank_name: bank.bankName,
-          msme_number: biz.msmeNumber || null,
-          host_type: biz.hostType,
-          onboarding_status: "pending",
           aadhaar_last_four: identity.aadhaarNumber ? identity.aadhaarNumber.slice(-4) : null,
           pan_number: identity.panNumber || null,
           service_types: biz.serviceTypes,
@@ -485,18 +491,6 @@ export default function HostOnboarding() {
         });
 
       if (profileError) throw profileError;
-
-      // Sync name and phone to primary profiles table
-      const { error: primaryProfileError } = await supabase
-        .from("profiles")
-        .update({
-          full_name: biz.hostType === "business" ? biz.businessName : biz.fullName,
-          phone: biz.phone || null,
-          onboarding_completed: true,
-        })
-        .eq("id", user.id);
-
-      if (primaryProfileError) throw primaryProfileError;
 
       const { error: roleError } = await supabase
         .from("user_roles")
@@ -512,9 +506,9 @@ export default function HostOnboarding() {
 
       toast.success("Host profile submitted for review!");
       navigate("/host");
-    } catch (error) {
-      console.error(error);
-      toast.error("Could not complete onboarding. Please try again.");
+    } catch (error: any) {
+      console.error("Onboarding error:", error);
+      toast.error(error?.message || "Could not complete onboarding. Please try again.");
     } finally {
       setLoading(false);
     }

@@ -145,9 +145,7 @@ export function DashboardOverview() {
             <LayoutCard key={index} layoutId={`stat-${stat.label}`}>
               <Card
                 className={`relative overflow-hidden rounded-2xl border-0 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${
-                  stat.highlighted
-                    ? 'text-primary-foreground'
-                    : 'bg-card'
+                  stat.highlighted ? '' : 'bg-card'
                 }`}
                 style={stat.highlighted ? {
                   background: 'linear-gradient(135deg, hsl(158 100% 10%) 0%, hsl(158 80% 25%) 50%, hsl(158 60% 35%) 100%)',
@@ -155,21 +153,21 @@ export function DashboardOverview() {
               >
                 <CardContent className="p-5 relative z-10">
                   <div className="flex items-center justify-between mb-4">
-                    <p className={`text-sm font-medium ${stat.highlighted ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                    <p className={`text-sm font-medium ${stat.highlighted ? 'text-white/80' : 'text-muted-foreground'}`}>
                       {stat.label}
                     </p>
                     <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
-                      stat.highlighted ? 'bg-primary-foreground/15 backdrop-blur-sm' : 'bg-muted/60'
+                      stat.highlighted ? 'bg-white/15 backdrop-blur-sm' : 'bg-muted/60'
                     }`}>
-                      <ArrowUpRight className={`h-4 w-4 ${stat.highlighted ? 'text-primary-foreground/70' : 'text-muted-foreground'}`} />
+                      <ArrowUpRight className={`h-4 w-4 ${stat.highlighted ? 'text-white/70' : 'text-muted-foreground'}`} />
                     </div>
                   </div>
-                  <p className={`text-3xl lg:text-4xl font-bold ${stat.highlighted ? '' : 'text-foreground'}`}>
+                  <p className={`text-3xl lg:text-4xl font-bold ${stat.highlighted ? 'text-white' : 'text-foreground'}`}>
                     {stat.value}
                   </p>
                   <div className="flex items-center gap-1.5 mt-2">
-                    <div className={`h-1.5 w-1.5 rounded-full ${stat.highlighted ? 'bg-primary-foreground/60' : 'bg-primary'}`} />
-                    <p className={`text-xs ${stat.highlighted ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                    <div className={`h-1.5 w-1.5 rounded-full ${stat.highlighted ? 'bg-white/60' : 'bg-primary'}`} />
+                    <p className={`text-xs ${stat.highlighted ? 'text-white/70' : 'text-muted-foreground'}`}>
                       {stat.change}
                     </p>
                   </div>
@@ -238,13 +236,13 @@ export function DashboardOverview() {
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="p-4 rounded-xl text-primary-foreground relative overflow-hidden" style={{
+              <div className="p-4 rounded-xl text-white relative overflow-hidden" style={{
                 background: 'linear-gradient(135deg, hsl(158 100% 10%) 0%, hsl(158 80% 25%) 60%, hsl(158 60% 35%) 100%)',
               }}>
                 <div className="relative z-10">
-                  <p className="text-xs text-primary-foreground/70">Total Earnings</p>
-                  <p className="text-2xl font-bold mt-1">{formatPrice(totalEarnings)}</p>
-                  <p className="text-[11px] text-primary-foreground/60 mt-1">After 20% commission</p>
+                  <p className="text-xs text-white/70">Total Earnings</p>
+                  <p className="text-2xl font-bold mt-1 text-white">{formatPrice(totalEarnings)}</p>
+                  <p className="text-[11px] text-white/60 mt-1">After 20% commission</p>
                 </div>
                 <div className="absolute inset-0 opacity-15" style={{
                   background: 'radial-gradient(circle at 90% 10%, hsl(158 60% 55% / 0.8) 0%, transparent 40%)',

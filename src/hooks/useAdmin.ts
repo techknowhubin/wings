@@ -320,19 +320,57 @@ export function useAdminProviders(search?: string) {
       const hostIds = (data ?? []).map((r: any) => r.user_id);
       if (hostIds.length === 0) return [];
 
-      const { data: profiles, error: pErr } = await supabase
-        .from('profiles')
-        .select('id, full_name, phone, profile_image, created_at')
-        .in('id', hostIds);
+      const [{ data: profiles, error: pErr }, { data: hostProfiles }] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, phone, profile_image, created_at').in('id', hostIds),
+        supabase.from('host_profiles').select('id, business_name, onboarding_status, service_types').in('id', hostIds),
+      ]);
       if (pErr) throw pErr;
 
-      let providers = profiles ?? [];
+      const hostProfileMap = new Map((hostProfiles ?? []).map((h: any) => [h.id, h]));
+
+      let providers = (profiles ?? []).map((p: any) => ({
+        ...p,
+        ...(hostProfileMap.get(p.id) ?? {}),
+      }));
+
       if (search) {
         const s = search.toLowerCase();
-        providers = providers.filter((p: any) => p.full_name?.toLowerCase().includes(s) || p.phone?.includes(s));
+        providers = providers.filter((p: any) =>
+          p.full_name?.toLowerCase().includes(s) ||
+          p.business_name?.toLowerCase().includes(s) ||
+          p.phone?.includes(s)
+        );
       }
       return providers;
     },
+  });
+}
+
+export function useApproveHost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (hostId: string) => {
+      const { error } = await supabase
+        .from('host_profiles')
+        .update({ onboarding_status: 'approved' })
+        .eq('id', hostId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'providers'] }),
+  });
+}
+
+export function useRejectHost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (hostId: string) => {
+      const { error } = await supabase
+        .from('host_profiles')
+        .update({ onboarding_status: 'rejected' })
+        .eq('id', hostId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'providers'] }),
   });
 }
 

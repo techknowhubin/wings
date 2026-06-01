@@ -2,7 +2,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from "react-router-dom";
+import { useEffect } from "react";
+import { captureReferral } from "@/lib/referral";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CookieConsentProvider } from "./contexts/CookieConsentContext";
@@ -71,6 +73,16 @@ import AdminBlogPosts from "./pages/Admin/AdminBlogPosts";
 
 const queryClient = new QueryClient();
 
+// Captures ?ref=HUB-XXXXXXXX from any page and stores in localStorage/cookie
+function ReferralCapture() {
+  const [params] = useSearchParams();
+  useEffect(() => {
+    const ref = params.get('ref');
+    if (ref) captureReferral(ref);
+  }, [params]);
+  return null;
+}
+
 const App = () =>
   !isSupabaseConfigured ? (
     <MissingSupabaseConfig />
@@ -84,6 +96,7 @@ const App = () =>
         <Sonner />
         <BrowserRouter>
           <ScrollToTop />
+          <ReferralCapture />
           <AuthRedirectHandler />
           <Routes>
             <Route path="/" element={<OutstationCabs />} />

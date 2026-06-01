@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { CalendarDays, CreditCard, MapPin, Receipt, ShieldCheck, UserRound } from "lucide-react";
 import type { BookingDetails } from "@/types/booking";
 import type { CouponOffer } from "@/lib/discounts";
+import { getReferralCode, clearReferral } from "@/lib/referral";
 
 type ConfirmAndPayState = {
   booking?: BookingDetails;
@@ -65,6 +66,9 @@ const ConfirmAndPay = () => {
   const [appliedCoupon, setAppliedCoupon] = useState<HostedCoupon | null>(null);
   const [globalCoupons, setGlobalCoupons] = useState<HostedCoupon[]>([]);
   const [bookingFeeRate, setBookingFeeRate] = useState(10);
+  const [referralCode, setReferralCode] = useState(() => getReferralCode() ?? "");
+  const [referralPartner, setReferralPartner] = useState<{ id: string; business_name: string; commission_rate: number } | null>(null);
+  const [referralValidating, setReferralValidating] = useState(false);
 
   useEffect(() => {
     async function fetchPlatformCommission() {
@@ -154,6 +158,35 @@ const ConfirmAndPay = () => {
     };
     void fetchCoupons();
   }, [booking]);
+
+  const handleValidateReferral = async () => {
+    const code = referralCode.trim().toUpperCase();
+    if (!code) return;
+    setReferralValidating(true);
+    try {
+      const { data, error } = await supabase
+        .from("hub_partners" as any)
+        .select("id, business_name, commission_rate, is_active")
+        .eq("referral_id", code)
+        .maybeSingle();
+      if (error || !data) { toast.error("Referral code not found."); setReferralPartner(null); return; }
+      if (!(data as any).is_active) { toast.error("This referral code is no longer active."); setReferralPartner(null); return; }
+      setReferralPartner(data as any);
+      toast.success(`Referral from ${(data as any).business_name} applied!`);
+    } catch {
+      toast.error("Could not validate referral code.");
+    } finally {
+      setReferralValidating(false);
+    }
+  };
+
+  // Auto-validate if referral code came from URL scan
+  useEffect(() => {
+    if (referralCode && !referralPartner) {
+      void handleValidateReferral();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const stayDates = useMemo(() => {
     if (!booking) return "";
@@ -382,10 +415,12 @@ const ConfirmAndPay = () => {
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
               booking_id: pendingBookingId,
-              coupon_id: appliedCoupon?.id
+              coupon_id: appliedCoupon?.id,
+              referral_code: referralPartner ? referralCode.trim().toUpperCase() : undefined,
+              referral_partner_id: referralPartner?.id ?? undefined,
             }
           });
-          
+
           if (error || !data?.success) {
             console.error("Payment signature verification failed:", error);
             toast.error("Payment verification failed. Invalid signature.");
@@ -401,7 +436,8 @@ const ConfirmAndPay = () => {
             });
             return;
           }
-          
+
+          if (referralPartner) clearReferral();
           toast.success("Booking confirmed securely!");
           
           const finalizedBooking = {
@@ -587,6 +623,35 @@ const ConfirmAndPay = () => {
                 Applied {appliedCoupon.code} ({appliedCoupon.value}% off).
               </p>
             ) : null}
+
+            {/* Referral Code */}
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-muted-foreground mb-1.5">Referral Code <span className="font-normal">(from QR scan)</span></p>
+              <div className="flex gap-2">
+                <Input
+                  value={referralCode}
+                  onChange={(e) => { setReferralCode(e.target.value.toUpperCase()); setReferralPartner(null); }}
+                  className="h-10 rounded-lg bg-background font-mono text-sm"
+                  placeholder="HUB-XXXXXXXX"
+                  disabled={!!referralPartner}
+                />
+                {referralPartner ? (
+                  <Button type="button" variant="ghost" className="h-10 text-red-500 hover:bg-red-50 px-3" onClick={() => { setReferralPartner(null); setReferralCode(""); clearReferral(); }}>
+                    Remove
+                  </Button>
+                ) : (
+                  <Button type="button" variant="outline" className="h-10 rounded-lg" onClick={handleValidateReferral} disabled={referralValidating || !referralCode.trim()}>
+                    {referralValidating ? "…" : "Apply"}
+                  </Button>
+                )}
+              </div>
+              {referralPartner && (
+                <p className="text-xs text-green-600 font-medium mt-1.5 flex items-center gap-1">
+                  <span>✓</span> Referred by {referralPartner.business_name} ({referralPartner.commission_rate}% commission to partner)
+                </p>
+              )}
+            </div>
+
             <div className="space-y-2 text-sm border-t border-border pt-4">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Item total</span>

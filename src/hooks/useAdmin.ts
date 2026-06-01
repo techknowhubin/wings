@@ -563,16 +563,20 @@ export function useAdminAnalytics(days: number = 30) {
   });
 }
 
-// ─── Hub Partners (graceful — table may not exist) ───────────────────────────
-export function useHubPartners() {
+// ─── Hub Partners ─────────────────────────────────────────────────────────────
+export function useHubPartners(search?: string) {
   return useQuery({
-    queryKey: ['admin', 'hubs'],
+    queryKey: ['admin', 'hubs', search],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('hub_partners' as any)
           .select('*')
           .order('created_at', { ascending: false });
+        if (search) {
+          query = query.or(`business_name.ilike.%${search}%,partner_name.ilike.%${search}%,city.ilike.%${search}%,referral_id.ilike.%${search}%`);
+        }
+        const { data, error } = await query;
         if (error) return [];
         return data ?? [];
       } catch { return []; }
@@ -584,7 +588,22 @@ export function useCreateHubPartner() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (hub: Record<string, any>) => {
-      const { error } = await supabase.from('hub_partners' as any).insert(hub);
+      const { data, error } = await supabase.from('hub_partners' as any).insert(hub).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'hubs'] }),
+  });
+}
+
+export function useUpdateHubPartner() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...fields }: Record<string, any>) => {
+      const { error } = await supabase
+        .from('hub_partners' as any)
+        .update({ ...fields, updated_at: new Date().toISOString() })
+        .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'hubs'] }),
@@ -599,6 +618,80 @@ export function useToggleHubStatus() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'hubs'] }),
+  });
+}
+
+export function useReferralTransactions(partnerId?: string) {
+  return useQuery({
+    queryKey: ['admin', 'referral-tx', partnerId],
+    queryFn: async () => {
+      try {
+        let query = supabase
+          .from('referral_transactions' as any)
+          .select('*, bookings(listing_type, start_date)')
+          .order('created_at', { ascending: false });
+        if (partnerId) query = query.eq('partner_id', partnerId);
+        const { data, error } = await query;
+        if (error) return [];
+        return data ?? [];
+      } catch { return []; }
+    },
+    enabled: !!partnerId,
+  });
+}
+
+export function useHubAnalytics() {
+  return useQuery({
+    queryKey: ['admin', 'hub-analytics'],
+    queryFn: async () => {
+      try {
+        const [{ data: partners }, { data: transactions }] = await Promise.all([
+          supabase.from('hub_partners' as any).select('id, is_active'),
+          supabase.from('referral_transactions' as any).select('commission_amount, booking_amount, payment_status, created_at'),
+        ]);
+
+        const totalPartners = (partners ?? []).length;
+        const activePartners = (partners ?? []).filter((p: any) => p.is_active).length;
+        const txList = (transactions ?? []) as any[];
+        const completedTx = txList.filter((t) => t.payment_status === 'completed');
+        const totalReferralBookings = txList.length;
+        const totalReferralRevenue = completedTx.reduce((s: number, t: any) => s + Number(t.booking_amount ?? 0), 0);
+        const totalCommissionPaid = completedTx.reduce((s: number, t: any) => s + Number(t.commission_amount ?? 0), 0);
+
+        // Monthly breakdown (last 6 months)
+        const now = new Date();
+        const monthly = Array.from({ length: 6 }, (_, i) => {
+          const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+          const label = d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+          const count = txList.filter((t: any) => {
+            const td = new Date(t.created_at);
+            return td.getMonth() === d.getMonth() && td.getFullYear() === d.getFullYear();
+          }).length;
+          return { label, count };
+        });
+
+        return { totalPartners, activePartners, totalReferralBookings, totalReferralRevenue, totalCommissionPaid, monthly };
+      } catch {
+        return { totalPartners: 0, activePartners: 0, totalReferralBookings: 0, totalReferralRevenue: 0, totalCommissionPaid: 0, monthly: [] };
+      }
+    },
+    staleTime: 60_000,
+  });
+}
+
+export function useValidateReferralCode() {
+  return useMutation({
+    mutationFn: async (code: string) => {
+      const { data, error } = await supabase
+        .from('hub_partners' as any)
+        .select('id, business_name, partner_name, commission_rate, is_active, referral_id')
+        .eq('referral_id', code.trim().toUpperCase())
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error('Referral code not found');
+      if (!(data as any).is_active) throw new Error('This referral code is no longer active');
+      return data as any;
+    },
   });
 }
 

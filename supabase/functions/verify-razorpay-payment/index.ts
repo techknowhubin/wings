@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, booking_id, coupon_id } = await req.json()
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, booking_id, coupon_id, referral_code, referral_partner_id } = await req.json()
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !booking_id) {
         throw new Error('Missing required payment parameters');
@@ -72,6 +72,49 @@ serve(async (req) => {
 
     if (updateError) {
       throw updateError
+    }
+
+    // Handle referral tracking securely on the server
+    if (referral_code && referral_partner_id && booking) {
+      try {
+        // Fetch partner to get commission rate and validate active status
+        const { data: partner } = await supabaseClient
+          .from('hub_partners')
+          .select('id, commission_rate, is_active, total_referrals, total_revenue, total_commission')
+          .eq('id', referral_partner_id)
+          .eq('referral_id', referral_code)
+          .single()
+
+        if (partner && partner.is_active) {
+          const bookingAmount = booking.total_price ?? 0
+          const commissionPct = partner.commission_rate ?? 5
+          const commissionAmount = Math.round((bookingAmount * commissionPct / 100) * 100) / 100
+
+          // Insert referral transaction
+          await supabaseClient.from('referral_transactions').insert({
+            booking_id: booking_id,
+            user_id: booking.user_id,
+            partner_id: referral_partner_id,
+            referral_code: referral_code,
+            booking_amount: bookingAmount,
+            commission_percentage: commissionPct,
+            payment_status: 'completed',
+          })
+
+          // Update partner aggregates atomically
+          await supabaseClient.from('hub_partners').update({
+            total_referrals:  (partner.total_referrals  ?? 0) + 1,
+            total_revenue:    (partner.total_revenue    ?? 0) + bookingAmount,
+            total_commission: (partner.total_commission ?? 0) + commissionAmount,
+            updated_at: new Date().toISOString(),
+          }).eq('id', referral_partner_id)
+
+          console.log(`[Referral] Tracked: ${referral_code} → partner ${referral_partner_id}, commission ₹${commissionAmount}`)
+        }
+      } catch (refErr) {
+        // Non-fatal — log but don't block payment confirmation
+        console.error('[Referral] Failed to record referral transaction:', refErr)
+      }
     }
 
     // Handle coupon logic securely on the server

@@ -135,11 +135,27 @@ export function useKycSubmissions(statusFilter?: string) {
       const { data, error } = await query;
       if (error) throw error;
       const submissions = (data ?? []) as any[];
-      const userIds = submissions.map((s: any) => s.user_id).filter(Boolean);
-      const names = await resolveProfileNames(userIds);
+      const userIds = [...new Set(submissions.map((s: any) => s.user_id).filter(Boolean))];
+
+      // Fetch profiles + host_profiles in parallel
+      const [names, hostProfilesRes] = await Promise.all([
+        resolveProfileNames(userIds),
+        userIds.length > 0
+          ? supabase
+              .from('host_profiles')
+              .select('id, business_name, host_type, service_types, aadhaar_last_four, pan_number, city, state, onboarding_status, gst_number, phone as host_phone, email as host_email')
+              .in('id', userIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      const hostMap = new Map(
+        ((hostProfilesRes as any).data ?? []).map((h: any) => [h.id, h])
+      );
+
       return submissions.map((s: any) => ({
         ...s,
         profiles: names.get(s.user_id) ?? { full_name: '—', phone: null },
+        host_profile: hostMap.get(s.user_id) ?? null,
       }));
     },
   });
@@ -181,8 +197,9 @@ export function useApproveKyc() {
         }).eq('id', userId),
       ]);
 
-      if (docRes.error) throw docRes.error;
-      if (profileRes.error) throw profileRes.error;
+      if (docRes.error) throw new Error(`Document update failed: ${docRes.error.message}`);
+      if (profileRes.error) throw new Error(`Profile update failed: ${profileRes.error.message}`);
+      // host_profiles update is best-effort — host may not have a host_profiles row yet
 
       return { wingId: 'APPROVED' };
     },
@@ -361,13 +378,24 @@ export function useApproveHost() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (hostId: string) => {
-      const { error } = await supabase
-        .from('host_profiles')
-        .update({ onboarding_status: 'approved' })
-        .eq('id', hostId);
-      if (error) throw error;
+      const now = new Date().toISOString();
+      const [hostRes, profileRes] = await Promise.all([
+        supabase
+          .from('host_profiles')
+          .update({ onboarding_status: 'approved', updated_at: now } as any)
+          .eq('id', hostId),
+        supabase
+          .from('profiles')
+          .update({ kyc_status: 'approved', updated_at: now } as any)
+          .eq('id', hostId),
+      ]);
+      if (hostRes.error) throw hostRes.error;
+      // profiles update is best-effort — don't block if column missing
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'providers'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'providers'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'kyc'] });
+    },
   });
 }
 
@@ -375,9 +403,10 @@ export function useRejectHost() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (hostId: string) => {
+      const now = new Date().toISOString();
       const { error } = await supabase
         .from('host_profiles')
-        .update({ onboarding_status: 'rejected' })
+        .update({ onboarding_status: 'rejected', updated_at: now } as any)
         .eq('id', hostId);
       if (error) throw error;
     },

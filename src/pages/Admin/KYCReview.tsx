@@ -170,10 +170,10 @@ export default function KYCReview() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Traveler</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Business / Type</TableHead>
                       <TableHead>Document</TableHead>
                       <TableHead>Submitted</TableHead>
-                      <TableHead>Attempt</TableHead>
                       <TableHead>SLA</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead></TableHead>
@@ -181,7 +181,7 @@ export default function KYCReview() {
                   </TableHeader>
                   <TableBody>
                     {(submissions ?? []).length === 0 && (
-                      <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">No submissions in this category.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={8} className="text-center py-10 text-muted-foreground">No submissions in this category.</TableCell></TableRow>
                     )}
                     {(submissions ?? []).map((sub: KycSubmission) => {
                       const slaClass = getSlaClass(sub.submitted_at, sub.status);
@@ -191,12 +191,21 @@ export default function KYCReview() {
                           <TableCell>
                             <div>
                               <p className="text-sm font-semibold">{sub.profiles?.full_name ?? '—'}</p>
-                              <p className="text-xs text-muted-foreground">{sub.profiles?.phone ?? sub.profiles?.email ?? '—'}</p>
+                              <p className="text-xs text-muted-foreground">{sub.profiles?.phone ?? '—'}</p>
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            {sub.host_profile ? (
+                              <div>
+                                <p className="text-xs font-semibold text-foreground">{sub.host_profile.business_name ?? '—'}</p>
+                                <p className="text-[10px] text-blue-600 capitalize">{sub.host_profile.host_type ?? 'host'}</p>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Traveler</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-sm">{DOC_LABELS[sub.document_type] ?? sub.document_type}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(sub.submitted_at), { addSuffix: true })}</TableCell>
-                          <TableCell className="text-sm">#{sub.attempt_number}</TableCell>
                           <TableCell>
                             {slaClass && (
                               <AlertTriangle className={`h-4 w-4 ${slaClass}`} title="SLA exceeded" />
@@ -227,39 +236,110 @@ export default function KYCReview() {
           </SheetHeader>
 
           {selected && (
-            <div className="mt-6 space-y-6">
-              {/* Profile Section */}
+            <div className="mt-6 space-y-5">
+              {/* Basic Profile */}
               <div className="p-4 rounded-xl border bg-muted/20 space-y-2">
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Traveler Profile</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Profile</p>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div><p className="text-xs text-muted-foreground">Name</p><p className="font-semibold">{selected.profiles?.full_name ?? '—'}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Phone</p><p className="font-semibold">{selected.profiles?.phone ?? '—'}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Email</p><p className="font-semibold">{selected.profiles?.email ?? '—'}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Attempt</p><p className="font-semibold">#{selected.attempt_number}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Phone</p><p className="font-semibold">{selected.profiles?.phone ?? selected.host_profile?.host_phone ?? '—'}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Email</p><p className="font-semibold">{selected.host_profile?.host_email ?? '—'}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Attempt</p><p className="font-semibold">#{selected.attempt_number ?? 1}</p></div>
                 </div>
               </div>
 
-              {/* Document Section */}
+              {/* Host Business Details — shown only if this is a host */}
+              {selected.host_profile && (
+                <div className="p-4 rounded-xl border bg-blue-50/50 dark:bg-blue-950/20 space-y-3">
+                  <p className="text-xs font-bold uppercase tracking-widest text-blue-600">Host / Business Details</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="col-span-2">
+                      <p className="text-xs text-muted-foreground">Business Name</p>
+                      <p className="font-semibold">{selected.host_profile.business_name ?? '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Host Type</p>
+                      <p className="font-semibold capitalize">{selected.host_profile.host_type ?? '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Location</p>
+                      <p className="font-semibold">
+                        {[selected.host_profile.city, selected.host_profile.state].filter(Boolean).join(', ') || '—'}
+                      </p>
+                    </div>
+                    {selected.host_profile.gst_number && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">GST Number</p>
+                        <p className="font-semibold font-mono text-xs">{selected.host_profile.gst_number}</p>
+                      </div>
+                    )}
+                    {selected.host_profile.service_types?.length > 0 && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-muted-foreground mb-1">Service Types</p>
+                        <div className="flex flex-wrap gap-1">
+                          {selected.host_profile.service_types.map((s: string) => (
+                            <span key={s} className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] rounded-full">{s}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Identity Details */}
+              <div className="p-4 rounded-xl border bg-amber-50/50 dark:bg-amber-950/20 space-y-2">
+                <p className="text-xs font-bold uppercase tracking-widest text-amber-600">Identity Details</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Document Type</p>
+                    <p className="font-semibold">{DOC_LABELS[selected.document_type] ?? selected.document_type}</p>
+                  </div>
+                  {selected.document_number && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Document Number</p>
+                      <p className="font-semibold font-mono text-xs">{selected.document_number}</p>
+                    </div>
+                  )}
+                  {selected.host_profile?.aadhaar_last_four && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Aadhaar (last 4)</p>
+                      <p className="font-semibold font-mono">XXXX XXXX {selected.host_profile.aadhaar_last_four}</p>
+                    </div>
+                  )}
+                  {selected.host_profile?.pan_number && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">PAN</p>
+                      <p className="font-semibold font-mono text-xs">{selected.host_profile.pan_number}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Document Images */}
               <div className="space-y-3">
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Document: {DOC_LABELS[selected.document_type]}</p>
-                {frontUrl && (
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  Document Images
+                </p>
+                {frontUrl ? (
                   <div className="relative group">
+                    <p className="text-xs text-muted-foreground mb-1">Front</p>
                     <img src={frontUrl} alt="Document Front" className="w-full rounded-xl border object-cover max-h-64" />
-                    <button onClick={() => setZoomSrc(frontUrl)} className="absolute top-2 right-2 bg-black/60 text-white rounded-lg p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => setZoomSrc(frontUrl)} className="absolute top-6 right-2 bg-black/60 text-white rounded-lg p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <ZoomIn className="h-4 w-4" />
                     </button>
                   </div>
+                ) : (
+                  <div className="p-6 rounded-xl border border-dashed text-center text-muted-foreground text-sm">No front image available</div>
                 )}
                 {backUrl && (
                   <div className="relative group">
+                    <p className="text-xs text-muted-foreground mb-1">Back</p>
                     <img src={backUrl} alt="Document Back" className="w-full rounded-xl border object-cover max-h-64" />
-                    <button onClick={() => setZoomSrc(backUrl)} className="absolute top-2 right-2 bg-black/60 text-white rounded-lg p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => setZoomSrc(backUrl)} className="absolute top-6 right-2 bg-black/60 text-white rounded-lg p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <ZoomIn className="h-4 w-4" />
                     </button>
                   </div>
-                )}
-                {!frontUrl && (
-                  <div className="p-6 rounded-xl border border-dashed text-center text-muted-foreground text-sm">No document images available</div>
                 )}
               </div>
 

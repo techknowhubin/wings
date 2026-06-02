@@ -26,8 +26,9 @@ export default function AdminProviders() {
     try {
       await approveHost.mutateAsync(id);
       toast.success(`${name || 'Host'} approved — they can now create listings.`);
-    } catch {
-      toast.error('Failed to approve host.');
+    } catch (error: any) {
+      console.error('Approval error:', error);
+      toast.error(`Failed to approve host: ${error?.message || error?.details || JSON.stringify(error) || 'Unknown error'}`);
     }
   };
 

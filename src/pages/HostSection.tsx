@@ -22,6 +22,9 @@ import HostAddCar from "./HostAddCar";
 import HostAddBike from "./HostAddBike";
 import HostAddExperience from "./HostAddExperience";
 import HostEditListing from "./HostEditListing";
+import HostNotifications from "./HostNotifications";
+import HostCabs from "./HostCabs";
+import HostAddCab from "./HostAddCab";
 
 export default function HostSection() {
   const { section } = useParams();
@@ -94,6 +97,10 @@ export default function HostSection() {
       return isAddMode ? <HostAddExperience /> : isEditMode ? <HostEditListing /> : <HostExperiences />;
     case "bookings":
       return <HostBookings />;
+    case "notifications":
+      return <HostNotifications />;
+    case "cabs":
+      return isAddMode ? <HostAddCab /> : isEditMode ? <HostEditListing /> : <HostCabs />;
     case "earnings":
       return <HostEarnings />;
     case "link":

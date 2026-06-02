@@ -15,6 +15,7 @@ import {
   XCircle,
   ExternalLink,
   AlertTriangle,
+  Info,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,56 @@ import { useDeleteListing } from '@/hooks/useListings';
 import { useUpdateMarketplaceRequest, useUpdateMarketplaceVisibility } from '@/hooks/useListings';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
+
+const renderApprovalStatusBadge = (status: string | null | undefined, reason?: string | null) => {
+  const normalizedStatus = status || 'pending';
+  
+  switch (normalizedStatus) {
+    case 'approved':
+      return (
+        <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white border-0 w-fit shrink-0">
+          <CheckCircle className="h-3.5 w-3.5 mr-1" />
+          Approved
+        </Badge>
+      );
+    case 'rejected':
+      return (
+        <div className="flex flex-col gap-1 max-w-[200px]">
+          <Badge variant="destructive" className="w-fit shrink-0">
+            <XCircle className="h-3.5 w-3.5 mr-1" />
+            Rejected
+          </Badge>
+          {reason && (
+            <span className="text-[11px] text-red-500 font-medium leading-tight">
+              Reason: {reason}
+            </span>
+          )}
+        </div>
+      );
+    case 'needs_revision':
+      return (
+        <div className="flex flex-col gap-1 max-w-[200px]">
+          <Badge className="bg-amber-500 hover:bg-amber-600 text-white border-0 w-fit shrink-0">
+            <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+            Revision Required
+          </Badge>
+          {reason && (
+            <span className="text-[11px] text-amber-600 font-medium leading-tight">
+              Note: {reason}
+            </span>
+          )}
+        </div>
+      );
+    case 'pending':
+    default:
+      return (
+        <Badge className="bg-blue-500 hover:bg-blue-600 text-white border-0 w-fit shrink-0">
+          <Info className="h-3.5 w-3.5 mr-1" />
+          Pending Approval
+        </Badge>
+      );
+  }
+};
 
 interface ListingsManagerProps {
   title: string;
@@ -223,7 +274,9 @@ export function ListingsManager({
             <div className="mx-auto w-16 h-16 mb-4 text-muted-foreground/50">
               {emptyIcon}
             </div>
-            <h3 className="text-lg font-semibold mb-2">No {title.toLowerCase()} yet</h3>
+            <h3 className="text-lg font-semibold mb-2">
+              No {listingType === 'experience' ? 'experiences' : `${listingType}s`} yet
+            </h3>
             <p className="text-muted-foreground mb-4">
               Start by adding your first {listingType} listing
             </p>
@@ -267,6 +320,9 @@ export function ListingsManager({
                 </div>
               </div>
               <CardContent className="p-4">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  {renderApprovalStatusBadge((listing as any).approval_status, (listing as any).rejection_reason)}
+                </div>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold truncate">{listing.title}</h3>
@@ -353,6 +409,7 @@ export function ListingsManager({
                 <TableHead>Location</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Approval Status</TableHead>
                 <TableHead>Marketplace Status</TableHead>
                 <TableHead>Views</TableHead>
                 <TableHead>Rating</TableHead>
@@ -397,6 +454,9 @@ export function ListingsManager({
                     <Badge variant={listing.availability_status ? 'default' : 'secondary'}>
                       {listing.availability_status ? 'Active' : 'Inactive'}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {renderApprovalStatusBadge((listing as any).approval_status, (listing as any).rejection_reason)}
                   </TableCell>
                   <TableCell>
                     {((listing as any).marketplace_visible ?? false) ? (

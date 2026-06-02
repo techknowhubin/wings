@@ -161,6 +161,7 @@ const App = () =>
               <Route path="hotels/add" element={<Navigate to="/host/hotels?mode=add" replace />} />
               <Route path="resorts/add" element={<Navigate to="/host/resorts?mode=add" replace />} />
               <Route path="cars/add" element={<Navigate to="/host/cars?mode=add" replace />} />
+              <Route path="cabs/add" element={<Navigate to="/host/cabs?mode=add" replace />} />
               <Route path="bikes/add" element={<Navigate to="/host/bikes?mode=add" replace />} />
               <Route path="experiences/add" element={<Navigate to="/host/experiences?mode=add" replace />} />
               <Route path=":section" element={<HostSection />} />

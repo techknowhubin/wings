@@ -270,7 +270,7 @@ export function useAdminPendingListings(_typeFilter?: string) {
             ...item,
             _table: table,
             profiles: names.get(item.host_id) ?? { full_name: '—', phone: null },
-            approval_status: item.is_verified === true ? 'approved' : 'pending',
+            approval_status: item.approval_status || (item.is_verified === true ? 'approved' : 'pending'),
           }));
         })
       );
@@ -283,12 +283,35 @@ export function useApproveListing() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, table }: { id: string; table: string }) => {
+      // 1. Fetch listing details to get host_id and title
+      const { data: listing, error: fetchError } = await supabase
+        .from(table as any)
+        .select('host_id, title')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError || !listing) throw new Error('Listing not found');
+
+      // 2. Update listing status in database
       const { error } = await supabase.from(table as any).update({
         is_verified: true,
         marketplace_visible: true,
+        approval_status: 'approved',
+        rejection_reason: null,
         updated_at: new Date().toISOString(),
       } as any).eq('id', id);
       if (error) throw error;
+
+      // 3. Create a notification for the host
+      const sectionName = table === 'stays' ? 'Home stays' : table === 'hotels' ? 'Hotels' : table === 'resorts' ? 'Resorts' : table === 'cars' ? 'Car Rentals' : table === 'bikes' ? 'Bike Rentals' : 'Packages/Experiences';
+      await supabase.from('notifications').insert({
+        user_id: (listing as any).host_id,
+        title: 'Listing Approved! 🎉',
+        message: `Your listing "${(listing as any).title}" under ${sectionName} has been approved by the admin and is now live on the marketplace.`,
+        type: 'system',
+        is_read: false,
+        link: `/host/${table}`,
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'listings'] }),
   });
@@ -298,12 +321,35 @@ export function useRejectListing() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, table, reason }: { id: string; table: string; reason: string }) => {
+      // 1. Fetch listing details to get host_id and title
+      const { data: listing, error: fetchError } = await supabase
+        .from(table as any)
+        .select('host_id, title')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError || !listing) throw new Error('Listing not found');
+
+      // 2. Update listing status in database
       const { error } = await supabase.from(table as any).update({
         is_verified: false,
         marketplace_visible: false,
+        approval_status: 'rejected',
+        rejection_reason: reason,
         updated_at: new Date().toISOString(),
       } as any).eq('id', id);
       if (error) throw error;
+
+      // 3. Create a notification for the host
+      const sectionName = table === 'stays' ? 'Home stays' : table === 'hotels' ? 'Hotels' : table === 'resorts' ? 'Resorts' : table === 'cars' ? 'Car Rentals' : table === 'bikes' ? 'Bike Rentals' : 'Packages/Experiences';
+      await supabase.from('notifications').insert({
+        user_id: (listing as any).host_id,
+        title: 'Listing Rejected ❌',
+        message: `Your listing "${(listing as any).title}" under ${sectionName} was not approved. Reason: ${reason}. Please update it and submit again.`,
+        type: 'system',
+        is_read: false,
+        link: `/host/${table}`,
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'listings'] }),
   });
@@ -324,12 +370,35 @@ export function useRequestRevision() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, table, reason }: { id: string; table: string; reason: string }) => {
+      // 1. Fetch listing details to get host_id and title
+      const { data: listing, error: fetchError } = await supabase
+        .from(table as any)
+        .select('host_id, title')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError || !listing) throw new Error('Listing not found');
+
+      // 2. Update listing status in database
       const { error } = await supabase.from(table as any).update({
         is_verified: false,
         marketplace_visible: false,
+        approval_status: 'needs_revision',
+        rejection_reason: reason,
         updated_at: new Date().toISOString(),
       } as any).eq('id', id);
       if (error) throw error;
+
+      // 3. Create a notification for the host
+      const sectionName = table === 'stays' ? 'Home stays' : table === 'hotels' ? 'Hotels' : table === 'resorts' ? 'Resorts' : table === 'cars' ? 'Car Rentals' : table === 'bikes' ? 'Bike Rentals' : 'Packages/Experiences';
+      await supabase.from('notifications').insert({
+        user_id: (listing as any).host_id,
+        title: 'Revision Required 🔄',
+        message: `Changes are requested for your listing "${(listing as any).title}" under ${sectionName}. Note: ${reason}`,
+        type: 'system',
+        is_read: false,
+        link: `/host/${table}`,
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'listings'] }),
   });
@@ -379,6 +448,7 @@ export function useApproveHost() {
   return useMutation({
     mutationFn: async (hostId: string) => {
       const now = new Date().toISOString();
+      console.log('[useApproveHost] Attempting approval for hostId:', hostId);
       const [hostRes, profileRes] = await Promise.all([
         supabase
           .from('host_profiles')
@@ -389,8 +459,16 @@ export function useApproveHost() {
           .update({ kyc_status: 'approved', updated_at: now } as any)
           .eq('id', hostId),
       ]);
-      if (hostRes.error) throw hostRes.error;
-      // profiles update is best-effort — don't block if column missing
+      console.log('[useApproveHost] hostRes:', hostRes);
+      console.log('[useApproveHost] profileRes:', profileRes);
+      if (hostRes.error) {
+        console.error('[useApproveHost] hostRes error:', hostRes.error);
+        throw hostRes.error;
+      }
+      if (profileRes.error) {
+        console.error('[useApproveHost] profileRes error:', profileRes.error);
+        throw profileRes.error;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'providers'] });

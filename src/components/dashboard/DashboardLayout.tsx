@@ -29,14 +29,13 @@ import {
   Mail,
   ChevronDown,
   Package,
-  PenSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/components/ThemeProvider';
-import { useIsAdmin, useProfile, useUnreadNotificationCount } from '@/hooks/useListings';
+import { useProfile, useUnreadNotificationCount } from '@/hooks/useListings';
 import { cn } from '@/lib/utils';
 import { DynamicLogo } from '../DynamicLogo';
 
@@ -46,17 +45,18 @@ interface DashboardLayoutProps {
 
 const mainMenuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/host/dashboard' },
-  { icon: Bell, label: 'Notifications', path: '/host/bookings', badge: true },
+  { icon: Bell, label: 'Notifications', path: '/host/notifications', badge: true },
   { icon: Calendar, label: 'Reservations', path: '/host/bookings' },
 ];
 
 const listingMenuItems = [
-  { icon: Home, label: 'Stays', path: '/host/stays' },
+  { icon: Home, label: 'Home stays', path: '/host/stays' },
   { icon: Building, label: 'Hotels', path: '/host/hotels' },
   { icon: Palmtree, label: 'Resorts', path: '/host/resorts' },
-  { icon: Car, label: 'Cars', path: '/host/cars' },
-  { icon: Bike, label: 'Bikes', path: '/host/bikes' },
-  { icon: Compass, label: 'Experiences', path: '/host/experiences' },
+  { icon: Car, label: 'Car Rentals', path: '/host/cars' },
+  { icon: Bike, label: 'Bike Rentals', path: '/host/bikes' },
+  { icon: Compass, label: 'Packages/Experiences', path: '/host/experiences' },
+  { icon: Car, label: 'Outstation Cabs', path: '/host/cabs' },
 ];
 
 const generalMenuItems = [
@@ -70,17 +70,13 @@ const generalMenuItems = [
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const isListingRoute = ['/host/stays', '/host/hotels', '/host/resorts', '/host/cars', '/host/bikes', '/host/experiences'].some(p => location.pathname.startsWith(p));
+  const isListingRoute = ['/host/stays', '/host/hotels', '/host/resorts', '/host/cars', '/host/bikes', '/host/experiences', '/host/cabs'].some(p => location.pathname.startsWith(p));
   const [listingsOpen, setListingsOpen] = useState(isListingRoute);
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { theme } = useTheme();
   const { data: profile } = useProfile(user?.id);
-  const { data: isAdminUser = false } = useIsAdmin(user?.id);
   const { data: unreadCount } = useUnreadNotificationCount(user?.id);
-  const roleAwareGeneralItems = isAdminUser
-    ? [...generalMenuItems, { icon: PenSquare, label: 'Blog Posts', path: '/host/blog' }]
-    : generalMenuItems;
 
   const handleSignOut = async () => {
     await signOut();
@@ -191,7 +187,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </Collapsible>
         </div>
 
-        {renderNavGroup(roleAwareGeneralItems, isAdminUser ? 'Admin' : 'General')}
+        {renderNavGroup(generalMenuItems, 'General')}
       </nav>
 
       {/* Sign Out */}

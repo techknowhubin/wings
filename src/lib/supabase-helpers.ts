@@ -427,6 +427,17 @@ export async function getUnreadNotificationCount(userId: string): Promise<number
   return count || 0;
 }
 
+export async function markAllNotificationsAsRead(userId: string) {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('user_id', userId)
+    .eq('is_read', false);
+  
+  if (error) throw error;
+}
+
+
 // ============ Host Listings Helpers ============
 
 export async function getHostStays(hostId: string) {
@@ -523,17 +534,18 @@ async function attachHostNames(listings: any[], isAdminUser: boolean) {
 }
 
 export async function getManagedListings(
-  listingType: ListingType | 'hotel' | 'resort',
+  listingType: ListingType | 'hotel' | 'resort' | 'cab',
   userId: string,
   isAdminUser: boolean,
 ) {
-  const tableMap: Record<ListingType | 'hotel' | 'resort', 'stays' | 'cars' | 'bikes' | 'experiences' | 'hotels' | 'resorts'> = {
+  const tableMap: Record<ListingType | 'hotel' | 'resort' | 'cab', 'stays' | 'cars' | 'bikes' | 'experiences' | 'hotels' | 'resorts'> = {
     stay: 'stays',
     car: 'cars',
     bike: 'bikes',
     experience: 'experiences',
     hotel: 'hotels',
     resort: 'resorts',
+    cab: 'cars',
   };
   let query = supabase
     .from(tableMap[listingType] as any)
@@ -546,23 +558,31 @@ export async function getManagedListings(
 
   const { data, error } = await query;
   if (error) throw error;
-  const listings = (data ?? []) as any[];
+  let listings = (data ?? []) as any[];
+
+  // Filter listings based on cab tags
+  if (listingType === 'car') {
+    listings = listings.filter(item => !Array.isArray(item.tags) || !item.tags.includes('cab'));
+  } else if (listingType === 'cab') {
+    listings = listings.filter(item => Array.isArray(item.tags) && item.tags.includes('cab'));
+  }
 
   return attachHostNames(listings, isAdminUser);
 }
 
 export async function updateMarketplaceVisibility(
-  listingType: ListingType | 'hotel' | 'resort',
+  listingType: ListingType | 'hotel' | 'resort' | 'cab',
   listingId: string,
   marketplaceVisible: boolean,
 ) {
-  const tableMap: Record<ListingType | 'hotel' | 'resort', 'stays' | 'cars' | 'bikes' | 'experiences' | 'hotels' | 'resorts'> = {
+  const tableMap: Record<ListingType | 'hotel' | 'resort' | 'cab', 'stays' | 'cars' | 'bikes' | 'experiences' | 'hotels' | 'resorts'> = {
     stay: 'stays',
     car: 'cars',
     bike: 'bikes',
     experience: 'experiences',
     hotel: 'hotels',
     resort: 'resorts',
+    cab: 'cars',
   };
   const { data, error } = await supabase
     .from(tableMap[listingType] as any)
@@ -587,9 +607,21 @@ export async function updateMarketplaceRequest(
     hotel: 'hotels',
     resort: 'resorts',
   };
+
+  const updatePayload: Record<string, any> = {
+    marketplace_requested: marketplaceRequested,
+  };
+
+  // If host is requesting marketplace visibility, reset approval status to pending and clear rejection reason
+  if (marketplaceRequested) {
+    updatePayload.approval_status = 'pending';
+    updatePayload.rejection_reason = null;
+    updatePayload.submitted_for_review_at = new Date().toISOString();
+  }
+
   const { data, error } = await supabase
     .from(tableMap[listingType] as any)
-    .update({ marketplace_requested: marketplaceRequested })
+    .update(updatePayload as any)
     .eq('id', listingId)
     .select('id')
     .single();
@@ -603,7 +635,14 @@ export async function createStay(stay: Omit<Stay, 'id' | 'created_at' | 'updated
   const slug = generateSlug(stay.title);
   const { data, error } = await supabase
     .from('stays')
-    .insert({ ...stay, slug, marketplace_visible: true, marketplace_requested: true })
+    .insert({
+      ...stay,
+      slug,
+      marketplace_visible: false,
+      marketplace_requested: true,
+      approval_status: 'pending',
+      submitted_for_review_at: new Date().toISOString(),
+    })
     .select()
     .single();
   if (error) throw error;
@@ -614,7 +653,14 @@ export async function createCar(car: Omit<Car, 'id' | 'created_at' | 'updated_at
   const slug = generateSlug(car.title);
   const { data, error } = await supabase
     .from('cars')
-    .insert({ ...car, slug, marketplace_visible: true, marketplace_requested: true })
+    .insert({
+      ...car,
+      slug,
+      marketplace_visible: false,
+      marketplace_requested: true,
+      approval_status: 'pending',
+      submitted_for_review_at: new Date().toISOString(),
+    })
     .select()
     .single();
   if (error) throw error;
@@ -625,7 +671,14 @@ export async function createBike(bike: Omit<Bike, 'id' | 'created_at' | 'updated
   const slug = generateSlug(bike.title);
   const { data, error } = await supabase
     .from('bikes')
-    .insert({ ...bike, slug, marketplace_visible: true, marketplace_requested: true })
+    .insert({
+      ...bike,
+      slug,
+      marketplace_visible: false,
+      marketplace_requested: true,
+      approval_status: 'pending',
+      submitted_for_review_at: new Date().toISOString(),
+    })
     .select()
     .single();
   if (error) throw error;
@@ -636,7 +689,14 @@ export async function createExperience(experience: Omit<Experience, 'id' | 'crea
   const slug = generateSlug(experience.title);
   const { data, error } = await supabase
     .from('experiences')
-    .insert({ ...experience, slug, marketplace_visible: true, marketplace_requested: true })
+    .insert({
+      ...experience,
+      slug,
+      marketplace_visible: false,
+      marketplace_requested: true,
+      approval_status: 'pending',
+      submitted_for_review_at: new Date().toISOString(),
+    })
     .select()
     .single();
   if (error) throw error;
@@ -647,7 +707,14 @@ export async function createHotel(hotel: any) {
   const slug = generateSlug(hotel.title);
   const { data, error } = await supabase
     .from('hotels' as any)
-    .insert({ ...hotel, slug, marketplace_visible: true, marketplace_requested: true })
+    .insert({
+      ...hotel,
+      slug,
+      marketplace_visible: false,
+      marketplace_requested: true,
+      approval_status: 'pending',
+      submitted_for_review_at: new Date().toISOString(),
+    })
     .select()
     .single();
   if (error) throw error;
@@ -658,7 +725,14 @@ export async function createResort(resort: any) {
   const slug = generateSlug(resort.title);
   const { data, error } = await supabase
     .from('resorts' as any)
-    .insert({ ...resort, slug, marketplace_visible: true, marketplace_requested: true })
+    .insert({
+      ...resort,
+      slug,
+      marketplace_visible: false,
+      marketplace_requested: true,
+      approval_status: 'pending',
+      submitted_for_review_at: new Date().toISOString(),
+    })
     .select()
     .single();
   if (error) throw error;
@@ -703,14 +777,15 @@ export async function getLinkInBioPageBySlug(slug: string) {
   return data;
 }
 
-export async function deleteListing(listingType: ListingType | 'hotel' | 'resort', listingId: string) {
-  const tableMap: Record<ListingType | 'hotel' | 'resort', 'stays' | 'cars' | 'bikes' | 'experiences' | 'hotels' | 'resorts'> = {
+export async function deleteListing(listingType: ListingType | 'hotel' | 'resort' | 'cab', listingId: string) {
+  const tableMap: Record<ListingType | 'hotel' | 'resort' | 'cab', 'stays' | 'cars' | 'bikes' | 'experiences' | 'hotels' | 'resorts'> = {
     stay: 'stays',
     car: 'cars',
     bike: 'bikes',
     experience: 'experiences',
     hotel: 'hotels',
     resort: 'resorts',
+    cab: 'cars',
   };
   const tableName = tableMap[listingType];
 

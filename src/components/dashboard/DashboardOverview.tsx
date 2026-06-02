@@ -14,6 +14,8 @@ import {
   Eye,
   ChevronRight,
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,6 +38,24 @@ import { StaggerContainer, StaggerItem, LayoutCard, ModuleSkeleton } from './Das
 export function DashboardOverview() {
   const { user } = useAuth();
   const { data: profile } = useProfile(user?.id);
+  const [cabApplications, setCabApplications] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!profile?.phone) return;
+    const fetchCabs = async () => {
+      try {
+        const { data } = await supabase
+          .from('driver_applications' as any)
+          .select('id')
+          .eq('mobile', profile.phone);
+        if (data) setCabApplications(data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    void fetchCabs();
+  }, [profile?.phone]);
+
   const { data: stays = [] } = useHostStays(user?.id);
   const { data: hotels = [] } = useHostHotels(user?.id);
   const { data: resorts = [] } = useHostResorts(user?.id);
@@ -108,12 +128,13 @@ export function DashboardOverview() {
   ];
 
   const listingTypes = [
-    { icon: Home, label: 'Stays', count: stays.length, path: '/host/stays', color: 'bg-primary/10 text-primary-text' },
+    { icon: Home, label: 'Home stays', count: stays.length, path: '/host/stays', color: 'bg-primary/10 text-primary-text' },
     { icon: Building, label: 'Hotels', count: hotels.length, path: '/host/hotels', color: 'bg-accent/10 text-accent' },
     { icon: Palmtree, label: 'Resorts', count: resorts.length, path: '/host/resorts', color: 'bg-primary/10 text-primary-text' },
-    { icon: Car, label: 'Cars', count: cars.length, path: '/host/cars', color: 'bg-accent/10 text-accent' },
-    { icon: Bike, label: 'Bikes', count: bikes.length, path: '/host/bikes', color: 'bg-primary/10 text-primary-text' },
-    { icon: Compass, label: 'Experiences', count: experiences.length, path: '/host/experiences', color: 'bg-accent/10 text-accent' },
+    { icon: Car, label: 'Car Rentals', count: cars.length, path: '/host/cars', color: 'bg-accent/10 text-accent' },
+    { icon: Bike, label: 'Bike Rentals', count: bikes.length, path: '/host/bikes', color: 'bg-primary/10 text-primary-text' },
+    { icon: Compass, label: 'Packages/Experiences', count: experiences.length, path: '/host/experiences', color: 'bg-accent/10 text-accent' },
+    { icon: Car, label: 'Outstation Cabs', count: cabApplications.length, path: '/host/cabs', color: 'bg-primary/10 text-primary-text' },
   ];
 
   const recentBookings = bookings.slice(0, 5);

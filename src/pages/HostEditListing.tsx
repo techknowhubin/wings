@@ -14,7 +14,7 @@ import { createDiscountConfig, parseListingDiscountConfig } from "@/lib/discount
 import { toast } from "sonner";
 import { ListingImageUploader } from "@/components/dashboard/ListingImageUploader";
 
-type Section = "stays" | "hotels" | "resorts" | "cars" | "bikes" | "experiences";
+type Section = "stays" | "hotels" | "resorts" | "cars" | "bikes" | "experiences" | "cabs";
 
 const tableMap: Record<Section, string> = {
   stays: "stays",
@@ -23,6 +23,7 @@ const tableMap: Record<Section, string> = {
   cars: "cars",
   bikes: "bikes",
   experiences: "experiences",
+  cabs: "cars",
 };
 
 const priceFieldMap: Record<Section, "price_per_night" | "price_per_day" | "price_per_person"> = {
@@ -32,6 +33,7 @@ const priceFieldMap: Record<Section, "price_per_night" | "price_per_day" | "pric
   cars: "price_per_day",
   bikes: "price_per_day",
   experiences: "price_per_person",
+  cabs: "price_per_day",
 };
 
 const extraSelectMap: Record<Section, string> = {
@@ -42,6 +44,7 @@ const extraSelectMap: Record<Section, string> = {
   resorts:
     "max_guests,bedrooms,bathrooms,property_type,check_in_time,check_out_time,cancellation_policy",
   cars: "brand,model,year,fuel_type,transmission,vehicle_type,seating_capacity,mileage_limit",
+  cabs: "brand,model,year,fuel_type,transmission,vehicle_type,seating_capacity,mileage_limit",
   bikes: "brand,model,year,engine_capacity,vehicle_type,mileage_limit,helmet_included",
   experiences: "category,duration,group_size,inclusions,exclusions",
 };
@@ -196,6 +199,11 @@ export default function HostEditListing() {
           discountConfig.hostDiscountPercent > 0 || discountConfig.coupons.length > 0
             ? discountConfig
             : null,
+        approval_status: 'pending',
+        rejection_reason: null,
+        marketplace_requested: true,
+        marketplace_visible: false,
+        submitted_for_review_at: new Date().toISOString(),
       };
 
       if (section === "stays" || section === "hotels" || section === "resorts") {
@@ -208,7 +216,7 @@ export default function HostEditListing() {
         payload.cancellation_policy = form.cancellation_policy || null;
       }
 
-      if (section === "cars") {
+      if (section === "cars" || section === "cabs") {
         payload.brand = form.brand || null;
         payload.model = form.model || null;
         payload.year = form.year ? Number(form.year) : null;
@@ -332,7 +340,7 @@ export default function HostEditListing() {
             </>
           )}
 
-          {section === "cars" && (
+          {(section === "cars" || section === "cabs") && (
             <Card>
               <CardHeader><CardTitle>Vehicle Details</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">

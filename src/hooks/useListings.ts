@@ -8,7 +8,7 @@ import {
   getListingReviews, createReview,
   getUserWishlist, addToWishlist, removeFromWishlist, isInWishlist,
   getProfile, updateProfile, getHostProfile,
-  getUserNotifications, getUnreadNotificationCount, markNotificationAsRead,
+  getUserNotifications, getUnreadNotificationCount, markNotificationAsRead, markAllNotificationsAsRead,
   getHostStays, getHostCars, getHostBikes, getHostExperiences, getHostHotels, getHostResorts,
   getManagedListings, updateMarketplaceRequest, updateMarketplaceVisibility,
   isAdmin, isHost, isModerator,
@@ -293,6 +293,17 @@ export function useMarkNotificationAsRead() {
   });
 }
 
+export function useMarkAllNotificationsAsRead() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: markAllNotificationsAsRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
 // ============ Host Listings Hooks ============
 
 export function useHostStays(hostId: string | undefined) {
@@ -344,7 +355,7 @@ export function useHostResorts(hostId: string | undefined) {
 }
 
 export function useManagedListings(
-  listingType: ListingType | 'hotel' | 'resort',
+  listingType: ListingType | 'hotel' | 'resort' | 'cab',
   userId: string | undefined,
   isAdminUser: boolean,
 ) {
@@ -458,10 +469,10 @@ export function useCreateResort() {
 export function useDeleteListing() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ listingType, listingId }: { listingType: ListingType | 'hotel' | 'resort'; listingId: string }) =>
+    mutationFn: ({ listingType, listingId }: { listingType: ListingType | 'hotel' | 'resort' | 'cab'; listingId: string }) =>
       deleteListing(listingType, listingId),
     onSuccess: (_, { listingType }) => {
-      const plural = listingType === 'experience' ? 'experiences' : `${listingType}s`;
+      const plural = listingType === 'cab' ? 'cars' : (listingType === 'experience' ? 'experiences' : `${listingType}s`);
       queryClient.invalidateQueries({ queryKey: ['host', plural] });
       queryClient.invalidateQueries({ queryKey: [plural] });
     },
@@ -476,12 +487,12 @@ export function useUpdateMarketplaceVisibility() {
       listingId,
       marketplaceVisible,
     }: {
-      listingType: ListingType | 'hotel' | 'resort';
+      listingType: ListingType | 'hotel' | 'resort' | 'cab';
       listingId: string;
       marketplaceVisible: boolean;
     }) => updateMarketplaceVisibility(listingType, listingId, marketplaceVisible),
     onSuccess: (_, { listingType }) => {
-      const plural = listingType === 'experience' ? 'experiences' : `${listingType}s`;
+      const plural = listingType === 'cab' ? 'cars' : (listingType === 'experience' ? 'experiences' : `${listingType}s`);
       queryClient.invalidateQueries({ queryKey: ['host', plural] });
       queryClient.invalidateQueries({ queryKey: ['managed-listings'] });
       queryClient.invalidateQueries({ queryKey: [plural] });
@@ -497,12 +508,12 @@ export function useUpdateMarketplaceRequest() {
       listingId,
       marketplaceRequested,
     }: {
-      listingType: ListingType | 'hotel' | 'resort';
+      listingType: ListingType | 'hotel' | 'resort' | 'cab';
       listingId: string;
       marketplaceRequested: boolean;
     }) => updateMarketplaceRequest(listingType, listingId, marketplaceRequested),
     onSuccess: (_, { listingType }) => {
-      const plural = listingType === 'experience' ? 'experiences' : `${listingType}s`;
+      const plural = listingType === 'cab' ? 'cars' : (listingType === 'experience' ? 'experiences' : `${listingType}s`);
       queryClient.invalidateQueries({ queryKey: ['host', plural] });
       queryClient.invalidateQueries({ queryKey: ['managed-listings'] });
       queryClient.invalidateQueries({ queryKey: [plural] });

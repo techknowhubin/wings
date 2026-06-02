@@ -50,6 +50,7 @@ import Privacy from "./pages/Privacy";
 import CookieSettings from "./pages/CookieSettings";
 import CabsBookingPage from "./pages/CabsBookingPage";
 import WhatsAppButton from "./components/WhatsAppButton";
+import PartnerDashboard from "./pages/PartnerDashboard";
 
 // Host Dashboard
 import HostLayout from "./pages/HostLayout";
@@ -144,6 +145,7 @@ const App = () =>
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/cookie-settings" element={<CookieSettings />} />
+            <Route path="/partner-dashboard/:referralId" element={<PartnerDashboard />} />
             
             {/* Host Dashboard — shared layout, only content transitions */}
             <Route 

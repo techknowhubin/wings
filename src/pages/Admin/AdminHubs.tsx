@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   useHubPartners, useCreateHubPartner, useUpdateHubPartner, useToggleHubStatus,
   useReferralTransactions, useHubAnalytics,
@@ -19,16 +20,26 @@ import { toast } from 'sonner';
 import {
   Building2, Plus, Search, QrCode, Download, Copy, Pencil,
   ToggleLeft, ToggleRight, TrendingUp, Users, DollarSign, BarChart3,
-  Eye, CheckCircle2, XCircle, Clock,
+  Eye, CheckCircle2, XCircle, Clock, ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { formatDistanceToNow, format } from 'date-fns';
 import { generateHubReferralId, buildReferralLink } from '@/lib/referral';
 
 const HUB_TYPE_COLORS: Record<string, string> = {
-  franchise:    'bg-purple-100 text-purple-700 border-purple-200',
-  collaborator: 'bg-blue-100 text-blue-700 border-blue-200',
-  restaurant:   'bg-amber-100 text-amber-700 border-amber-200',
+  franchise:   'bg-purple-100 text-purple-700 border-purple-200',
+  hub:         'bg-blue-100 text-blue-700 border-blue-200',
+  collaborator:'bg-blue-100 text-blue-700 border-blue-200',
+  restaurant:  'bg-amber-100 text-amber-700 border-amber-200',
+  cab_driver:  'bg-green-100 text-green-700 border-green-200',
+};
+
+const HUB_TYPE_LABELS: Record<string, string> = {
+  franchise:   'Franchise',
+  hub:         'Hub',
+  collaborator:'Hub',
+  restaurant:  'Chai Point / Restaurant',
+  cab_driver:  'Cab Driver',
 };
 
 // ─── QR Download helper ──────────────────────────────────────────────────────
@@ -163,6 +174,17 @@ function QRSheet({ hub, open, onClose }: { hub: any; open: boolean; onClose: () 
               </Button>
             </div>
 
+            <button
+              onClick={() => {
+                const dashboardUrl = `${window.location.origin}/partner-dashboard/${refId}`;
+                navigator.clipboard.writeText(dashboardUrl);
+                toast.success('Partner dashboard link copied! Share this with the partner.');
+              }}
+              className="w-full py-2 border border-dashed border-muted-foreground/30 rounded-xl text-xs text-muted-foreground hover:border-[#013220] hover:text-[#013220] transition flex items-center justify-center gap-1.5"
+            >
+              <Copy className="h-3.5 w-3.5" /> Copy partner dashboard link
+            </button>
+
             <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
               Print and display this QR at your location. Customers who scan it will have your referral code automatically applied at checkout.
             </p>
@@ -220,7 +242,8 @@ function ReferralHistorySheet({ hub, open, onClose }: { hub: any; open: boolean;
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AdminHubs() {
   const { user } = useAuth();
-  const [tab, setTab] = useState('all');
+  const navigate = useNavigate();
+  const [tab, setTab] = useState<'all' | 'franchise' | 'restaurant' | 'cab_driver' | 'hub'>('all');
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [qrHub, setQrHub] = useState<any>(null);
@@ -228,7 +251,7 @@ export default function AdminHubs() {
   const [form, setForm] = useState({
     business_name: '', partner_name: '', partner_phone: '', partner_email: '',
     address: '', city: '', state: '', pincode: '',
-    hub_type: 'collaborator', commission_rate: '5',
+    hub_type: 'hub', commission_rate: '5',
   });
 
   const [editHub, setEditHub] = useState<any>(null);
@@ -274,9 +297,12 @@ export default function AdminHubs() {
     }
   };
 
-  const filtered = tab === 'all' ? (hubs ?? []) : (hubs ?? []).filter((h: any) =>
-    tab === 'restaurant' ? h.hub_type === 'restaurant' : h.hub_type !== 'restaurant'
-  );
+  const filtered = tab === 'all'
+    ? (hubs ?? [])
+    : (hubs ?? []).filter((h: any) => {
+        if (tab === 'hub') return h.hub_type === 'hub' || h.hub_type === 'collaborator';
+        return h.hub_type === tab;
+      });
 
   const handleCreate = async () => {
     if (!form.business_name || !form.partner_name || !form.partner_phone || !form.city) {
@@ -300,7 +326,7 @@ export default function AdminHubs() {
       });
       toast.success(`Hub partner added! Referral ID: ${referral_id}`);
       setAddOpen(false);
-      setForm({ business_name: '', partner_name: '', partner_phone: '', partner_email: '', address: '', city: '', state: '', pincode: '', hub_type: 'collaborator', commission_rate: '5' });
+      setForm({ business_name: '', partner_name: '', partner_phone: '', partner_email: '', address: '', city: '', state: '', pincode: '', hub_type: 'hub', commission_rate: '5' });
     } catch (err: any) {
       toast.error(err.message ?? 'Failed to add hub partner.');
     }
@@ -332,8 +358,10 @@ export default function AdminHubs() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="all">All Hubs</TabsTrigger>
-          <TabsTrigger value="franchise">Franchises & Collaborators</TabsTrigger>
-          <TabsTrigger value="restaurant">Hub Restaurants</TabsTrigger>
+          <TabsTrigger value="franchise">Franchises</TabsTrigger>
+          <TabsTrigger value="hub">Hubs</TabsTrigger>
+          <TabsTrigger value="restaurant">Chai Points & Restaurants</TabsTrigger>
+          <TabsTrigger value="cab_driver">Cab Drivers</TabsTrigger>
         </TabsList>
 
         <TabsContent value={tab} className="mt-4">
@@ -408,7 +436,7 @@ export default function AdminHubs() {
                           <TableCell className="text-sm">{h.city}{h.state ? `, ${h.state}` : ''}</TableCell>
 
                           <TableCell>
-                            <Badge variant="outline" className={`text-[10px] capitalize ${HUB_TYPE_COLORS[h.hub_type] ?? ''}`}>{h.hub_type}</Badge>
+                            <Badge variant="outline" className={`text-[10px] ${HUB_TYPE_COLORS[h.hub_type] ?? ''}`}>{HUB_TYPE_LABELS[h.hub_type] ?? h.hub_type}</Badge>
                           </TableCell>
 
                           <TableCell className="text-sm font-semibold">{h.commission_rate}%</TableCell>
@@ -448,6 +476,13 @@ export default function AdminHubs() {
                               </Button>
                               <Button size="icon" variant="ghost" className="h-7 w-7" title="Referral History" onClick={() => setHistoryHub(h)}>
                                 <Eye className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="icon" variant="ghost" className="h-7 w-7 text-blue-600 hover:bg-blue-50"
+                                title="Open Partner Dashboard"
+                                onClick={() => navigate(`/partner-dashboard/${refId}`)}
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
                               </Button>
                               <Button
                                 size="icon" variant="ghost"
@@ -511,13 +546,14 @@ export default function AdminHubs() {
                 <Input value={editForm.state ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, state: e.target.value }))} />
               </div>
               <div className="space-y-1">
-                <Label>Hub Type</Label>
-                <Select value={editForm.hub_type ?? 'collaborator'} onValueChange={(v) => setEditForm((f) => ({ ...f, hub_type: v }))}>
+                <Label>Partner Type</Label>
+                <Select value={editForm.hub_type ?? 'hub'} onValueChange={(v) => setEditForm((f) => ({ ...f, hub_type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="hub">Hub</SelectItem>
                     <SelectItem value="franchise">Franchise</SelectItem>
-                    <SelectItem value="collaborator">Collaborator</SelectItem>
-                    <SelectItem value="restaurant">Restaurant</SelectItem>
+                    <SelectItem value="restaurant">Chai Point / Restaurant</SelectItem>
+                    <SelectItem value="cab_driver">Cab Driver</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -571,13 +607,14 @@ export default function AdminHubs() {
                 <Input placeholder="State" value={form.state} onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))} />
               </div>
               <div className="space-y-1">
-                <Label>Hub Type</Label>
+                <Label>Partner Type</Label>
                 <Select value={form.hub_type} onValueChange={(v) => setForm((f) => ({ ...f, hub_type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="hub">Hub</SelectItem>
                     <SelectItem value="franchise">Franchise</SelectItem>
-                    <SelectItem value="collaborator">Collaborator</SelectItem>
-                    <SelectItem value="restaurant">Restaurant</SelectItem>
+                    <SelectItem value="restaurant">Chai Point / Restaurant</SelectItem>
+                    <SelectItem value="cab_driver">Cab Driver</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

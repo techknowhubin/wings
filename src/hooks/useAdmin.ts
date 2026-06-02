@@ -292,6 +292,17 @@ export function useRejectListing() {
   });
 }
 
+export function useDeleteListing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, table }: { id: string; table: string }) => {
+      const { error } = await supabase.from(table as any).delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'listings'] }),
+  });
+}
+
 export function useRequestRevision() {
   const qc = useQueryClient();
   return useMutation({

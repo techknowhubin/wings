@@ -80,14 +80,28 @@ export default function PartnerDashboard() {
 
     async function load() {
       setLoading(true);
+      const code = referralId.toUpperCase();
 
-      const { data: hub, error } = await (supabase as any)
+      // Try referral_id first, then fall back to qr_tracking_id for older partners
+      let hub: any = null;
+      const { data: byReferralId } = await (supabase as any)
         .from('hub_partners')
         .select('*')
-        .eq('referral_id', referralId.toUpperCase())
+        .eq('referral_id', code)
         .maybeSingle();
 
-      if (error || !hub) { setNotFound(true); setLoading(false); return; }
+      if (byReferralId) {
+        hub = byReferralId;
+      } else {
+        const { data: byQrId } = await (supabase as any)
+          .from('hub_partners')
+          .select('*')
+          .eq('qr_tracking_id', code)
+          .maybeSingle();
+        hub = byQrId;
+      }
+
+      if (!hub) { setNotFound(true); setLoading(false); return; }
       setPartner(hub);
 
       const { data: txns } = await (supabase as any)

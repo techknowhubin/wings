@@ -42,9 +42,31 @@ CREATE INDEX IF NOT EXISTS idx_hub_partners_ref_id  ON public.hub_partners(refer
 -- 4. RLS on referral_transactions
 ALTER TABLE public.referral_transactions ENABLE ROW LEVEL SECURITY;
 
--- Admins (service role) can do everything; authenticated users can read their own
+DROP POLICY IF EXISTS "admin_all_referral_tx"              ON public.referral_transactions;
+DROP POLICY IF EXISTS "user_read_own_referral_tx"          ON public.referral_transactions;
+DROP POLICY IF EXISTS "public_read_referral_tx_by_partner" ON public.referral_transactions;
+
 CREATE POLICY "admin_all_referral_tx" ON public.referral_transactions
   FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
 
 CREATE POLICY "user_read_own_referral_tx" ON public.referral_transactions
   FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "public_read_referral_tx_by_partner" ON public.referral_transactions
+  FOR SELECT USING (
+    partner_id IN (
+      SELECT id FROM public.hub_partners WHERE is_active = true
+    )
+  );
+
+-- 5. RLS on hub_partners
+ALTER TABLE public.hub_partners ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "admin_full_access_hub_partners"  ON public.hub_partners;
+DROP POLICY IF EXISTS "public_read_active_hub_partners" ON public.hub_partners;
+
+CREATE POLICY "admin_full_access_hub_partners" ON public.hub_partners
+  FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "public_read_active_hub_partners" ON public.hub_partners
+  FOR SELECT USING (is_active = true);

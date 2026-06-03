@@ -34,5 +34,6 @@ export function generateHubReferralId(): string {
 }
 
 export function buildReferralLink(referralId: string): string {
-  return `https://xplorwing.com?ref=${referralId}`;
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://xplorwing.com';
+  return `${origin}?ref=${referralId}`;
 }

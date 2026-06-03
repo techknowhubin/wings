@@ -144,15 +144,16 @@ function QRSheet({ hub, open, onClose }: { hub: any; open: boolean; onClose: () 
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-2">
               {[
+                { label: 'Scans', value: hub.qr_scans ?? 0 },
                 { label: 'Referrals', value: hub.total_referrals ?? 0 },
                 { label: 'Revenue', value: `₹${Number(hub.total_revenue ?? 0).toFixed(0)}` },
                 { label: 'Commission', value: `₹${Number(hub.total_commission ?? 0).toFixed(0)}` },
               ].map((s) => (
-                <div key={s.label} className="p-3 rounded-xl bg-muted/40 text-center">
-                  <p className="text-lg font-bold">{s.value}</p>
-                  <p className="text-[10px] text-muted-foreground">{s.label}</p>
+                <div key={s.label} className="p-2 rounded-xl bg-muted/40 text-center">
+                  <p className="text-base font-bold">{s.value}</p>
+                  <p className="text-[9px] text-muted-foreground">{s.label}</p>
                 </div>
               ))}
             </div>
@@ -176,7 +177,7 @@ function QRSheet({ hub, open, onClose }: { hub: any; open: boolean; onClose: () 
 
             <button
               onClick={() => {
-                const dashboardUrl = `${window.location.origin}/partner-dashboard/${refId}`;
+                const dashboardUrl = `${window.location.origin}/partner/${hub.id}`;
                 navigator.clipboard.writeText(dashboardUrl);
                 toast.success('Partner dashboard link copied! Share this with the partner.');
               }}
@@ -379,6 +380,7 @@ export default function AdminHubs() {
                       <TableHead>City</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Commission</TableHead>
+                      <TableHead>Scans</TableHead>
                       <TableHead>Referrals</TableHead>
                       <TableHead>Revenue</TableHead>
                       <TableHead>Status</TableHead>
@@ -440,6 +442,7 @@ export default function AdminHubs() {
                           </TableCell>
 
                           <TableCell className="text-sm font-semibold">{h.commission_rate}%</TableCell>
+                          <TableCell className="text-sm font-medium">{h.qr_scans ?? 0}</TableCell>
                           <TableCell className="text-sm font-medium">{h.total_referrals ?? 0}</TableCell>
                           <TableCell className="text-sm">₹{Number(h.total_revenue ?? 0).toFixed(0)}</TableCell>
 
@@ -480,7 +483,7 @@ export default function AdminHubs() {
                               <Button
                                 size="icon" variant="ghost" className="h-7 w-7 text-blue-600 hover:bg-blue-50"
                                 title="Open Partner Dashboard"
-                                onClick={() => navigate(`/partner-dashboard/${refId}`)}
+                                onClick={() => navigate(`/partner/${h.id}`)}
                               >
                                 <ExternalLink className="h-3.5 w-3.5" />
                               </Button>

@@ -447,28 +447,8 @@ export function useApproveHost() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (hostId: string) => {
-      const now = new Date().toISOString();
-      console.log('[useApproveHost] Attempting approval for hostId:', hostId);
-      const [hostRes, profileRes] = await Promise.all([
-        supabase
-          .from('host_profiles')
-          .update({ onboarding_status: 'approved', updated_at: now } as any)
-          .eq('id', hostId),
-        supabase
-          .from('profiles')
-          .update({ kyc_status: 'approved', updated_at: now } as any)
-          .eq('id', hostId),
-      ]);
-      console.log('[useApproveHost] hostRes:', hostRes);
-      console.log('[useApproveHost] profileRes:', profileRes);
-      if (hostRes.error) {
-        console.error('[useApproveHost] hostRes error:', hostRes.error);
-        throw hostRes.error;
-      }
-      if (profileRes.error) {
-        console.error('[useApproveHost] profileRes error:', profileRes.error);
-        throw profileRes.error;
-      }
+      const { error } = await (supabase as any).rpc('admin_approve_host', { target_user_id: hostId });
+      if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'providers'] });
@@ -481,14 +461,13 @@ export function useRejectHost() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (hostId: string) => {
-      const now = new Date().toISOString();
-      const { error } = await supabase
-        .from('host_profiles')
-        .update({ onboarding_status: 'rejected', updated_at: now } as any)
-        .eq('id', hostId);
+      const { error } = await (supabase as any).rpc('admin_reject_host', { target_user_id: hostId });
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'providers'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'providers'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'kyc'] });
+    },
   });
 }
 

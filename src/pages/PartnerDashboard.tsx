@@ -28,6 +28,7 @@ interface HubPartner {
   total_commission: number;
   is_active: boolean;
   created_at: string;
+  qr_scans?: number;
 }
 
 interface Transaction {
@@ -65,7 +66,8 @@ function downloadQR(referralId: string) {
 }
 
 export default function PartnerDashboard() {
-  const { referralId } = useParams<{ referralId: string }>();
+  const { referralId, partnerId } = useParams<{ referralId?: string; partnerId?: string }>();
+  const lookupKey = partnerId || referralId;
   const [partner, setPartner] = useState<HubPartner | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,29 +78,44 @@ export default function PartnerDashboard() {
     : '';
 
   useEffect(() => {
-    if (!referralId) return;
+    if (!lookupKey) return;
 
     async function load() {
       setLoading(true);
-      const code = referralId.toUpperCase();
-
-      // Try referral_id first, then fall back to qr_tracking_id for older partners
       let hub: any = null;
-      const { data: byReferralId } = await (supabase as any)
-        .from('hub_partners')
-        .select('*')
-        .eq('referral_id', code)
-        .maybeSingle();
 
-      if (byReferralId) {
-        hub = byReferralId;
-      } else {
-        const { data: byQrId } = await (supabase as any)
+      // Check if lookupKey matches a UUID format
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lookupKey);
+
+      if (isUuid) {
+        const { data: byId } = await (supabase as any)
           .from('hub_partners')
           .select('*')
-          .eq('qr_tracking_id', code)
+          .eq('id', lookupKey)
           .maybeSingle();
-        hub = byQrId;
+        hub = byId;
+      }
+
+      if (!hub) {
+        const code = lookupKey.toUpperCase();
+
+        // Try referral_id first, then fall back to qr_tracking_id for older partners
+        const { data: byReferralId } = await (supabase as any)
+          .from('hub_partners')
+          .select('*')
+          .eq('referral_id', code)
+          .maybeSingle();
+
+        if (byReferralId) {
+          hub = byReferralId;
+        } else {
+          const { data: byQrId } = await (supabase as any)
+            .from('hub_partners')
+            .select('*')
+            .eq('qr_tracking_id', code)
+            .maybeSingle();
+          hub = byQrId;
+        }
       }
 
       if (!hub) { setNotFound(true); setLoading(false); return; }
@@ -116,7 +133,7 @@ export default function PartnerDashboard() {
     }
 
     load();
-  }, [referralId]);
+  }, [lookupKey]);
 
   if (loading) {
     return (
@@ -132,7 +149,7 @@ export default function PartnerDashboard() {
         <DynamicLogo lightHeightClass="h-10" className="mb-6" />
         <h1 className="text-2xl font-bold text-gray-800 mb-2">Partner Not Found</h1>
         <p className="text-gray-500 text-center max-w-xs">
-          The referral ID <span className="font-mono font-semibold">{referralId}</span> does not match any active partner.
+          The partner identifier <span className="font-mono font-semibold">{lookupKey}</span> does not match any active partner.
         </p>
         <Link to="/" className="mt-6 text-sm text-[#013220] underline underline-offset-4">Go to Xplorwing</Link>
       </div>
@@ -145,6 +162,7 @@ export default function PartnerDashboard() {
   const totalBookings  = transactions.length;
 
   const stats = [
+    { label: 'QR Scans',        value: partner.qr_scans ?? 0, icon: QrCode,        color: 'text-indigo-600 bg-indigo-50', suffix: '' },
     { label: 'Total Referrals', value: totalBookings, icon: Users,       color: 'text-blue-600 bg-blue-50',   suffix: '' },
     { label: 'Total Revenue',   value: Number(partner.total_revenue ?? 0).toFixed(0), icon: BarChart3, color: 'text-purple-600 bg-purple-50', prefix: '₹' },
     { label: 'Commission Earned', value: totalEarned.toFixed(0), icon: TrendingUp, color: 'text-green-700 bg-green-50', prefix: '₹' },
@@ -185,7 +203,7 @@ export default function PartnerDashboard() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {stats.map(s => (
             <div key={s.label} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
               <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${s.color}`}>

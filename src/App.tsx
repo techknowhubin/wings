@@ -9,7 +9,7 @@ import { ThemeProvider } from "./components/ThemeProvider";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CookieConsentProvider } from "./contexts/CookieConsentContext";
 import CookieBanner from "./components/CookieBanner";
-import { isSupabaseConfigured } from "@/integrations/supabase/client";
+import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
 import MissingSupabaseConfig from "@/components/MissingSupabaseConfig";
 import ScrollToTop from "./components/ScrollToTop";
 import AuthRedirectHandler from "./components/AuthRedirectHandler";
@@ -79,7 +79,12 @@ function ReferralCapture() {
   const [params] = useSearchParams();
   useEffect(() => {
     const ref = params.get('ref');
-    if (ref) captureReferral(ref);
+    if (ref) {
+      captureReferral(ref);
+      // Increment the QR scan count in the database
+      supabase.rpc('increment_partner_qr_scans_by_code', { ref_code: ref })
+        .catch(err => console.error('Error tracking QR scan:', err));
+    }
   }, [params]);
   return null;
 }
@@ -146,6 +151,7 @@ const App = () =>
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/cookie-settings" element={<CookieSettings />} />
             <Route path="/partner-dashboard/:referralId" element={<PartnerDashboard />} />
+            <Route path="/partner/:partnerId" element={<PartnerDashboard />} />
             
             {/* Host Dashboard — shared layout, only content transitions */}
             <Route 

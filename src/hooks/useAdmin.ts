@@ -51,16 +51,17 @@ export function useAdminMetrics() {
       const [
         gmvData,
         todayBookings,
-        pendingKyc,
-        registeredTravelers,
+        kycDocs,
+        userRoles,
+        allProfiles,
         wingIdsIssued,
         staysPending, hotelsPending, resortsPending, carsPending, bikesPending, expPending,
-        activeProvidersCount,
       ] = await Promise.all([
         safeQuery(() => supabase.from('bookings').select('total_price').eq('payment_status', 'completed')),
         safeCount(() => supabase.from('bookings').select('*', { count: 'exact', head: true }).gte('created_at', today)),
-        safeCount(() => supabase.from('user_documents' as any).select('*', { count: 'exact', head: true }).eq('status', 'pending')),
-        safeCount(() => supabase.from('user_roles').select('*', { count: 'exact', head: true }).eq('role', 'user')),
+        safeQuery(() => supabase.from('user_documents' as any).select('user_id, status')),
+        safeQuery(() => supabase.from('user_roles').select('user_id, role')),
+        safeQuery(() => supabase.from('profiles').select('id')),
         safeCount(() => supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('kyc_status', 'approved')),
         safeQuery(() => supabase.from('stays').select('id').eq('approval_status', 'pending')),
         safeQuery(() => supabase.from('hotels' as any).select('id').eq('approval_status', 'pending')),
@@ -68,7 +69,6 @@ export function useAdminMetrics() {
         safeQuery(() => supabase.from('cars').select('id').eq('approval_status', 'pending')),
         safeQuery(() => supabase.from('bikes').select('id').eq('approval_status', 'pending')),
         safeQuery(() => supabase.from('experiences').select('id').eq('approval_status', 'pending')),
-        safeCount(() => supabase.from('user_roles').select('*', { count: 'exact', head: true }).eq('role', 'host')),
       ]);
 
       const totalGmv = (gmvData as any[] ?? []).reduce((s: number, r: any) => s + Number(r.total_price || 0), 0);
@@ -81,6 +81,28 @@ export function useAdminMetrics() {
         ((carsPending as any[])?.length ?? 0) +
         ((bikesPending as any[])?.length ?? 0) +
         ((expPending as any[])?.length ?? 0);
+
+      const pendingKyc = new Set(
+        (kycDocs as any[] ?? [])
+          .filter((d: any) => d.status === 'pending' || d.status === 'under_review')
+          .map((d: any) => d.user_id)
+      ).size;
+
+      const hostAndAdminIds = new Set(
+        (userRoles as any[] ?? [])
+          .filter((r: any) => r.role === 'host' || r.role === 'admin')
+          .map((r: any) => r.user_id)
+      );
+
+      const registeredTravelers = (allProfiles as any[] ?? [])
+        .filter((p: any) => !hostAndAdminIds.has(p.id))
+        .length;
+
+      const activeProvidersCount = new Set(
+        (userRoles as any[] ?? [])
+          .filter((r: any) => r.role === 'host')
+          .map((r: any) => r.user_id)
+      ).size;
 
       return {
         totalGmv,
@@ -172,7 +194,10 @@ export function useLockKycSubmission() {
         .eq('status', 'pending');
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'kyc'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'kyc'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'metrics'] });
+    },
   });
 }
 
@@ -182,6 +207,20 @@ export function useApproveKyc() {
     mutationFn: async ({ submissionId, userId, adminId }: { submissionId: string; userId: string; adminId: string }) => {
       const now = new Date().toISOString();
 
+      // Get user profile to check if they already have a wing_id
+      const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
+        .select('wing_id')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (profileErr) throw new Error(`Failed to fetch user profile: ${profileErr.message}`);
+
+      let wingId = profile?.wing_id;
+      if (!wingId) {
+        wingId = await generateUniqueWingId();
+      }
+
       const [docRes, profileRes, hostRes] = await Promise.all([
         supabase.from('user_documents' as any).update({
           status: 'approved',
@@ -190,6 +229,7 @@ export function useApproveKyc() {
         }).eq('id', submissionId),
         supabase.from('profiles').update({
           kyc_status: 'approved',
+          wing_id: wingId,
           updated_at: now,
         }).eq('id', userId),
         supabase.from('host_profiles').update({
@@ -201,7 +241,7 @@ export function useApproveKyc() {
       if (profileRes.error) throw new Error(`Profile update failed: ${profileRes.error.message}`);
       // host_profiles update is best-effort — host may not have a host_profiles row yet
 
-      return { wingId: 'APPROVED' };
+      return { wingId };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'kyc'] });
@@ -225,7 +265,10 @@ export function useRejectKyc() {
       if (k.error) throw k.error;
       if (p.error) throw p.error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'kyc'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'kyc'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'metrics'] });
+    },
   });
 }
 
@@ -244,7 +287,10 @@ export function useRequestReupload() {
       if (k.error) throw k.error;
       if (p.error) throw p.error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'kyc'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'kyc'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'metrics'] });
+    },
   });
 }
 
@@ -476,10 +522,21 @@ export function useAdminUsers(kycFilter?: string, search?: string) {
   return useQuery({
     queryKey: ['admin', 'users', kycFilter, search],
     queryFn: async () => {
+      // 1. Get all host/admin user IDs to exclude
+      const { data: nonTravelers, error: ntError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .in('role', ['host', 'admin']);
+      
+      if (ntError) throw ntError;
+      const excludeIds = new Set((nonTravelers ?? []).map((r: any) => r.user_id));
+
+      // 2. Query all profiles
       let query = supabase
         .from('profiles')
         .select('id, full_name, phone, profile_image, kyc_status, created_at')
         .order('created_at', { ascending: false });
+
       if (kycFilter && kycFilter !== 'all') {
         if (kycFilter === 'no_kyc') {
           query = query.eq('kyc_status', 'not_started');
@@ -489,7 +546,10 @@ export function useAdminUsers(kycFilter?: string, search?: string) {
       }
       const { data, error } = await query;
       if (error) throw error;
-      let users = data ?? [];
+
+      // 3. Filter out hosts and admins on the client side
+      let users = (data ?? []).filter((u: any) => !excludeIds.has(u.id));
+
       if (search) {
         const s = search.toLowerCase();
         users = users.filter((u: any) => u.full_name?.toLowerCase().includes(s) || u.phone?.includes(s));
@@ -715,6 +775,20 @@ export function useToggleHubStatus() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'hubs'] }),
+  });
+}
+
+export function useDeleteHubPartner() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('hub_partners' as any).delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'hubs'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'hub-analytics'] });
+    },
   });
 }
 

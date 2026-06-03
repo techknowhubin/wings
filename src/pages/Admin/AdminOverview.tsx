@@ -64,7 +64,7 @@ export default function AdminOverview() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard label="Total GMV" value={INR(metrics?.totalGmv ?? 0)} icon={TrendingUp} color="bg-emerald-500/10 text-emerald-600" sub="All-time paid bookings" />
           <MetricCard label="Bookings Today" value={metrics?.todayBookings ?? 0} icon={BookOpen} color="bg-blue-500/10 text-blue-600" />
-          <MetricCard label="Active Providers" value={metrics?.activeProviders ?? 0} icon={Users} color="bg-purple-500/10 text-purple-600" />
+          <MetricCard label="Active Hosts" value={metrics?.activeProviders ?? 0} icon={Users} color="bg-purple-500/10 text-purple-600" />
           <MetricCard label="Platform Revenue" value={INR(metrics?.platformRevenue ?? 0)} icon={Wallet} color="bg-amber-500/10 text-amber-600" sub="Commission earned" />
           <MetricCard label="Pending KYC" value={metrics?.pendingKyc ?? 0} icon={ShieldCheck} color="bg-orange-500/10 text-orange-600" sub="Awaiting review" />
           <MetricCard label="Pending Listings" value={metrics?.pendingListings ?? 0} icon={CheckSquare} color="bg-red-500/10 text-red-600" sub="Awaiting approval" />

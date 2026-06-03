@@ -584,9 +584,21 @@ export async function updateMarketplaceVisibility(
     resort: 'resorts',
     cab: 'cars',
   };
+
+  const updatePayload: any = {
+    marketplace_visible: marketplaceVisible,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (marketplaceVisible) {
+    updatePayload.approval_status = 'approved';
+    updatePayload.is_verified = true;
+    updatePayload.rejection_reason = null;
+  }
+
   const { data, error } = await supabase
     .from(tableMap[listingType] as any)
-    .update({ marketplace_visible: marketplaceVisible })
+    .update(updatePayload)
     .eq('id', listingId)
     .select('id')
     .single();

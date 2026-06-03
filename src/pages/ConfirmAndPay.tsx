@@ -135,25 +135,46 @@ const ConfirmAndPay = () => {
 
   useEffect(() => {
     const fetchCoupons = async () => {
-      if (!booking?.hostId || !booking.listingCouponType) return;
+      if (!booking?.hostId) return;
       const { data } = await supabase
         .from("host_coupons" as any)
-        .select("id,code,discount_percent,starts_at,ends_at,usage_limit,used_count,one_time_per_user")
+        .select(
+          "id,code,discount_type,discount_value,discount_percent,is_enabled,listing_id,starts_at,ends_at,expires_at,usage_limit,used_count,one_time_per_user,listing_types"
+        )
         .eq("host_id", booking.hostId)
-        .eq("is_active", true)
-        .contains("listing_types", [booking.listingCouponType]);
+        .eq("is_active", true);
+      // Filter: coupon must be enabled AND (global OR matches current listing)
+      const filtered = (data ?? []).filter((item: any) => {
+        if (!item.is_enabled) return false;
+        // listing_types check (pre-existing global scope guard)
+        if (booking.listingCouponType && Array.isArray(item.listing_types) && item.listing_types.length > 0) {
+          if (!item.listing_types.includes(booking.listingCouponType)) return false;
+        }
+        // listing_id scope: if set, must match the current listing
+        if (item.listing_id && item.listing_id !== booking.listingId) return false;
+        return true;
+      });
       setGlobalCoupons(
-        (data ?? []).map((item: any) => ({
-          id: String(item.id),
-          code: String(item.code ?? "").toUpperCase(),
-          type: "percent" as const,
-          value: Number(item.discount_percent ?? 0),
-          startsAt: item.starts_at ?? null,
-          endsAt: item.ends_at ?? null,
-          usageLimit: item.usage_limit ?? null,
-          usedCount: Number(item.used_count ?? 0),
-          oneTimePerUser: Boolean(item.one_time_per_user),
-        }))
+        filtered.map((item: any) => {
+          const discountType: "percent" | "flat" =
+            item.discount_type === "flat" ? "flat" : "percent";
+          const value =
+            discountType === "flat"
+              ? Number(item.discount_value ?? 0)
+              : Number(item.discount_value ?? item.discount_percent ?? 0);
+          return {
+            id: String(item.id),
+            code: String(item.code ?? "").toUpperCase(),
+            type: discountType,
+            value,
+            startsAt: item.starts_at ?? null,
+            endsAt: item.expires_at ?? item.ends_at ?? null,
+            usageLimit: item.usage_limit ?? null,
+            usedCount: Number(item.used_count ?? 0),
+            oneTimePerUser: Boolean(item.one_time_per_user),
+            listingId: item.listing_id ?? null,
+          };
+        })
       );
     };
     void fetchCoupons();
@@ -267,7 +288,10 @@ const ConfirmAndPay = () => {
 
   const couponDiscountAmount = useMemo(() => {
     if (!booking || !appliedCoupon) return 0;
-    // For other coupons, we can apply their percentage discount directly to the booking fee
+    if (appliedCoupon.type === "flat") {
+      return Math.min(appliedCoupon.value, normalBookingFee);
+    }
+    // Percentage discount applied to the booking fee
     return (normalBookingFee * appliedCoupon.value) / 100;
   }, [appliedCoupon, booking, normalBookingFee]);
 
@@ -283,18 +307,15 @@ const ConfirmAndPay = () => {
   };
 
   const handleApplyCoupon = async () => {
-    if (!availableCoupons.length) {
-      toast.error("No coupons are available for this listing.");
-      return;
-    }
     const normalized = promoCode.trim().toUpperCase();
     if (!normalized) {
       toast.error("Enter a coupon code to apply.");
       return;
     }
+    // Search all available coupons (from DB fetch) by code
     const match = availableCoupons.find((coupon) => coupon.code.toUpperCase() === normalized);
     if (!match) {
-      toast.error("Invalid coupon code.");
+      toast.error("Invalid or unavailable coupon code.");
       return;
     }
     const now = new Date();
@@ -307,7 +328,12 @@ const ConfirmAndPay = () => {
       return;
     }
     if (match.usageLimit && (match.usedCount ?? 0) >= match.usageLimit) {
-      toast.error("This coupon reached its usage limit.");
+      toast.error("This coupon has reached its usage limit.");
+      return;
+    }
+    // Listing-specific validation: coupon.listingId must match current listing if set
+    if ((match as any).listingId && booking?.listingId && (match as any).listingId !== booking.listingId) {
+      toast.error("This coupon is not valid for the selected listing.");
       return;
     }
     if (match.oneTimePerUser && user) {
@@ -620,7 +646,7 @@ const ConfirmAndPay = () => {
             </div>
             {appliedCoupon ? (
               <p className="text-xs text-accent mb-3">
-                Applied {appliedCoupon.code} ({appliedCoupon.value}% off).
+                Applied {appliedCoupon.code} ({appliedCoupon.type === "flat" ? `₹${appliedCoupon.value} off` : `${appliedCoupon.value}% off`}).
               </p>
             ) : null}
 
@@ -674,7 +700,7 @@ const ConfirmAndPay = () => {
               {appliedCoupon ? (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground font-semibold text-accent">
-                    Coupon discount ({appliedCoupon.value}%)
+                    Coupon discount ({appliedCoupon.type === "flat" ? `₹${appliedCoupon.value} flat` : `${appliedCoupon.value}%`})
                   </span>
                   <span className="font-medium text-accent">-{booking.currencySymbol}{formatAmount(couponDiscountAmount)}</span>
                 </div>

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAdminPendingListings, useApproveListing, useRejectListing, useRequestRevision, useDeleteListing } from '@/hooks/useAdmin';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +13,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { Switch } from '@/components/ui/switch';
+import { useUpdateMarketplaceVisibility } from '@/hooks/useListings';
 import { formatDistanceToNow } from 'date-fns';
 import { CheckCircle2, XCircle, RefreshCw, Trash2, CheckSquare, X } from 'lucide-react';
 
@@ -44,9 +47,21 @@ const REJECTION_REASONS = [
 // Composite key for uniquely identifying a listing across tables
 const rowKey = (l: any) => `${l._table}:${l.id}`;
 
+const getListingTypeFromTable = (table: string): any => {
+  if (table === 'stays') return 'stay';
+  if (table === 'cars') return 'car';
+  if (table === 'bikes') return 'bike';
+  if (table === 'experiences') return 'experience';
+  if (table === 'hotels') return 'hotel';
+  if (table === 'resorts') return 'resort';
+  return table;
+};
+
 export default function ListingApprovals() {
   const { toast } = useToast();
   const [tab, setTab] = useState('all');
+  const queryClient = useQueryClient();
+  const updateMarketplaceVisibility = useUpdateMarketplaceVisibility();
 
   // Single-item review state
   const [selected, setSelected] = useState<any>(null);
@@ -263,13 +278,14 @@ export default function ListingApprovals() {
                       <TableHead>Location</TableHead>
                       <TableHead>Submitted</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Marketplace</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filtered.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
                           No listings to review.
                         </TableCell>
                       </TableRow>
@@ -306,6 +322,38 @@ export default function ListingApprovals() {
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className={`text-[10px] ${badge?.className}`}>{badge?.label}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={l.marketplace_visible ?? false}
+                                onCheckedChange={async (checked) => {
+                                  try {
+                                    await updateMarketplaceVisibility.mutateAsync({
+                                      listingType: getListingTypeFromTable(l._table),
+                                      listingId: l.id,
+                                      marketplaceVisible: checked,
+                                    });
+                                    queryClient.invalidateQueries({ queryKey: ['admin', 'listings'] });
+                                    toast({
+                                      title: checked ? 'Listing is now visible in users marketplace.' : 'Listing removed from marketplace.',
+                                      className: 'border-green-200 bg-green-50 text-green-800',
+                                    });
+                                  } catch (err: any) {
+                                    toast({
+                                      title: 'Failed to update marketplace visibility.',
+                                      description: err.message,
+                                      variant: 'destructive',
+                                    });
+                                  }
+                                }}
+                              />
+                              {l.marketplace_requested && !l.marketplace_visible && (
+                                <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200 text-[9px] px-1 py-0 scale-90">
+                                  Requested
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1.5">
@@ -360,6 +408,46 @@ export default function ListingApprovals() {
                 <p className="text-sm font-semibold">{selected.profiles?.full_name ?? '—'}</p>
                 <p className="text-xs text-muted-foreground">{selected.profiles?.phone ?? '—'}</p>
               </div>
+
+              <div className="p-4 rounded-xl border bg-muted/10 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Marketplace Visibility</p>
+                  <p className="text-xs text-muted-foreground">Show this listing in the travelers marketplace</p>
+                  {selected.marketplace_requested && (
+                    <p className="text-[10px] text-amber-600 mt-1 font-semibold">⚠️ Host requested marketplace listing</p>
+                  )}
+                </div>
+                <Switch
+                  checked={selected.marketplace_visible ?? false}
+                  onCheckedChange={async (checked) => {
+                    try {
+                      await updateMarketplaceVisibility.mutateAsync({
+                        listingType: getListingTypeFromTable(selected._table),
+                        listingId: selected.id,
+                        marketplaceVisible: checked,
+                      });
+                      setSelected((prev: any) => prev ? { 
+                        ...prev, 
+                        marketplace_visible: checked,
+                        approval_status: checked ? 'approved' : prev.approval_status,
+                        is_verified: checked ? true : prev.is_verified,
+                        rejection_reason: checked ? null : prev.rejection_reason,
+                      } : null);
+                      toast({
+                        title: checked ? 'Listing is now visible in users marketplace.' : 'Listing removed from marketplace.',
+                        className: 'border-green-200 bg-green-50 text-green-800',
+                      });
+                    } catch (err: any) {
+                      toast({
+                        title: 'Failed to update marketplace status.',
+                        description: err.message,
+                        variant: 'destructive',
+                      });
+                    }
+                  }}
+                />
+              </div>
+
               <div className="space-y-3 pt-2 border-t">
                 <Button className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={() => setApproveOpen(true)}>
                   <CheckCircle2 className="h-4 w-4 mr-2" /> Approve Listing

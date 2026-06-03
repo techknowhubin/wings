@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   useHubPartners, useCreateHubPartner, useUpdateHubPartner, useToggleHubStatus,
-  useReferralTransactions, useHubAnalytics,
+  useReferralTransactions, useHubAnalytics, useDeleteHubPartner,
 } from '@/hooks/useAdmin';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 import {
   Building2, Plus, Search, QrCode, Download, Copy, Pencil,
   ToggleLeft, ToggleRight, TrendingUp, Users, DollarSign, BarChart3,
-  Eye, CheckCircle2, XCircle, Clock, ExternalLink,
+  Eye, CheckCircle2, XCircle, Clock, ExternalLink, Trash2,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -262,6 +262,20 @@ export default function AdminHubs() {
   const createMut = useCreateHubPartner();
   const updateMut = useUpdateHubPartner();
   const toggleMut = useToggleHubStatus();
+  const deleteMut = useDeleteHubPartner();
+
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const handleDelete = async () => {
+    if (!deleteConfirmId) return;
+    try {
+      await deleteMut.mutateAsync(deleteConfirmId);
+      toast.success('Hub partner deleted successfully.');
+      setDeleteConfirmId(null);
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to delete.');
+    }
+  };
 
   const openEdit = (h: any) => {
     setEditHub(h);
@@ -495,6 +509,14 @@ export default function AdminHubs() {
                               >
                                 {h.is_active ? <ToggleRight className="h-3.5 w-3.5" /> : <ToggleLeft className="h-3.5 w-3.5" />}
                               </Button>
+                              <Button
+                                size="icon" variant="ghost"
+                                className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                title="Delete"
+                                onClick={() => setDeleteConfirmId(h.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -513,6 +535,24 @@ export default function AdminHubs() {
 
       {/* Referral History */}
       <ReferralHistorySheet hub={historyHub} open={!!historyHub} onClose={() => setHistoryHub(null)} />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteConfirmId} onOpenChange={(o) => !o && setDeleteConfirmId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Hub Partner?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete this hub partner? This action cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteMut.isPending}>
+              {deleteMut.isPending ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Hub Partner Dialog */}
       <Dialog open={!!editHub} onOpenChange={(o) => !o && setEditHub(null)}>

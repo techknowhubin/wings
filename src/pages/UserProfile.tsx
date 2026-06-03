@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   User, Calendar, ShieldCheck, Lock, Bell, HelpCircle, LogOut,
   Camera, Edit2, Save, Check, Clock, Upload, X, Eye, EyeOff,
-  FileText, ChevronRight, ExternalLink, MessageSquare, Loader2,
+  FileText, ChevronRight, ExternalLink, MessageSquare, Loader2, Ticket,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -32,7 +32,7 @@ import { CalendarIcon } from "lucide-react";
 
 // ======================== Types ========================
 
-type Section = "profile" | "bookings" | "kyc" | "security" | "notifications" | "help";
+type Section = "profile" | "bookings" | "kyc" | "security" | "notifications" | "help" | "coupons";
 
 interface KYCDoc {
   name: string;
@@ -46,6 +46,7 @@ interface KYCDoc {
 const navItems: { icon: typeof User; label: string; section: Section }[] = [
   { icon: User, label: "My Profile", section: "profile" },
   { icon: Calendar, label: "Booking History", section: "bookings" },
+  { icon: Ticket, label: "My Coupons", section: "coupons" },
   { icon: ShieldCheck, label: "KYC Details", section: "kyc" },
   { icon: Lock, label: "Security & Password", section: "security" },
   { icon: Bell, label: "Notifications", section: "notifications" },
@@ -288,6 +289,34 @@ export default function UserProfile() {
       return results;
     },
     enabled: !!user
+  });
+
+  // My Coupons: fetch coupons from hosts the user has booked with
+  const { data: myCoupons = [], isLoading: couponsLoading } = useQuery({
+    queryKey: ["my-coupons", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      // Get distinct host IDs from user's bookings
+      const { data: bData } = await supabase
+        .from("bookings")
+        .select("host_id")
+        .eq("user_id", user.id);
+      const hostIds = [...new Set((bData ?? []).map((b: any) => b.host_id).filter(Boolean))];
+      if (!hostIds.length) return [];
+      const { data } = await (supabase as any)
+        .from("host_coupons")
+        .select("id,code,discount_type,discount_value,discount_percent,is_enabled,listing_id,expires_at,ends_at,listing_types,host_id")
+        .in("host_id", hostIds)
+        .eq("is_active", true)
+        .eq("is_enabled", true);
+      const now = new Date();
+      return (data ?? []).filter((c: any) => {
+        const exp = c.expires_at ?? c.ends_at;
+        if (exp && new Date(exp) < now) return false;
+        return true;
+      });
+    },
+    enabled: !!user,
   });
 
   const handleSaveProfile = async () => {
@@ -952,6 +981,84 @@ export default function UserProfile() {
                 </Card>
               </div>
             )}
+            {/* ====== My Coupons ====== */}
+            {activeSection === "coupons" && (
+              <div className="space-y-6">
+                <h1 className="text-2xl font-bold text-foreground">My Coupons</h1>
+                <p className="text-sm text-muted-foreground">
+                  Coupons available from hosts you've booked with. Apply these codes at checkout.
+                </p>
+                {couponsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-24 w-full bg-muted animate-pulse rounded-xl" />
+                    ))}
+                  </div>
+                ) : myCoupons.length === 0 ? (
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <Ticket className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground mb-2">No coupons available yet</p>
+                      <p className="text-xs text-muted-foreground">Book a stay, vehicle or experience to unlock coupons from hosts.</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {myCoupons.map((coupon: any) => {
+                      const discountType = coupon.discount_type === "flat" ? "flat" : "percent";
+                      const value =
+                        discountType === "flat"
+                          ? Number(coupon.discount_value ?? 0)
+                          : Number(coupon.discount_value ?? coupon.discount_percent ?? 0);
+                      const expDate = coupon.expires_at ?? coupon.ends_at;
+                      const scope =
+                        coupon.listing_id
+                          ? "Listing-specific"
+                          : Array.isArray(coupon.listing_types) && coupon.listing_types.length > 0
+                          ? coupon.listing_types.join(", ")
+                          : "All listings";
+                      return (
+                        <Card key={coupon.id} className="border-dashed border-2 border-primary/30 bg-primary/5 hover:border-primary/60 transition-colors">
+                          <CardContent className="p-4 flex items-start gap-4">
+                            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                              <Ticket className="h-6 w-6 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <p className="font-bold font-mono text-foreground text-sm tracking-widest">
+                                  {coupon.code}
+                                </p>
+                                <Badge variant="outline" className="text-primary border-primary/30 bg-primary/10 text-xs font-semibold">
+                                  {discountType === "flat" ? `₹${value} OFF` : `${value}% OFF`}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">Scope: {scope}</p>
+                              {expDate && (
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  Expires: {format(new Date(expDate), "MMM d, yyyy")}
+                                </p>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="mt-2 h-7 px-2 text-xs text-primary hover:bg-primary/10"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(coupon.code);
+                                  toast.success(`Coupon code "${coupon.code}" copied!`);
+                                }}
+                              >
+                                Copy Code
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
           </motion.div>
         </main>
       </div>

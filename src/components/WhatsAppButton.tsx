@@ -1,8 +1,15 @@
 import React from "react";
 import { useCookieConsent } from "@/contexts/CookieConsentContext";
+import { useLocation } from "react-router-dom";
 
 const WhatsAppButton = () => {
   const { hasResponded } = useCookieConsent();
+  const location = useLocation();
+
+  // Hide the Chat with us widget on all admin dashboard pages
+  if (location.pathname.startsWith("/admin")) {
+    return null;
+  }
 
   return (
     <a
@@ -18,3 +25,4 @@ const WhatsAppButton = () => {
 };
 
 export default WhatsAppButton;
+

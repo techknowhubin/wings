@@ -54,31 +54,70 @@ const OffersSection = ({ variant = "default" }: OffersSectionProps) => {
 
   useEffect(() => {
     async function fetchOffers() {
+      const emojiMap: Record<string, string> = {
+        Stay: "🏡", Cab: "🚗", Tour: "🌄", Default: "🏷️",
+      };
+
+      const toOffer = (dbOffer: any, idx: number) => {
+        const cat = mapListingTypeToCategory(dbOffer.listing_types);
+        const colorSet =
+          idx % 2 === 0 && cat === "Stay"
+            ? categoryColorMap["Default"]
+            : categoryColorMap[cat] || categoryColorMap["Default"];
+        const discVal = Number(dbOffer.discount_percent ?? 0);
+        const discLabel = `${discVal}% off`;
+        const scope = `on ${(dbOffer.listing_types as string[] | null)?.join(", ") || "all listings"}`;
+        const expiry = dbOffer.ends_at;
+        return {
+          id: dbOffer.id,
+          type: cat,
+          title: dbOffer.title || `${discLabel}\n${scope}`,
+          validity: getValidityText(expiry),
+          code: dbOffer.code,
+          emoji: dbOffer.emoji || emojiMap[cat] || "🏷️",
+          category: cat,
+          terms: Array.isArray(dbOffer.terms) && dbOffer.terms.length
+            ? dbOffer.terms
+            : [
+                `Use code ${dbOffer.code} at checkout to avail this offer.`,
+                `Get ${discVal}% off on your booking fee.`,
+                expiry
+                  ? `Valid till ${new Date(expiry).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}.`
+                  : "Valid until further notice.",
+                "Cannot be combined with other coupon codes.",
+                "Platform T&C apply.",
+              ],
+          colors: colorSet,
+        };
+      };
+
+      // Fetch ALL active host coupons visible to the public.
       const { data, error } = await supabase
-        .from('host_coupons')
-        .select('*')
-        .eq('is_platform_offer', true)
+        .from('host_coupons' as any)
+        .select('id,code,discount_percent,listing_types,is_active,ends_at,usage_limit,used_count')
         .eq('is_active', true);
-        
-      if (!error && data) {
-        const mappedOffers = data.map((dbOffer, idx) => {
-          const cat = mapListingTypeToCategory(dbOffer.listing_types);
-          // Distribute colors across items if they share same category
-          const colorSet = idx % 2 === 0 && cat === 'Stay' ? categoryColorMap['Default'] : categoryColorMap[cat] || categoryColorMap['Default'];
-          return {
-            id: dbOffer.id,
-            type: cat,
-            title: dbOffer.title || `${dbOffer.discount_percent}% off`,
-            validity: getValidityText(dbOffer.ends_at),
-            code: dbOffer.code,
-            emoji: dbOffer.emoji || "🏷️",
-            category: cat,
-            terms: dbOffer.terms || ["Standard T&C Apply"],
-            colors: colorSet
-          };
-        });
-        setOffers(mappedOffers);
+
+      console.log("OffersSection DB result:", { data, error });
+
+      if (error) {
+        console.error("OffersSection fetch error:", error.message);
+        setLoading(false);
+        return;
       }
+
+      console.log("Raw coupons from DB:", data?.length, data);
+
+      const seen = new Set<string>();
+      const valid = (data ?? []).filter((c: any) => {
+        if (seen.has(c.id)) return false;
+        seen.add(c.id);
+        if (c.ends_at && new Date(c.ends_at) < new Date()) return false;
+        if (c.usage_limit && c.used_count >= c.usage_limit) return false;
+        return true;
+      });
+
+      console.log("Valid coupons after filter:", valid.length);
+      setOffers(valid.map((c: any, idx: number) => toOffer(c, idx)));
       setLoading(false);
     }
     fetchOffers();

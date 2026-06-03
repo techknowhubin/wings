@@ -45,7 +45,7 @@ export default function AdminProviders() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black tracking-tight">Providers</h1>
+          <h1 className="text-2xl font-black tracking-tight">Hosts</h1>
           <p className="text-muted-foreground text-sm mt-1">Review and approve host profiles before they can create listings.</p>
         </div>
       </div>
@@ -68,7 +68,7 @@ export default function AdminProviders() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Provider</TableHead>
+                  <TableHead>Host</TableHead>
                   <TableHead>Business</TableHead>
                   <TableHead>Joined</TableHead>
                   <TableHead>Status</TableHead>
@@ -77,7 +77,7 @@ export default function AdminProviders() {
               </TableHeader>
               <TableBody>
                 {(providers ?? []).length === 0 && (
-                  <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No providers found.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No hosts found.</TableCell></TableRow>
                 )}
                 {(providers ?? []).map((p: any) => {
                   const status = p.onboarding_status ?? 'pending';

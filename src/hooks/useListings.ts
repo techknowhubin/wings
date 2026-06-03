@@ -491,11 +491,69 @@ export function useUpdateMarketplaceVisibility() {
       listingId: string;
       marketplaceVisible: boolean;
     }) => updateMarketplaceVisibility(listingType, listingId, marketplaceVisible),
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ['admin', 'listings'] });
+      const plural = variables.listingType === 'cab' ? 'cars' : (variables.listingType === 'experience' ? 'experiences' : `${variables.listingType}s`);
+      await queryClient.cancelQueries({ queryKey: ['host', plural] });
+      await queryClient.cancelQueries({ queryKey: [plural] });
+      await queryClient.cancelQueries({ queryKey: ['managed-listings'] });
+
+      const previousAdminListings = queryClient.getQueryData(['admin', 'listings']);
+      queryClient.setQueryData(['admin', 'listings'], (old: any) => {
+        if (!old) return old;
+        return old.map((item: any) => {
+          if (item.id === variables.listingId) {
+            const updated = {
+              ...item,
+              marketplace_visible: variables.marketplaceVisible,
+            };
+            if (variables.marketplaceVisible) {
+              updated.approval_status = 'approved';
+              updated.is_verified = true;
+              updated.rejection_reason = null;
+            }
+            return updated;
+          }
+          return item;
+        });
+      });
+
+      const previousManagedListings = queryClient.getQueryData(['managed-listings']);
+      queryClient.setQueryData(['managed-listings'], (old: any) => {
+        if (!old) return old;
+        return old.map((item: any) => {
+          if (item.id === variables.listingId) {
+            const updated = {
+              ...item,
+              marketplace_visible: variables.marketplaceVisible,
+            };
+            if (variables.marketplaceVisible) {
+              updated.approval_status = 'approved';
+              updated.is_verified = true;
+              updated.rejection_reason = null;
+            }
+            return updated;
+          }
+          return item;
+        });
+      });
+
+      return { previousAdminListings, previousManagedListings };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousAdminListings) {
+        queryClient.setQueryData(['admin', 'listings'], context.previousAdminListings);
+      }
+      if (context?.previousManagedListings) {
+        queryClient.setQueryData(['managed-listings'], context.previousManagedListings);
+      }
+    },
     onSuccess: (_, { listingType }) => {
       const plural = listingType === 'cab' ? 'cars' : (listingType === 'experience' ? 'experiences' : `${listingType}s`);
       queryClient.invalidateQueries({ queryKey: ['host', plural] });
       queryClient.invalidateQueries({ queryKey: ['managed-listings'] });
       queryClient.invalidateQueries({ queryKey: [plural] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'listings'] });
     },
   });
 }

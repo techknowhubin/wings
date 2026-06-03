@@ -2,7 +2,7 @@ import type { Json } from "@/integrations/supabase/types";
 
 export interface CouponOffer {
   code: string;
-  type: "percent";
+  type: "percent" | "flat";
   value: number;
 }
 
@@ -33,12 +33,13 @@ export function parseListingDiscountConfig(raw: Json | null | undefined): Listin
           if (!coupon || typeof coupon !== "object") return null;
           const c = coupon as { code?: unknown; type?: unknown; value?: unknown };
           if (typeof c.code !== "string" || !c.code.trim()) return null;
-          if (c.type !== "percent") return null;
-          if (typeof c.value !== "number" || c.value <= 0 || c.value > 90) return null;
+          if (c.type !== "percent" && c.type !== "flat") return null;
+          if (typeof c.value !== "number" || c.value <= 0) return null;
+          if (c.type === "percent" && c.value > 90) return null;
 
           return {
             code: c.code.trim().toUpperCase(),
-            type: "percent" as const,
+            type: c.type as "percent" | "flat",
             value: c.value,
           };
         })
@@ -56,8 +57,10 @@ export function createDiscountConfig(
     hostDiscountPercent: Math.min(Math.max(Math.round(hostDiscountPercent), 0), 90),
     coupons: coupons.map((coupon) => ({
       code: coupon.code.trim().toUpperCase(),
-      type: "percent",
-      value: Math.min(Math.max(Math.round(coupon.value), 1), 90),
+      type: coupon.type,
+      value: coupon.type === "percent"
+        ? Math.min(Math.max(Math.round(coupon.value), 1), 90)
+        : Math.max(Number(coupon.value), 1),
     })),
   };
 }

@@ -81,9 +81,17 @@ function ReferralCapture() {
     const ref = params.get('ref');
     if (ref) {
       captureReferral(ref);
-      // Increment the QR scan count in the database
-      supabase.rpc('increment_partner_qr_scans_by_code', { ref_code: ref })
-        .catch(err => console.error('Error tracking QR scan:', err));
+      
+      // Increment the QR scan count safely inside an async wrapper
+      const trackScan = async () => {
+        try {
+          const { error } = await supabase.rpc('increment_partner_qr_scans_by_code', { ref_code: ref });
+          if (error) console.error('Error tracking QR scan:', error);
+        } catch (err) {
+          console.error('Exception tracking QR scan:', err);
+        }
+      };
+      trackScan();
     }
   }, [params]);
   return null;

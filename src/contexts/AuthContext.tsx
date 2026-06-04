@@ -44,6 +44,7 @@ interface AuthContextValue {
   signInWithOtp: (phone: string) => Promise<{ error: Error | null }>;
   verifyOtp: (phone: string, token: string) => Promise<{ data: any; error: any }>;
   resendEmail: (email: string) => Promise<{ error: any }>;
+  checkEmailRegistered: (email: string) => Promise<{ exists: boolean; checked: boolean }>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -270,6 +271,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
+  const checkEmailRegistered = async (email: string): Promise<{ exists: boolean; checked: boolean }> => {
+    try {
+      const { data, error } = await supabase.rpc('check_email_registered' as any, {
+        check_email: email.trim().toLowerCase(),
+      });
+      if (error) {
+        // RPC not deployed yet — SQL not run. Return checked:false so caller can fallback gracefully.
+        console.warn('[checkEmailRegistered] RPC unavailable:', error.message);
+        return { exists: false, checked: false };
+      }
+      return { exists: !!data, checked: true };
+    } catch {
+      return { exists: false, checked: false };
+    }
+  };
+
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
@@ -287,6 +304,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithOtp,
         verifyOtp,
         resendEmail,
+        checkEmailRegistered,
       }}
     >
       {children}

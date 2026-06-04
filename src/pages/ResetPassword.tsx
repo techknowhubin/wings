@@ -27,10 +27,17 @@ const ResetPassword = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Optionally verify if user session actually exists on this page since recovery links log them in
+  // Wait for Supabase to process the #access_token hash from the recovery email.
+  // getSession() fires before the hash is parsed — use onAuthStateChange instead.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // Recovery link processed — user can set a new password.
+        return;
+      }
+      // If there's still no session after the initial check (and it's not a recovery event),
+      // the link is invalid or already used.
+      if (event === 'INITIAL_SESSION' && !session) {
         toast({
           variant: "destructive",
           title: "Invalid or expired link",
@@ -39,6 +46,7 @@ const ResetPassword = () => {
         navigate("/forgot-password");
       }
     });
+    return () => subscription.unsubscribe();
   }, [navigate, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {

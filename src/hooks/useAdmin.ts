@@ -866,6 +866,57 @@ export function useValidateReferralCode() {
   });
 }
 
+// ─── Listing Type Requests ───────────────────────────────────────────────────
+export function useListingTypeRequests(statusFilter?: string) {
+  return useQuery({
+    queryKey: ['admin', 'listing-type-requests', statusFilter],
+    queryFn: async () => {
+      let query = (supabase as any)
+        .from('listing_type_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (statusFilter && statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      const requests = (data ?? []) as any[];
+      const hostIds = [...new Set(requests.map((r: any) => r.host_id).filter(Boolean))];
+      const names = await resolveProfileNames(hostIds);
+      return requests.map((r: any) => ({
+        ...r,
+        host_name: names.get(r.host_id)?.full_name ?? '—',
+        host_phone: names.get(r.host_id)?.phone ?? null,
+      }));
+    },
+  });
+}
+
+export function useApproveListingTypeRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (requestId: string) => {
+      const { error } = await (supabase as any).rpc('admin_approve_listing_type', { request_id: requestId });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'listing-type-requests'] }),
+  });
+}
+
+export function useRejectListingTypeRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ requestId, notes }: { requestId: string; notes?: string }) => {
+      const { error } = await (supabase as any).rpc('admin_reject_listing_type', {
+        request_id: requestId,
+        notes: notes ?? null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'listing-type-requests'] }),
+  });
+}
+
 // ─── Admin Settings — Team ────────────────────────────────────────────────────
 export function useAdminTeam() {
   return useQuery({

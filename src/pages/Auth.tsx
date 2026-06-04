@@ -162,9 +162,16 @@ const styles = `
   }
 `;
 
+// Email check phases:
+// 'enter'   → neutral entry: email field + Continue button
+// 'checking'→ loading while RPC runs
+// 'login'   → account found: show password form
+// 'signup'  → account not found: show full registration form
+type EmailPhase = 'enter' | 'checking' | 'login' | 'signup';
+
 const Auth = () => {
   const [loading, setLoading] = useState(false);
-  const { signUp, signIn, signOut, resendEmail, signInWithPopup, signInWithOtp, verifyOtp, user, getUserRole } = useAuth();
+  const { signUp, signIn, signOut, resendEmail, signInWithPopup, signInWithOtp, verifyOtp, user, getUserRole, checkEmailRegistered } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -186,8 +193,14 @@ const Auth = () => {
   const [searchParams] = useSearchParams();
   const targetRole = (isHostSignupPath || isHostSigninPath) ? "host" : searchParams.get("role");
 
-  // Email state
-  const [isLoginMode, setIsLoginMode] = useState(true);
+  // Email phase — host paths skip the check step entirely
+  const initialEmailPhase: EmailPhase = isHostSignupPath ? 'signup' : isHostSigninPath ? 'login' : 'enter';
+  const [emailPhase, setEmailPhase] = useState<EmailPhase>(initialEmailPhase);
+
+  // Derived compat helpers (used in existing logic below)
+  const isLoginMode = emailPhase === 'login';
+  const setIsLoginMode = (v: boolean) => setEmailPhase(v ? 'login' : 'signup');
+
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -201,10 +214,12 @@ const Auth = () => {
   const [successCountdown, setSuccessCountdown] = useState(5);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [roleConfirmed, setRoleConfirmed] = useState(false);
-  const showRoleSelection = !isLoginMode && !roleConfirmed && !isHostSignupPath;
+  const showRoleSelection = emailPhase === 'signup' && !roleConfirmed && !isHostSignupPath;
 
   // WhatsApp fallback modal
   const [showWaModal, setShowWaModal] = useState(false);
+  // WhatsApp registration check state
+  const [waAccountExists, setWaAccountExists] = useState<boolean | null>(null);
 
   const [selectedRole, setSelectedRole] = useState<'user' | 'host'>(
     targetRole === 'host' ? 'host' : 'user'
@@ -214,18 +229,21 @@ const Auth = () => {
     setSelectedRole(targetRole === 'host' ? 'host' : 'user');
   }, [targetRole]);
 
-  // Set initial mode based on path
+  // Set initial phase based on path
   useEffect(() => {
     if (isHostSigninPath) {
-      setIsLoginMode(true);
+      setEmailPhase('login');
     } else if (isHostSignupPath) {
-      setIsLoginMode(false);
+      setEmailPhase('signup');
     }
   }, [isHostSigninPath, isHostSignupPath]);
 
-  // Reset role confirmation when path changes
+  // Reset role confirmation and email phase when path changes
   useEffect(() => {
     setRoleConfirmed(false);
+    if (!isHostSignupPath && !isHostSigninPath) {
+      setEmailPhase('enter');
+    }
   }, [location.pathname]);
 
   /* ─── routing ─── */
@@ -416,7 +434,28 @@ const Auth = () => {
       return;
     }
     setLoading(true);
-    const { error } = await signInWithOtp(`+91${waNumber}`);
+
+    // Check if this phone number is registered before sending OTP
+    const formattedPhone = `+91${waNumber}`;
+    const { data: phoneCheck } = await supabase
+      .from('profiles')
+      .select('id')
+      .or(`phone.eq.${formattedPhone},phone.eq.${waNumber}`)
+      .maybeSingle();
+
+    if (!phoneCheck) {
+      setLoading(false);
+      setWaAccountExists(false);
+      toast({
+        variant: "destructive",
+        title: "Account not found",
+        description: "No account found for this number. Please create an account with your email first.",
+      });
+      return;
+    }
+
+    setWaAccountExists(true);
+    const { error } = await signInWithOtp(formattedPhone);
     setLoading(false);
     if (error) {
       toast({ variant: "destructive", title: "Failed to send OTP", description: error.message });
@@ -517,7 +556,40 @@ const Auth = () => {
     }
   };
 
-  /* ─── Email ─── */
+  /* ─── Email check: enter phase ─── */
+  const handleEmailContinue = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormErrors({});
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setFormErrors({ email: 'Please enter your email address.' });
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmed)) {
+      setFormErrors({ email: 'Please enter a valid email address.' });
+      return;
+    }
+    setEmailPhase('checking');
+    const { exists, checked } = await checkEmailRegistered(trimmed);
+
+    if (!checked) {
+      // RPC not yet deployed (run supabase/auth_email_check.sql). Default to login so
+      // existing users are never blocked. They can switch to signup via the toggle below.
+      setEmailPhase('login');
+      return;
+    }
+
+    if (exists) {
+      setEmailPhase('login');
+      toast({ title: "Account found", description: "Welcome back! Please enter your password." });
+    } else {
+      setEmailPhase('signup');
+      toast({ title: "New here?", description: "No account found — let's create one for you." });
+    }
+  };
+
+  /* ─── Email auth: login / signup ─── */
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormErrors({});
@@ -540,23 +612,24 @@ const Auth = () => {
           toast({ variant: "destructive", title: "Validation Error", description: err.errors[0].message });
         } else {
           const msg: string = err.message ?? '';
-          const isNoAccount =
-            msg.includes('no account') ||
-            msg.toLowerCase().includes('invalid login') ||
-            msg.toLowerCase().includes('invalid credentials') ||
-            msg.toLowerCase().includes('user not found') ||
-            msg.toLowerCase().includes('no user');
+          const msgL = msg.toLowerCase();
+
+          // Supabase returns "Invalid login credentials" for BOTH wrong password and
+          // unknown email — treat it as wrong credentials, never redirect to signup.
+          const isWrongCredentials =
+            msgL.includes('invalid login') ||
+            msgL.includes('invalid credentials');
+
           const isUnverified =
             msg === 'email_not_verified' ||
-            msg.toLowerCase().includes('email not confirmed') ||
-            msg.toLowerCase().includes('email_not_confirmed');
+            msgL.includes('email not confirmed') ||
+            msgL.includes('email_not_confirmed');
 
-          if (isNoAccount) {
-            // Stay on sign-in page — do NOT switch to signup mode (that causes unintended signUp calls).
+          if (isWrongCredentials) {
             toast({
               variant: "destructive",
-              title: "No account found",
-              description: `No account exists for "${email}". Click "Sign up" below to create one.`,
+              title: "Incorrect password",
+              description: "The password you entered is incorrect. Please try again or reset your password.",
             });
           } else if (isUnverified) {
             toast({
@@ -656,12 +729,25 @@ const Auth = () => {
               autoFocus={autoFocusInput}
             />
           </div>
+          {waAccountExists === false && (
+            <p className="text-[11px] text-red-400 text-center">
+              No account with this number.{' '}
+              <button
+                type="button"
+                onClick={() => { setAuthMethod('email'); setEmailPhase('signup'); setWaAccountExists(null); }}
+                className="underline font-bold hover:opacity-80"
+              >
+                Create account with email
+              </button>
+            </p>
+          )}
           <button
             type="submit"
             disabled={loading || waNumber.length < 10}
             className="auth-btn auth-btn-primary"
+            onClick={() => setWaAccountExists(null)}
           >
-            {loading ? "Sending…" : "Get Started"}
+            {loading ? "Checking…" : "Get Started"}
           </button>
         </form>
       ) : (
@@ -757,7 +843,9 @@ const Auth = () => {
             >
               {authMethod === "whatsapp"
                 ? (isOtpSent ? "Enter verification code" : "Sign in with WhatsApp")
-                : isLoginMode ? "Sign in with email" : "Create your account"
+                : emailPhase === 'enter' || emailPhase === 'checking' ? "Sign in or create account"
+                : emailPhase === 'login' ? "Welcome back!"
+                : "Create your account"
               }
             </h1>
             <p
@@ -771,9 +859,11 @@ const Auth = () => {
                 ? (isOtpSent
                   ? "A 6-digit code was sent to your WhatsApp."
                   : "Enter your mobile number to get a secure verification code.")
-                : isLoginMode
-                  ? "Welcome back! Enter your credentials."
-                  : "Join the community of explorers."
+                : emailPhase === 'enter' || emailPhase === 'checking'
+                  ? "Enter your email address to get started."
+                  : emailPhase === 'login'
+                    ? "Your account was found. Please enter your password."
+                    : "No account found — let's set one up for you."
               }
             </p>
           </div>
@@ -924,52 +1014,47 @@ const Auth = () => {
                     Continue to create account
                   </button>
                 </div>
-              ) : (
-                <form onSubmit={handleEmailAuth} className="flex flex-col justify-center space-y-3" style={{ minHeight: "250px" }}>
-                  {!isLoginMode && (
-                    <>
-                      <div className="relative">
-                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
-                        <input
-                          type="text"
-                          value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          className="auth-input"
-                          placeholder="Full Name"
-                          required
-                        />
-                      </div>
-                      {formErrors.fullName && <p className="text-[11px] text-red-500">{formErrors.fullName}</p>}
-                    </>
-                  )}
+              ) : emailPhase === 'enter' || emailPhase === 'checking' ? (
+                /* ── PHASE 1: email entry ── */
+                <form onSubmit={handleEmailContinue} className="flex flex-col justify-center space-y-3" style={{ minHeight: "220px" }}>
                   <div className="relative">
                     <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
                     <input
                       type="email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => { setEmail(e.target.value); setFormErrors({}); }}
                       className="auth-input"
-                      placeholder="Email"
+                      placeholder="Your email address"
+                      autoFocus
                       required
                     />
                   </div>
                   {formErrors.email && <p className="text-[11px] text-red-500">{formErrors.email}</p>}
-                  {!isLoginMode && (
-                    <>
-                      <div className="relative">
-                        <PhoneCall className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
-                        <input
-                          type="tel"
-                          value={mobileNumber}
-                          onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                          className="auth-input"
-                          placeholder="Mobile Number"
-                          required
-                        />
-                      </div>
-                      {formErrors.mobileNumber && <p className="text-[11px] text-red-500">{formErrors.mobileNumber}</p>}
-                    </>
-                  )}
+                  <button
+                    type="submit"
+                    disabled={emailPhase === 'checking' || !email.trim()}
+                    className="auth-btn auth-btn-primary"
+                  >
+                    {emailPhase === 'checking' ? "Checking…" : "Continue"}
+                  </button>
+                </form>
+              ) : emailPhase === 'login' ? (
+                /* ── PHASE 2: login — account exists ── */
+                <form onSubmit={handleEmailAuth} className="flex flex-col justify-center space-y-3" style={{ minHeight: "250px" }}>
+                  {/* Locked email with change link */}
+                  <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-[9999px] border border-gray-200/60 bg-white/40 text-sm">
+                    <Mail className="h-[16px] w-[16px] text-green-700 shrink-0" />
+                    <span className="flex-1 text-gray-800 truncate">{email}</span>
+                    {!isHostSigninPath && (
+                      <button
+                        type="button"
+                        onClick={() => { setEmailPhase('enter'); setPassword(''); setFormErrors({}); }}
+                        className="text-[10px] font-bold text-[#115f10] hover:opacity-70 shrink-0"
+                      >
+                        Change
+                      </button>
+                    )}
+                  </div>
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
                     <input
@@ -979,92 +1064,91 @@ const Auth = () => {
                       className="auth-input"
                       style={{ paddingRight: "2.75rem" }}
                       placeholder="Password"
+                      autoFocus
                       required
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors"
-                    >
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors">
                       {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
                     </button>
                   </div>
                   {formErrors.password && <p className="text-[11px] text-red-500">{formErrors.password}</p>}
-                  {!isLoginMode && (
-                    <>
-                      <div className="relative">
-                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          className="auth-input"
-                          style={{ paddingRight: "2.75rem" }}
-                          placeholder="Confirm Password"
-                          required
-                        />
+                  <div className="flex justify-between items-center">
+                    <label className="flex items-center gap-2 text-[11px] font-bold text-[#115f10] cursor-pointer hover:opacity-80 transition-opacity">
+                      <div className="relative flex items-center justify-center w-4 h-4 rounded-full border-[1.5px] border-[#115f10] bg-transparent">
+                        <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="appearance-none absolute inset-0 w-full h-full cursor-pointer rounded-full peer" />
+                        <svg viewBox="0 0 14 14" className="w-2.5 h-2.5 text-[#115f10] fill-current opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none"><path d="M5.5 10.5L2 7l1.4-1.4 2.1 2.1 5.1-5.1L12 4z" /></svg>
                       </div>
-                      {formErrors.confirmPassword && <p className="text-[11px] text-red-500">{formErrors.confirmPassword}</p>}
-                    </>
-                  )}
-                  {isLoginMode && (
-                    <div className="flex justify-between items-center">
-                      <label className="flex items-center gap-2 text-[11px] font-bold text-[#115f10] cursor-pointer hover:opacity-80 transition-opacity">
-                        <div className="relative flex items-center justify-center w-4 h-4 rounded-full border-[1.5px] border-[#115f10] bg-transparent">
-                          <input
-                            type="checkbox"
-                            checked={rememberMe}
-                            onChange={(e) => setRememberMe(e.target.checked)}
-                            className="appearance-none absolute inset-0 w-full h-full cursor-pointer rounded-full peer"
-                          />
-                          <svg viewBox="0 0 14 14" className="w-2.5 h-2.5 text-[#115f10] fill-current opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none">
-                            <path d="M5.5 10.5L2 7l1.4-1.4 2.1 2.1 5.1-5.1L12 4z" />
-                          </svg>
-                        </div>
-                        Remember me
-                      </label>
-                      <Link to="/forgot-password" className="text-[11px] font-bold text-[#115f10] hover:opacity-80 transition-opacity">
-                        Forgot password?
-                      </Link>
-                    </div>
-                  )}
+                      Remember me
+                    </label>
+                    <Link to="/forgot-password" className="text-[11px] font-bold text-[#115f10] hover:opacity-80 transition-opacity">Forgot password?</Link>
+                  </div>
                   <button type="submit" disabled={loading} className="auth-btn auth-btn-primary">
-                    {loading ? "Please wait…" : isLoginMode ? "Sign In" : "Confirm Account"}
+                    {loading ? "Signing in…" : "Sign In"}
                   </button>
-                  <div className="mt-auto pt-1">
-                    <p className="text-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (isHostSignupPath) {
-                            navigate("/host/signin");
-                          } else if (isHostSigninPath) {
-                            navigate("/host/signup");
-                          } else {
-                            const nextIsLogin = !isLoginMode;
-                            setIsLoginMode(nextIsLogin);
-                            setRoleConfirmed(false);
-                          }
-                        }}
-                        className="text-[11px] text-[#fafafa] font-semibold hover:opacity-80 transition-opacity"
-                      >
-                        {isLoginMode ? "Don't have an account? " : "Already have an account? "}
-                        <span className="font-extrabold underline underline-offset-4 decoration-1">{isLoginMode ? "Sign up" : "Sign in"}</span>
+                  {!isHostSigninPath && (
+                    <p className="text-center mt-auto pt-1">
+                      <button type="button" onClick={() => { setEmailPhase('signup'); setPassword(''); setRoleConfirmed(false); }} className="text-[11px] text-[#fafafa] font-semibold hover:opacity-80 transition-opacity">
+                        Not your account? <span className="font-extrabold underline underline-offset-4 decoration-1">Create new one</span>
                       </button>
                     </p>
+                  )}
+                </form>
+              ) : (
+                /* ── PHASE 3: signup — no account found ── */
+                <form onSubmit={handleEmailAuth} className="flex flex-col justify-center space-y-3" style={{ minHeight: "250px" }}>
+                  <div className="relative">
+                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
+                    <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="auth-input" placeholder="Full Name" required />
                   </div>
+                  {formErrors.fullName && <p className="text-[11px] text-red-500">{formErrors.fullName}</p>}
+                  {/* Locked email with change link */}
+                  <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-[9999px] border border-gray-200/60 bg-white/40 text-sm">
+                    <Mail className="h-[16px] w-[16px] text-green-700 shrink-0" />
+                    <span className="flex-1 text-gray-800 truncate">{email}</span>
+                    {!isHostSignupPath && (
+                      <button type="button" onClick={() => { setEmailPhase('enter'); setPassword(''); setFullName(''); setFormErrors({}); }} className="text-[10px] font-bold text-[#115f10] hover:opacity-70 shrink-0">Change</button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <PhoneCall className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
+                    <input type="tel" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} className="auth-input" placeholder="Mobile Number" required />
+                  </div>
+                  {formErrors.mobileNumber && <p className="text-[11px] text-red-500">{formErrors.mobileNumber}</p>}
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
+                    <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="auth-input" style={{ paddingRight: "2.75rem" }} placeholder="Password" required />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors">
+                      {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
+                    </button>
+                  </div>
+                  {formErrors.password && <p className="text-[11px] text-red-500">{formErrors.password}</p>}
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
+                    <input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="auth-input" style={{ paddingRight: "2.75rem" }} placeholder="Confirm Password" required />
+                  </div>
+                  {formErrors.confirmPassword && <p className="text-[11px] text-red-500">{formErrors.confirmPassword}</p>}
+                  <button type="submit" disabled={loading} className="auth-btn auth-btn-primary">
+                    {loading ? "Creating account…" : "Create Account"}
+                  </button>
+                  {!isHostSignupPath && (
+                    <p className="text-center mt-auto pt-1">
+                      <button type="button" onClick={() => { setEmailPhase('login'); setFullName(''); setPassword(''); setConfirmPassword(''); setRoleConfirmed(false); }} className="text-[11px] text-[#fafafa] font-semibold hover:opacity-80 transition-opacity">
+                        Already have an account? <span className="font-extrabold underline underline-offset-4 decoration-1">Sign in</span>
+                      </button>
+                    </p>
+                  )}
                 </form>
               )}
             </div>
           </div>
 
-          {!showRoleSelection && !verificationPending && !confirmationSuccess && (
+          {!showRoleSelection && !verificationPending && !confirmationSuccess && emailPhase !== 'checking' && (
             <>
               {/* Divider */}
               <div className="flex items-center gap-3 my-7">
                 <div className="divider-line" />
                 <span className="text-[10px] uppercase tracking-[0.15em] font-bold text-[#fafafa] whitespace-nowrap select-none">
-                  Or {isLoginMode ? "sign in" : "sign up"} with
+                  Or {emailPhase === 'login' ? "sign in" : "sign up"} with
                 </span>
                 <div className="divider-line" />
               </div>

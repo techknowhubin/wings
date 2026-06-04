@@ -41,7 +41,7 @@ interface BusinessDetails {
   city: string;
   state: string;
   pin: string;
-  serviceTypes: string[];
+  primaryListingType: string;
   listingCount: string;
 }
 
@@ -79,9 +79,13 @@ interface IdentityDetails {
   digiOtpSent: boolean;
 }
 
-const SERVICE_TYPE_OPTIONS = [
-  "Eco Stay", "Treehouse", "Homestay", "Farm Stay",
-  "Tent Camp", "Self-Drive Cab", "Outstation Cab", "Travel Package",
+const LISTING_TYPE_OPTIONS = [
+  { value: "stays",       label: "Home Stays",             emoji: "🏡", desc: "Eco-stays, treehouses, farm stays, homestays" },
+  { value: "hotels",      label: "Hotels",                 emoji: "🏨", desc: "Budget to luxury hotel rooms" },
+  { value: "resorts",     label: "Resorts",                emoji: "🌴", desc: "Beach, hill station or jungle resorts" },
+  { value: "cars",        label: "Car Rentals / Cabs",     emoji: "🚗", desc: "Self-drive cars or outstation cab service" },
+  { value: "bikes",       label: "Bike Rentals",           emoji: "🏍️", desc: "Two-wheelers for city rides or adventure trails" },
+  { value: "experiences", label: "Packages / Experiences", emoji: "🧭", desc: "Tours, treks, travel packages & activities" },
 ];
 
 const BUSINESS_TYPES = ["Proprietorship", "Partnership", "Pvt Ltd", "LLP"];
@@ -229,7 +233,7 @@ export default function HostOnboarding() {
     city: "",
     state: "",
     pin: "",
-    serviceTypes: [],
+    primaryListingType: "",
     listingCount: "1",
   });
 
@@ -284,15 +288,6 @@ export default function HostOnboarding() {
     else setIfscData(null);
   }, [bank.ifscCode, fetchIFSC]);
 
-  const toggleServiceType = (type: string) => {
-    setBiz((b) => ({
-      ...b,
-      serviceTypes: b.serviceTypes.includes(type)
-        ? b.serviceTypes.filter((t) => t !== type)
-        : [...b.serviceTypes, type],
-    }));
-  };
-
   const validateStep2 = () => {
     if (biz.hostType === "individual") {
       if (!biz.fullName || (!isGoogleUser && !biz.phone) || !biz.email) {
@@ -305,8 +300,8 @@ export default function HostOnboarding() {
         return false;
       }
     }
-    if (biz.serviceTypes.length === 0) {
-      toast.error("Select at least one service type");
+    if (!biz.primaryListingType) {
+      toast.error("Please select your primary listing type");
       return false;
     }
     return true;
@@ -486,7 +481,9 @@ export default function HostOnboarding() {
           bank_ifsc: bank.ifscCode,
           aadhaar_last_four: identity.aadhaarNumber ? identity.aadhaarNumber.slice(-4) : null,
           pan_number: identity.panNumber || null,
-          service_types: biz.serviceTypes,
+          service_types: biz.primaryListingType ? [biz.primaryListingType] : [],
+          primary_listing_type: biz.primaryListingType || null,
+          approved_listing_types: biz.primaryListingType ? [biz.primaryListingType] : [],
           address: addressString || null,
         });
 
@@ -685,24 +682,32 @@ export default function HostOnboarding() {
                     </motion.div>
                   </AnimatePresence>
 
-                  {/* Service Types */}
-                  <div className="space-y-2">
-                    <Label>What do you plan to list? *</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {SERVICE_TYPE_OPTIONS.map((type) => (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => toggleServiceType(type)}
-                          className={`px-3 py-1.5 rounded-full text-sm border transition-all ${
-                            biz.serviceTypes.includes(type)
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "border-border text-muted-foreground hover:border-primary/50"
-                          }`}
-                        >
-                          {type}
-                        </button>
-                      ))}
+                  {/* Primary Listing Type — single selection */}
+                  <div className="space-y-3">
+                    <Label>What do you plan to list? * <span className="text-xs text-muted-foreground font-normal">(Choose one — you can request more later)</span></Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {LISTING_TYPE_OPTIONS.map((opt) => {
+                        const selected = biz.primaryListingType === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setBiz((b) => ({ ...b, primaryListingType: opt.value }))}
+                            className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
+                              selected
+                                ? "border-primary bg-primary/10"
+                                : "border-border hover:border-primary/40"
+                            }`}
+                          >
+                            <span className="text-2xl leading-none">{opt.emoji}</span>
+                            <div>
+                              <p className={`text-sm font-semibold ${selected ? "text-primary" : "text-foreground"}`}>{opt.label}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                            </div>
+                            {selected && <Check className="h-4 w-4 text-primary ml-auto shrink-0 mt-0.5" />}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 

@@ -24,6 +24,8 @@ import { format } from "date-fns";
 import { BookOpen } from "lucide-react";
 
 import heroOutstationCabs from "@/assets/hero-outstation-cabs.jpg";
+import heroOutstationCabs1 from "@/assets/hero-outstation-cabs-1.jpg";
+import heroOutstationCabs2 from "@/assets/hero-outstation-cabs-2.jpg";
 import homestaysIcon from "@/assets/categories/homestays-icon.png";
 import bikesIcon from "@/assets/categories/bikes-icon.png";
 import carsIcon from "@/assets/categories/cars-icon.png";
@@ -125,7 +127,7 @@ const OutstationCabs = () => {
   const navigate = useNavigate();
   const [categoryPage, setCategoryPage] = useState(0);
   const [heroSlide, setHeroSlide] = useState(0);
-  const heroImages = [heroXplorwing, heroOutstationCabs];
+  const heroImages = [heroXplorwing, heroOutstationCabs1, heroOutstationCabs2];
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
 
@@ -285,19 +287,25 @@ const OutstationCabs = () => {
       <Header />
       <BackButton />
 
-      {/* Hero Section with Slider */}
-      <section className="hidden lg:block container mx-auto px-4 pt-4">
-        <div className="relative h-[65vh] md:h-[85vh] rounded-3xl overflow-hidden">
+      {/* Hero Section with Slider — desktop only */}
+      <section className="hidden md:block w-full max-w-[1440px] mx-auto pt-4 px-4">
+        <div className="relative w-full rounded-2xl overflow-hidden">
+          {/* Invisible anchor image — sets the natural height based on actual image ratio */}
+          <img src={heroImages[0]} alt="" className="w-full block opacity-0 pointer-events-none" />
+
+          {/* Slides — stacked absolutely over the anchor */}
           {heroImages.map((img, i) => (
             <motion.div
               key={i}
               initial={false}
               animate={{ opacity: i === heroSlide ? 1 : 0 }}
               transition={{ duration: 1.2, ease: "easeInOut" }}
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url(${img})` }}
-            />
+              className="absolute inset-0"
+            >
+              <img src={img} alt={`Slide ${i + 1}`} className="w-full h-full object-fill" />
+            </motion.div>
           ))}
+
           {/* Navigation Arrows */}
           <button
             onClick={() => setHeroSlide((heroSlide - 1 + heroImages.length) % heroImages.length)}
@@ -313,6 +321,7 @@ const OutstationCabs = () => {
           >
             <ChevronRight className="h-6 w-6" />
           </button>
+
           {/* Slide indicators */}
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
             {heroImages.map((_, i) => (

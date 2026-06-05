@@ -5,14 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Building2, User, Briefcase, CreditCard, ShieldCheck, FileText,
   Upload, Loader2, ArrowRight, ChevronLeft, Check, Clock, Eye, EyeOff,
-  X, Smartphone, MapPin, CheckCircle2,
+  X, MapPin, CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -73,10 +72,6 @@ interface IdentityDetails {
   aadhaarVerified: boolean;
   panVerified: boolean;
   agreed: boolean;
-  // DigiLocker
-  digiPhone: string;
-  digiOtp: string;
-  digiOtpSent: boolean;
 }
 
 const LISTING_TYPE_OPTIONS = [
@@ -256,9 +251,6 @@ export default function HostOnboarding() {
     aadhaarVerified: false,
     panVerified: false,
     agreed: false,
-    digiPhone: "",
-    digiOtp: "",
-    digiOtpSent: false,
   });
 
   useEffect(() => {
@@ -337,22 +329,6 @@ export default function HostOnboarding() {
     setIdentity((id) => ({ ...id, panVerified: true }));
     setLoading(false);
     toast.success("PAN verified successfully!");
-  };
-
-  const handleDigiSendOTP = async () => {
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 1500));
-    setIdentity((id) => ({ ...id, digiOtpSent: true }));
-    setLoading(false);
-    toast.success("OTP sent successfully!");
-  };
-
-  const handleDigiVerifyOTP = async () => {
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 2000));
-    setIdentity((id) => ({ ...id, aadhaarVerified: true }));
-    setLoading(false);
-    toast.success("Aadhaar verified via DigiLocker!");
   };
 
   const validateStep4 = () => {
@@ -843,92 +819,32 @@ export default function HostOnboarding() {
                     </div>
 
                     {!identity.aadhaarVerified ? (
-                      <Tabs defaultValue="upload" className="w-full">
-                        <TabsList className="w-full grid grid-cols-2">
-                          <TabsTrigger value="upload">Upload Docs</TabsTrigger>
-                          <TabsTrigger value="digilocker">Use DigiLocker</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="upload" className="space-y-4 mt-4">
-                          <div className="space-y-2">
-                            <Label>Aadhaar Number *</Label>
-                            <MaskedInput value={identity.aadhaarNumber} onChange={(v) => setIdentity({ ...identity, aadhaarNumber: v.replace(/\D/g, "") })} placeholder="xxxx xxxx xxxx" maxLength={12} />
-                          </div>
-                          <FileUploadZone
-                            label="Aadhaar Front"
-                            file={identity.aadhaarFrontFile}
-                            onFileSelect={(f) => setIdentity({ ...identity, aadhaarFrontFile: f })}
-                            onRemove={() => setIdentity({ ...identity, aadhaarFrontFile: undefined })}
-                          />
-                          <FileUploadZone
-                            label="Aadhaar Back"
-                            file={identity.aadhaarBackFile}
-                            onFileSelect={(f) => setIdentity({ ...identity, aadhaarBackFile: f })}
-                            onRemove={() => setIdentity({ ...identity, aadhaarBackFile: undefined })}
-                          />
-                          <Button
-                            onClick={handleSimulateAadhaarVerify}
-                            disabled={identity.aadhaarNumber.length !== 12 || !identity.aadhaarFrontFile || loading}
-                            className="w-full"
-                          >
-                            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
-                            Upload & Verify
-                          </Button>
-                        </TabsContent>
-                        <TabsContent value="digilocker" className="space-y-4 mt-4">
-                          <div className="space-y-2">
-                            <Label>Mobile linked to DigiLocker</Label>
-                            <div className="flex gap-2">
-                              <span className="flex items-center px-3 rounded-xl border border-input bg-muted/30 text-sm text-muted-foreground">+91</span>
-                              <Input
-                                type="tel"
-                                maxLength={10}
-                                value={identity.digiPhone}
-                                onChange={(e) => setIdentity({ ...identity, digiPhone: e.target.value.replace(/\D/g, "") })}
-                                placeholder="10-digit number"
-                                disabled={identity.digiOtpSent}
-                              />
-                            </div>
-                          </div>
-                          {!identity.digiOtpSent ? (
-                            <Button onClick={handleDigiSendOTP} disabled={identity.digiPhone.length !== 10 || loading} className="w-full">
-                              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Smartphone className="h-4 w-4 mr-2" />}
-                              Send OTP
-                            </Button>
-                          ) : (
-                            <div className="space-y-4">
-                              <div className="space-y-2">
-                                <Label>Enter 6-digit OTP</Label>
-                                <div className="flex justify-center gap-2">
-                                  {Array.from({ length: 6 }).map((_, i) => (
-                                    <input
-                                      key={i}
-                                      type="text"
-                                      maxLength={1}
-                                      value={identity.digiOtp[i] || ""}
-                                      onChange={(e) => {
-                                        const val = e.target.value.replace(/\D/g, "");
-                                        const newOtp = identity.digiOtp.split("");
-                                        newOtp[i] = val;
-                                        setIdentity({ ...identity, digiOtp: newOtp.join("") });
-                                        if (val && e.target.nextElementSibling) (e.target.nextElementSibling as HTMLInputElement).focus();
-                                      }}
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Backspace" && !identity.digiOtp[i] && e.currentTarget.previousElementSibling)
-                                          (e.currentTarget.previousElementSibling as HTMLInputElement).focus();
-                                      }}
-                                      className="w-11 h-13 text-center text-lg font-semibold rounded-xl border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                                    />
-                                  ))}
-                                </div>
-                              </div>
-                              <Button onClick={handleDigiVerifyOTP} disabled={identity.digiOtp.length !== 6 || loading} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                                {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
-                                Verify OTP
-                              </Button>
-                            </div>
-                          )}
-                        </TabsContent>
-                      </Tabs>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Aadhaar Number *</Label>
+                          <MaskedInput value={identity.aadhaarNumber} onChange={(v) => setIdentity({ ...identity, aadhaarNumber: v.replace(/\D/g, "") })} placeholder="xxxx xxxx xxxx" maxLength={12} />
+                        </div>
+                        <FileUploadZone
+                          label="Aadhaar Front"
+                          file={identity.aadhaarFrontFile}
+                          onFileSelect={(f) => setIdentity({ ...identity, aadhaarFrontFile: f })}
+                          onRemove={() => setIdentity({ ...identity, aadhaarFrontFile: undefined })}
+                        />
+                        <FileUploadZone
+                          label="Aadhaar Back"
+                          file={identity.aadhaarBackFile}
+                          onFileSelect={(f) => setIdentity({ ...identity, aadhaarBackFile: f })}
+                          onRemove={() => setIdentity({ ...identity, aadhaarBackFile: undefined })}
+                        />
+                        <Button
+                          onClick={handleSimulateAadhaarVerify}
+                          disabled={identity.aadhaarNumber.length !== 12 || !identity.aadhaarFrontFile || loading}
+                          className="w-full"
+                        >
+                          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                          Upload & Verify
+                        </Button>
+                      </div>
                     ) : (
                       <div className="flex items-center gap-2 text-accent text-sm">
                         <CheckCircle2 className="h-4 w-4" /> Aadhaar verified successfully

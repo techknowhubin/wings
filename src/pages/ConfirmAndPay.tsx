@@ -156,12 +156,12 @@ const ConfirmAndPay = () => {
       });
       setGlobalCoupons(
         filtered.map((item: any) => {
-          const discountType: "percent" | "flat" =
-            item.discount_type === "flat" ? "flat" : "percent";
-          const value =
-            discountType === "flat"
-              ? Number(item.discount_value ?? 0)
-              : Number(item.discount_value ?? item.discount_percent ?? 0);
+          const isFlat = item.discount_type === "flat";
+          const discountType: "percent" | "flat" = isFlat ? "flat" : "percent";
+          // For flat: use discount_value; for percentage: prefer discount_percent, fallback to discount_value
+          const value = isFlat
+            ? Number(item.discount_value ?? 0)
+            : Number(item.discount_percent ?? item.discount_value ?? 0);
           return {
             id: String(item.id),
             code: String(item.code ?? "").toUpperCase(),

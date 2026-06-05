@@ -441,9 +441,12 @@ export default function UserOnboarding() {
 
     const prefill = async () => {
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
+      // Normalize phone: strip +91 prefix for the 10-digit input field
+      const rawPhone = profile?.phone || user.user_metadata?.phone || user.phone || "";
+      const normalizedPhone = rawPhone.replace(/^\+91/, "").replace(/\D/g, "").slice(0, 10);
       setBasicInfo({
         full_name: profile?.full_name || user.user_metadata?.full_name || "",
-        phone: profile?.phone || user.phone || "",
+        phone: normalizedPhone,
         city: profile?.city || "",
       });
 
@@ -473,11 +476,16 @@ export default function UserOnboarding() {
     if (!user) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from("profiles").update({
+      const phoneForDb = basicInfo.phone
+        ? (basicInfo.phone.startsWith('+') ? basicInfo.phone : `+91${basicInfo.phone}`)
+        : null;
+      const { error } = await supabase.from("profiles").upsert({
+        id: user.id,
         full_name: basicInfo.full_name,
-        phone: basicInfo.phone,
+        phone: phoneForDb,
         city: basicInfo.city,
-      }).eq("id", user.id);
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "id" });
       if (error) throw error;
     } catch (err: any) {
       toast.error(err.message || "Failed to save profile");

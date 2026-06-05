@@ -133,7 +133,8 @@ export default function UserProfile() {
       setForm({
         full_name: profile.full_name || "",
         display_name: (profile as any).display_name || "",
-        phone: profile.phone || "",
+        // Strip +91 prefix for the editable 10-digit input
+        phone: (profile.phone || "").replace(/^\+91/, "").replace(/\D/g, "").slice(0, 10),
         dob: (profile as any).date_of_birth || "",
         gender: (profile as any).gender || "prefer_not_to_say",
         city: (profile as any).city || "",
@@ -322,12 +323,14 @@ export default function UserProfile() {
   const handleSaveProfile = async () => {
     if (!user) return;
     try {
-      await updateProfile.mutateAsync({ 
-        userId: user.id, 
-        updates: { 
-          full_name: form.full_name, 
+      await updateProfile.mutateAsync({
+        userId: user.id,
+        updates: {
+          full_name: form.full_name,
           display_name: form.display_name,
-          phone: form.phone,
+          phone: form.phone
+            ? (form.phone.startsWith('+') ? form.phone : `+91${form.phone}`)
+            : null,
           date_of_birth: form.dob || null,
           gender: form.gender,
           city: form.city,
@@ -543,7 +546,22 @@ export default function UserProfile() {
                       </div>
                       <div className="space-y-2">
                         <Label>Phone</Label>
-                        <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "") })} disabled={!editing} maxLength={10} />
+                        <div className="relative flex items-center">
+                          {editing && (
+                            <span className="absolute left-3 text-xs font-semibold text-muted-foreground pointer-events-none pr-1.5 border-r border-border z-10">+91</span>
+                          )}
+                          <Input
+                            value={form.phone}
+                            onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "").slice(0, 10) })}
+                            disabled={!editing}
+                            maxLength={10}
+                            placeholder="98765 43210"
+                            style={editing ? { paddingLeft: '3.5rem' } : undefined}
+                          />
+                        </div>
+                        {editing && form.phone.length > 0 && form.phone.length < 10 && (
+                          <p className="text-[10px] text-amber-600">{10 - form.phone.length} more digits needed</p>
+                        )}
                       </div>
                       <div className="space-y-2 flex flex-col">
                         <Label>Date of Birth</Label>

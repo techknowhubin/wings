@@ -117,7 +117,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: {
           full_name: fullName,
           role,
-          phone: mobileNumber,
+          // Store in international format so it's consistent everywhere
+          phone: mobileNumber
+            ? (mobileNumber.startsWith('+') ? mobileNumber : `+91${mobileNumber.replace(/\D/g, '')}`)
+            : null,
         },
       },
     });

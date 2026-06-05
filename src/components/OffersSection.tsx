@@ -50,8 +50,12 @@ const OffersSection = ({ variant = "default" }: OffersSectionProps) => {
           idx % 2 === 0 && cat === "Stay"
             ? categoryColorMap["Default"]
             : categoryColorMap[cat] || categoryColorMap["Default"];
-        const discVal = Number(dbOffer.discount_percent ?? 0);
-        const discLabel = `${discVal}% off`;
+        const isFlat = dbOffer.discount_type === "flat";
+        const discVal = isFlat
+          ? Number(dbOffer.discount_value ?? 0)
+          : Number(dbOffer.discount_percent ?? dbOffer.discount_value ?? 0);
+        const discLabel = isFlat ? `₹${discVal} off` : `${discVal}% off`;
+        const discDesc = isFlat ? `Get ₹${discVal} off on your booking.` : `Get ${discVal}% off on your booking fee.`;
         const scope = `on ${(dbOffer.listing_types as string[] | null)?.join(", ") || "all listings"}`;
         const expiry = dbOffer.ends_at;
         return {
@@ -66,7 +70,7 @@ const OffersSection = ({ variant = "default" }: OffersSectionProps) => {
             ? dbOffer.terms
             : [
                 `Use code ${dbOffer.code} at checkout to avail this offer.`,
-                `Get ${discVal}% off on your booking fee.`,
+                discDesc,
                 expiry
                   ? `Valid till ${new Date(expiry).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}.`
                   : "Valid until further notice.",
@@ -80,7 +84,7 @@ const OffersSection = ({ variant = "default" }: OffersSectionProps) => {
       // Fetch ALL active host coupons visible to the public.
       const { data, error } = await supabase
         .from('host_coupons' as any)
-        .select('id,code,discount_percent,listing_types,is_active,ends_at,usage_limit,used_count,is_platform_offer,title,emoji,terms')
+        .select('id,code,discount_percent,discount_type,discount_value,listing_types,is_active,ends_at,usage_limit,used_count,is_platform_offer,title,emoji,terms')
         .eq('is_active', true);
 
       console.log("OffersSection DB result:", { data, error });

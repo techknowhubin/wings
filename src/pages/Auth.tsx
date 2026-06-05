@@ -939,14 +939,15 @@ const Auth = () => {
                 </div>
               ) : verificationPending ? (
                 <div className="flex flex-col items-center py-6 text-center space-y-4">
-                  <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center">
+                  <div className="w-16 h-16 bg-[#115f10]/15 rounded-full flex items-center justify-center">
                     <Mail className="w-8 h-8 text-[#115f10]" />
                   </div>
-                  <div className="space-y-1">
-                    <h3 className="font-bold text-gray-900">Check your email</h3>
-                    <p className="text-xs text-gray-500 max-w-[200px]">
-                      We've sent a verification link to <span className="font-semibold text-gray-900">{email}</span>
+                  <div className="space-y-1.5">
+                    <h3 className="font-bold text-[#064E3B]">Check your email</h3>
+                    <p className="text-xs text-[#064E3B]/80 max-w-[220px] leading-relaxed">
+                      We've sent a verification link to
                     </p>
+                    <p className="text-sm font-bold text-[#064E3B] break-all">{email}</p>
                   </div>
                   <div className="pt-2 flex flex-col items-center gap-3">
                     <button
@@ -957,11 +958,10 @@ const Auth = () => {
                     >
                       {resendCountdown > 0 ? `Resend mail in ${resendCountdown}s` : "Resend mail"}
                     </button>
-                    
                     <button
                       type="button"
                       onClick={() => setVerificationPending(false)}
-                      className="text-[10px] text-gray-400 font-medium hover:text-gray-600 transition-colors"
+                      className="text-[10px] text-[#064E3B]/60 font-medium hover:text-[#064E3B] transition-colors"
                     >
                       Use a different email
                     </button>
@@ -1109,11 +1109,26 @@ const Auth = () => {
                       <button type="button" onClick={() => { setEmailPhase('enter'); setPassword(''); setFullName(''); setFormErrors({}); }} className="text-[10px] font-bold text-[#115f10] hover:opacity-70 shrink-0">Change</button>
                     )}
                   </div>
-                  <div className="relative">
-                    <PhoneCall className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
-                    <input type="tel" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} className="auth-input" placeholder="Mobile Number" required />
+                  <div className="relative flex items-center">
+                    <div className="absolute left-3.5 flex items-center gap-1.5 pointer-events-none z-10">
+                      <PhoneCall className="h-[18px] w-[18px] text-gray-400" />
+                      <span className="text-xs font-semibold text-gray-500 pr-1.5 border-r border-gray-300/70">+91</span>
+                    </div>
+                    <input
+                      type="tel"
+                      value={mobileNumber}
+                      onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      className="auth-input"
+                      style={{ paddingLeft: '5.5rem' }}
+                      placeholder="98765 43210"
+                      maxLength={10}
+                      required
+                    />
                   </div>
                   {formErrors.mobileNumber && <p className="text-[11px] text-red-500">{formErrors.mobileNumber}</p>}
+                  {mobileNumber.length > 0 && mobileNumber.length < 10 && !formErrors.mobileNumber && (
+                    <p className="text-[10px] text-amber-600">{10 - mobileNumber.length} more digits needed</p>
+                  )}
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
                     <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="auth-input" style={{ paddingRight: "2.75rem" }} placeholder="Password" required />

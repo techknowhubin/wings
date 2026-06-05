@@ -107,7 +107,7 @@ const Hotels = () => {
               Luxurious accommodations across India's best destinations
             </p>
           </motion.div>
-          <SearchBar defaultCategory="stays" />
+          <SearchBar defaultCategory="hotels" />
         </div>
       </section>
 

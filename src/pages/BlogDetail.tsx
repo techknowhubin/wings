@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Calendar, User, BookOpen, ArrowLeft, Tag, Clock, Share2 } from "lucide-react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { BlogBlockRenderer, BlogTableOfContents } from "@/components/blog/BlogBlockRenderer";
@@ -13,23 +14,38 @@ import type { ContentBlock } from "@/components/blog/types";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
+const VIEW_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function hasViewedRecently(postId: string): boolean {
+  try {
+    const stored = localStorage.getItem(`xw_blog_view_${postId}`);
+    if (!stored) return false;
+    return Date.now() - parseInt(stored, 10) < VIEW_COOLDOWN_MS;
+  } catch { return false; }
+}
+
+function recordBlogView(postId: string): void {
+  try { localStorage.setItem(`xw_blog_view_${postId}`, String(Date.now())); }
+  catch { /* storage blocked */ }
+}
+
 /**
- * Converts plain-text content (newlines) into HTML paragraphs.
- * If the content already contains HTML tags, it is returned as-is.
+ * Prepares TipTap HTML for rendering:
+ * - ONLY removes the trailing ProseMirror artifact (<br class="ProseMirror-trailingBreak">)
+ * - Preserves ALL intentional empty paragraphs (blank lines between content)
+ * - Preserves ALL formatting, spacing, and structure exactly as authored
  */
-function formatContent(raw: string): string {
+function prepareContent(raw: string): string {
   if (!raw) return "";
-  // If it already has HTML tags, trust it
-  if (/<[a-z][\s\S]*>/i.test(raw)) return raw;
-  // Split on one or more blank lines → separate paragraphs
+  if (/<[a-z][\s\S]*>/i.test(raw)) {
+    // Only remove TipTap's editor artifact — the trailing break it appends automatically
+    return raw.replace(/<br\s+class="ProseMirror-trailingBreak"\s*\/?>/gi, "");
+  }
+  // Plain text → wrap lines in paragraphs
   return raw
     .split(/\n{2,}/)
     .map((para) =>
-      `<p>${para
-        .split(/\n/)
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .join("<br/>")}</p>`
+      `<p>${para.split(/\n/).map((l) => l.trim()).filter(Boolean).join("<br/>")}</p>`
     )
     .join("\n");
 }
@@ -42,7 +58,7 @@ const BlogDetail = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("blog_posts")
-        .select("id, title, content, excerpt, featured_image, published_at, slug, tags, status, reading_time")
+        .select("id, title, content, excerpt, featured_image, published_at, slug, tags, status, reading_time, views_count")
         .eq("slug", slug!)
         .maybeSingle();
 
@@ -71,6 +87,19 @@ const BlogDetail = () => {
     },
     enabled: !!post?.id,
   });
+
+  // Increment views_count once per unique visitor per 24 hours using localStorage
+  useEffect(() => {
+    if (!post?.id) return;
+    if (hasViewedRecently(post.id)) return; // already counted — skip (handles refreshes)
+    recordBlogView(post.id);
+    supabase
+      .from("blog_posts" as any)
+      .update({ views_count: (post.views_count ?? 0) + 1 })
+      .eq("id", post.id)
+      .then();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post?.id]);
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -229,11 +258,8 @@ const BlogDetail = () => {
               </>
             ) : (
               <div
-                className="prose prose-lg dark:prose-invert max-w-none text-left
-                  prose-headings:font-bold prose-headings:text-foreground 
-                  prose-p:text-muted-foreground prose-p:leading-relaxed
-                  prose-img:rounded-3xl prose-a:text-primary hover:prose-a:underline"
-                dangerouslySetInnerHTML={{ __html: formatContent(post.content || post.excerpt || "") }}
+                className="blog-content"
+                dangerouslySetInnerHTML={{ __html: prepareContent(post.content || post.excerpt || "") }}
               />
             )}
           </motion.div>

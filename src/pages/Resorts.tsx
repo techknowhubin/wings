@@ -107,7 +107,7 @@ const Resorts = () => {
               Unwind in the most exclusive resort destinations
             </p>
           </motion.div>
-          <SearchBar defaultCategory="stays" />
+          <SearchBar defaultCategory="resorts" />
         </div>
       </section>
 

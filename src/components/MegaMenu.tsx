@@ -26,7 +26,7 @@ import rishikeshImg from "@/assets/destinations/rishikesh.jpg";
 
 const categories = [
   {
-    title: "Stays",
+    title: "Home Stays",
     subtitle: "Homestays, hotels & resorts",
     icon: Home,
     link: "/stays",
@@ -34,7 +34,7 @@ const categories = [
     stats: "500+ properties",
   },
   {
-    title: "Experiences",
+    title: "Packages/Experiences",
     subtitle: "Treks, tours & activities",
     icon: Compass,
     link: "/experiences",

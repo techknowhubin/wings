@@ -694,7 +694,7 @@ export default function AdminAnalytics() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {bookingsList.filter(b => b.booking_status !== 'cancelled').slice(0, 4).map((b) => (
+                    {realBookings.filter(b => b.booking_status !== 'cancelled').slice(0, 4).map((b) => (
                       <TableRow key={b.booking_id}>
                         <TableCell>
                           <div>
@@ -882,7 +882,7 @@ export default function AdminAnalytics() {
                       <SelectValue placeholder="Choose booking..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {bookingsList
+                      {simBookingsList
                         .filter(b => b.booking_status !== 'cancelled')
                         .map(b => (
                           <SelectItem key={b.booking_id} value={b.booking_id}>

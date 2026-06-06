@@ -44,7 +44,7 @@ import rishikeshDestImage from "@/assets/destinations/rishikesh.jpg";
 const categories = [
   {
     image: homestaysIcon,
-    title: "Stays",
+    title: "Home Stays",
     subtitle: "Unique homestays",
     link: "/stays",
     bgColor: "bg-pink-100 dark:bg-pink-950/60",
@@ -82,6 +82,16 @@ const categories = [
     iconOffsetY: -15,
   },
 
+  {
+    image: experiencesIcon,
+    title: "Packages/Experiences",
+    subtitle: "Tours & activities",
+    link: "/experiences",
+    bgColor: "bg-orange-100 dark:bg-orange-950/60",
+    iconScale: 1.1,
+    iconOffsetX: 15,
+    iconOffsetY: 0,
+  },
   {
     image: hotelsIcon,
     title: "Hotels",
@@ -428,7 +438,7 @@ const LandingPage = () => {
       {stays.length > 0 && (
         <section className="container mx-auto px-4 py-16">
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.5 }} viewport={{ once: true }}>
-            <h2 className="text-3xl font-bold text-foreground mb-8">Featured Homestays</h2>
+            <h2 className="text-3xl font-bold text-foreground mb-8">Home Stays</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
               {stays
                 .filter(stay => !stay.title.toLowerCase().includes("comfy homestay"))

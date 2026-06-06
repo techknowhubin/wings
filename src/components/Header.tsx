@@ -23,13 +23,13 @@ import ButtonWithIcon from "@/components/ui/button-with-icon";
 
 
 const mobileNavLinks = [
-  { label: "Stays", icon: Home, to: "/stays" },
+  { label: "Home Stays", icon: Home, to: "/stays" },
   { label: "Hotels", icon: Building, to: "/hotels" },
   { label: "Resorts", icon: Palmtree, to: "/resorts" },
-  { label: "Experiences", icon: Compass, to: "/experiences" },
+  { label: "Packages/Experiences", icon: Compass, to: "/experiences" },
   { label: "Outstation Cabs", icon: Car, to: "/outstation-cabs" },
-  { label: "Bikes", icon: Bike, to: "/bikes" },
-  { label: "Cars", icon: Car, to: "/cars" },
+  { label: "Bike Rentals", icon: Bike, to: "/bikes" },
+  { label: "Car Rentals", icon: Car, to: "/cars" },
   { label: "Destinations", icon: MapPin, to: "/destinations" },
 ];
 
@@ -97,7 +97,7 @@ const Header = () => {
                 to="/stays"
                 className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-3 py-2 rounded-lg nav-link-hover"
               >
-                Stays
+                Home Stays
               </Link>
               <Link
                 to="/hotels"
@@ -115,13 +115,13 @@ const Header = () => {
                 to="/bikes"
                 className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-3 py-2 rounded-lg nav-link-hover"
               >
-                Bikes
+                Bike Rentals
               </Link>
               <Link
                 to="/cars"
                 className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-3 py-2 rounded-lg nav-link-hover"
               >
-                Cars
+                Car Rentals
               </Link>
               <Link
                 to="/outstation-cabs"
@@ -133,7 +133,7 @@ const Header = () => {
                 to="/experiences"
                 className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-3 py-2 rounded-lg nav-link-hover"
               >
-                Experiences
+                Packages/Experiences
               </Link>
             </nav>
 

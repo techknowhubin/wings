@@ -30,7 +30,7 @@ import {
   useHostBookings,
   useProfile,
 } from '@/hooks/useListings';
-import { formatPrice, calculateCommission } from '@/lib/supabase-helpers';
+import { formatPrice, calculateHostBookingAmounts } from '@/lib/supabase-helpers';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { StaggerContainer, StaggerItem, LayoutCard, ModuleSkeleton } from './DashboardTransitions';
@@ -72,7 +72,7 @@ export function DashboardOverview() {
   const totalEarnings = bookings
     .filter((b) => b.payment_status === 'completed')
     .reduce((sum, b) => {
-      const { hostEarnings } = calculateCommission(b.total_price, true);
+      const { hostEarnings } = calculateHostBookingAmounts(b);
       return sum + hostEarnings;
     }, 0);
 
@@ -85,7 +85,7 @@ export function DashboardOverview() {
   const thisMonthEarnings = thisMonthBookings
     .filter((b) => b.payment_status === 'completed')
     .reduce((sum, b) => {
-      const { hostEarnings } = calculateCommission(b.total_price, true);
+      const { hostEarnings } = calculateHostBookingAmounts(b);
       return sum + hostEarnings;
     }, 0);
 

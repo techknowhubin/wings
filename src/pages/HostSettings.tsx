@@ -18,7 +18,7 @@ import { useProfile, useUpdateProfile, useHostProfile, useHostBookings } from '@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { calculateCommission, formatPrice } from '@/lib/supabase-helpers';
+import { calculateHostBookingAmounts, formatPrice } from '@/lib/supabase-helpers';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -451,11 +451,11 @@ export default function HostSettings() {
     (b) => b.booking_status === 'confirmed' && b.payment_status !== 'completed'
   );
   const totalEarned = completedBookings.reduce((sum, b) => {
-    const { hostEarnings } = calculateCommission(b.total_price, true);
+    const { hostEarnings } = calculateHostBookingAmounts(b);
     return sum + hostEarnings;
   }, 0);
   const pendingEarnings = pendingBookings.reduce((sum, b) => {
-    const { hostEarnings } = calculateCommission(b.total_price, true);
+    const { hostEarnings } = calculateHostBookingAmounts(b);
     return sum + hostEarnings;
   }, 0);
 

@@ -966,3 +966,29 @@ export function calculateCommission(amount: number, isMarketplace: boolean): {
     hostEarnings: amount - commission,
   };
 }
+
+export function calculateHostBookingAmounts(booking: any): {
+  totalAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  hostEarnings: number;
+  commission: number;
+  rate: number;
+} {
+  const rate = booking.booking_channel === 'link-in-bio' ? 10 : 20;
+  const paidAmount = Number(booking.total_price) || 0;
+  const commissionAmount = Number(booking.commission_amount) || paidAmount;
+  
+  const totalAmount = rate > 0 ? (commissionAmount / (rate / 100)) : paidAmount;
+  const remainingAmount = Math.max(totalAmount - paidAmount, 0);
+  
+  return {
+    totalAmount,
+    paidAmount,
+    remainingAmount,
+    hostEarnings: remainingAmount,
+    commission: commissionAmount,
+    rate,
+  };
+}
+

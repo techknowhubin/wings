@@ -165,7 +165,7 @@ CREATE TABLE IF NOT EXISTS public.hub_referral_events (
 );
 
 ALTER TABLE public.hub_referral_events ENABLE ROW LEVEL SECURITY;
-
+DROP POLICY IF EXISTS "Admins view hub referral events" ON public.hub_referral_events;
 CREATE POLICY "Admins view hub referral events"
   ON public.hub_referral_events FOR ALL TO authenticated
   USING (public.has_role(auth.uid(), 'admin'));

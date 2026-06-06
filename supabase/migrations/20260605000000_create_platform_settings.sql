@@ -55,6 +55,7 @@ ON CONFLICT (id) DO NOTHING;
 ALTER TABLE public.platform_settings ENABLE ROW LEVEL SECURITY;
 
 -- Admins can read
+DROP POLICY IF EXISTS "Admins can read platform_settings" ON public.platform_settings;
 CREATE POLICY "Admins can read platform_settings"
   ON public.platform_settings FOR SELECT
   USING (
@@ -65,6 +66,7 @@ CREATE POLICY "Admins can read platform_settings"
   );
 
 -- Admins can update
+DROP POLICY IF EXISTS "Admins can update platform_settings" ON public.platform_settings;
 CREATE POLICY "Admins can update platform_settings"
   ON public.platform_settings FOR UPDATE
   USING (
@@ -75,6 +77,7 @@ CREATE POLICY "Admins can update platform_settings"
   );
 
 -- Admins can insert (needed for upsert)
+DROP POLICY IF EXISTS "Admins can insert platform_settings" ON public.platform_settings;
 CREATE POLICY "Admins can insert platform_settings"
   ON public.platform_settings FOR INSERT
   WITH CHECK (
@@ -86,6 +89,7 @@ CREATE POLICY "Admins can insert platform_settings"
 
 -- ConfirmAndPay (and other public pages) need to read commission rates
 -- Allow authenticated users to read commission columns only
+DROP POLICY IF EXISTS "Authenticated users read commission rates" ON public.platform_settings;
 CREATE POLICY "Authenticated users read commission rates"
   ON public.platform_settings FOR SELECT
   USING (auth.uid() IS NOT NULL);

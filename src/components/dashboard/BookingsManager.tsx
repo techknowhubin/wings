@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostBookings, useUpdateBookingStatus, useListingTitles } from '@/hooks/useListings';
-import { formatPrice, calculateCommission } from '@/lib/supabase-helpers';
+import { formatPrice, calculateHostBookingAmounts } from '@/lib/supabase-helpers';
 import { format, differenceInDays } from 'date-fns';
 import type { BookingStatus } from '@/types/database';
 import { toast } from 'sonner';
@@ -250,7 +250,7 @@ export function BookingsManager() {
                   new Date(booking.end_date),
                   new Date(booking.start_date)
                 );
-                const { hostEarnings, commission, rate } = calculateCommission(booking.total_price, true);
+                const { totalAmount, paidAmount, remainingAmount, hostEarnings, rate } = calculateHostBookingAmounts(booking);
                 const listingTitle = listingTitles[booking.listing_id];
 
                 return (
@@ -385,11 +385,15 @@ export function BookingsManager() {
                           <div className="space-y-3">
                             <div className="flex justify-between">
                               <span className="text-sm text-muted-foreground">Total Amount</span>
-                              <span className="font-semibold">{formatPrice(booking.total_price)}</span>
+                              <span className="font-semibold">{formatPrice(totalAmount)}</span>
                             </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">Commission ({rate}%)</span>
-                              <span className="text-muted-foreground">−{formatPrice(commission)}</span>
+                            <div className="flex justify-between text-sm text-muted-foreground">
+                              <span>Paid (Online)</span>
+                              <span>{formatPrice(paidAmount)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-muted-foreground">
+                              <span>Remaining (Collect)</span>
+                              <span>{formatPrice(remainingAmount)}</span>
                             </div>
                             <div className="pt-3 border-t border-border flex justify-between">
                               <span className="font-medium">Your Earnings</span>

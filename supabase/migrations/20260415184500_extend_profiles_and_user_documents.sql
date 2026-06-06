@@ -173,6 +173,10 @@ DROP POLICY IF EXISTS "Users can insert their own documents" ON public.user_docu
 DROP POLICY IF EXISTS "Users can update their own documents" ON public.user_documents;
 DROP POLICY IF EXISTS "Admins can view all documents" ON public.user_documents;
 DROP POLICY IF EXISTS "Admins can update all documents" ON public.user_documents;
+DROP POLICY IF EXISTS "Users can select own documents" ON public.user_documents;
+DROP POLICY IF EXISTS "Users can insert own documents" ON public.user_documents;
+DROP POLICY IF EXISTS "Admins can select all documents" ON public.user_documents;
+
 
 -- User Policy: Authenticated users can only INSERT and SELECT their own document submissions
 CREATE POLICY "Users can select own documents"

@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostBookings } from '@/hooks/useListings';
-import { formatPrice, calculateCommission } from '@/lib/supabase-helpers';
+import { formatPrice, calculateHostBookingAmounts } from '@/lib/supabase-helpers';
 import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 
 export function EarningsTracker() {
@@ -62,17 +62,17 @@ export function EarningsTracker() {
   const pendingBookings = filteredBookings.filter((b) => b.payment_status === 'pending');
 
   const totalEarnings = completedBookings.reduce((sum, b) => {
-    const { hostEarnings } = calculateCommission(b.total_price, true);
+    const { hostEarnings } = calculateHostBookingAmounts(b);
     return sum + hostEarnings;
   }, 0);
 
   const totalCommission = completedBookings.reduce((sum, b) => {
-    const { commission } = calculateCommission(b.total_price, true);
+    const { commission } = calculateHostBookingAmounts(b);
     return sum + commission;
   }, 0);
 
   const pendingEarnings = pendingBookings.reduce((sum, b) => {
-    const { hostEarnings } = calculateCommission(b.total_price, true);
+    const { hostEarnings } = calculateHostBookingAmounts(b);
     return sum + hostEarnings;
   }, 0);
 
@@ -89,7 +89,7 @@ export function EarningsTracker() {
       if (!months[monthKey]) {
         months[monthKey] = { earnings: 0, bookings: 0 };
       }
-      const { hostEarnings } = calculateCommission(booking.total_price, true);
+      const { hostEarnings } = calculateHostBookingAmounts(booking);
       months[monthKey].earnings += hostEarnings;
       months[monthKey].bookings += 1;
     });
@@ -112,7 +112,7 @@ export function EarningsTracker() {
       if (!types[booking.listing_type]) {
         types[booking.listing_type] = 0;
       }
-      const { hostEarnings } = calculateCommission(booking.total_price, true);
+      const { hostEarnings } = calculateHostBookingAmounts(booking);
       types[booking.listing_type] += hostEarnings;
     });
 
@@ -310,7 +310,7 @@ export function EarningsTracker() {
           ) : (
             <div className="space-y-3">
               {completedBookings.slice(0, 10).map((booking) => {
-                const { hostEarnings, commission, rate } = calculateCommission(booking.total_price, true);
+                const { totalAmount, paidAmount, remainingAmount, hostEarnings, rate } = calculateHostBookingAmounts(booking);
                 return (
                   <div
                     key={booking.id}
@@ -326,12 +326,15 @@ export function EarningsTracker() {
                           {format(new Date(booking.created_at), 'MMM d, yyyy')} •{' '}
                           <span className="capitalize">{booking.listing_type}</span>
                         </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Total: {formatPrice(totalAmount)} · Paid online: {formatPrice(paidAmount)}
+                        </p>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-green-600">+{formatPrice(hostEarnings)}</p>
                       <p className="text-xs text-muted-foreground">
-                        {formatPrice(booking.total_price)} - {rate}% fee
+                        Collect from guest
                       </p>
                     </div>
                   </div>

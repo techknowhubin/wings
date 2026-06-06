@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAdminPendingListings, useApproveListing, useRejectListing, useRequestRevision, useDeleteListing } from '@/hooks/useAdmin';
+import { useAdminPendingListings, useApproveListing, useRejectListing, useRequestRevision, useDeleteListing, useSuspendListing, useReactivateListing } from '@/hooks/useAdmin';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -84,6 +84,8 @@ export default function ListingApprovals() {
   const rejectMut  = useRejectListing();
   const revisionMut = useRequestRevision();
   const deleteMut  = useDeleteListing();
+  const suspendMut = useSuspendListing();
+  const reactivateMut = useReactivateListing();
 
   const filtered = useMemo(
     () => tab === 'all' ? (listings ?? []) : (listings ?? []).filter((l: any) => l._table === tab),
@@ -421,20 +423,17 @@ export default function ListingApprovals() {
                   checked={selected.marketplace_visible ?? false}
                   onCheckedChange={async (checked) => {
                     try {
-                      await updateMarketplaceVisibility.mutateAsync({
-                        listingType: getListingTypeFromTable(selected._table),
-                        listingId: selected.id,
-                        marketplaceVisible: checked,
-                      });
+                      if (checked) {
+                        await reactivateMut.mutateAsync({ id: selected.id, table: selected._table });
+                      } else {
+                        await suspendMut.mutateAsync({ id: selected.id, table: selected._table });
+                      }
                       setSelected((prev: any) => prev ? { 
                         ...prev, 
                         marketplace_visible: checked,
-                        approval_status: checked ? 'approved' : prev.approval_status,
-                        is_verified: checked ? true : prev.is_verified,
-                        rejection_reason: checked ? null : prev.rejection_reason,
                       } : null);
                       toast({
-                        title: checked ? 'Listing is now visible in users marketplace.' : 'Listing removed from marketplace.',
+                        title: checked ? 'Listing reactivated and now visible.' : 'Listing suspended and hidden.',
                         className: 'border-green-200 bg-green-50 text-green-800',
                       });
                     } catch (err: any) {

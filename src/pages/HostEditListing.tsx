@@ -59,11 +59,11 @@ const STANDARD_AMENITIES = [
   { key: "wifi" as const, label: "WiFi" },
   { key: "ac" as const, label: "Air Conditioning" },
   { key: "tv" as const, label: "TV" },
-  { key: "kitchen" as const, label: "Kitchen" },
+  { key: "kitchen" as const, label: "Kitchen / Restaurant" },
   { key: "parking" as const, label: "Free Parking" },
   { key: "pool" as const, label: "Swimming Pool" },
   { key: "petFriendly" as const, label: "Pet Friendly" },
-  { key: "dedicatedWorkspace" as const, label: "Dedicated Workspace" },
+  { key: "dedicatedWorkspace" as const, label: "Workspace" },
   { key: "selfCheckIn" as const, label: "Self Check-in" },
   { key: "freeCancellation" as const, label: "Free Cancellation" },
   { key: "breakfast" as const, label: "Breakfast Included" },
@@ -74,7 +74,19 @@ type AmenityKey = (typeof STANDARD_AMENITIES)[number]["key"];
 const amenityFormKey = (k: AmenityKey) =>
   `amenity${k.charAt(0).toUpperCase()}${k.slice(1)}` as keyof typeof emptyExtendedForm;
 
-const emptyBedroom = () => ({ name: "", bedType: "King", count: "1" });
+const emptyBedroom = () => ({
+  name: "",
+  bedType: "King",
+  count: "1",
+  description: "",
+  photos: [] as string[],
+  sizeSqFt: "",
+  bathrooms: "1",
+  occupancyCapacity: "2",
+  amenities: [] as string[],
+  amenityInput: "",
+});
+
 const emptyCoupon = () => ({ code: "", type: "percent" as const, value: "" });
 
 const emptyExtendedForm = {
@@ -91,7 +103,18 @@ const emptyExtendedForm = {
   cleaningFee: "",
   securityDeposit: "",
   roomImages: [] as string[],
-  bedroomDetails: [emptyBedroom()] as Array<{ name: string; bedType: string; count: string }>,
+  bedroomDetails: [] as Array<{
+    name: string;
+    bedType: string;
+    count: string;
+    description: string;
+    photos: string[];
+    sizeSqFt: string;
+    bathrooms: string;
+    occupancyCapacity: string;
+    amenities: string[];
+    amenityInput: string;
+  }>,
   coupons: [] as Array<{ code: string; type: "percent" | "flat"; value: string }>,
   amenityWifi: false,
   amenityAc: false,
@@ -107,7 +130,55 @@ const emptyExtendedForm = {
   amenityGym: false,
   customAmenities: [] as string[],
   amenityInput: "",
+
+  // New premium fields
+  propertyCategory: "Premium",
+  googleMapsUrl: "",
+  videos: [] as string[],
+  videoInput: "",
+  virtualTourUrl: "",
+
+  // Room plans
+  planRoomOnly: true,
+  planFreeBreakfast: false,
+  planHalfBoard: false,
+  planAllInclusive: false,
+  customPlans: [] as string[],
+  customPlanInput: "",
+
+  // Pricing additions
+  originalPrice: "",
+  discountedPrice: "",
+  dailyPrice: "",
+  taxesAndFees: "",
+  offerPercentage: "",
+  bookAtZero: false,
+
+  // Detailed policies
+  policySmokingAllowed: false,
+  policyPetAllowed: false,
+  policyChildAllowed: true,
+  policyChildDescription: "",
+
+  // Nearby Info
+  nearbyRestaurants: [] as string[],
+  nearbyAttractions: [] as string[],
+  nearbyTransport: [] as string[],
+  nearbyHospitals: [] as string[],
+  nearbyShopping: [] as string[],
+  nearbyRestaurantsInput: "",
+  nearbyAttractionsInput: "",
+  nearbyTransportInput: "",
+  nearbyHospitalsInput: "",
+  nearbyShoppingInput: "",
+
+  // Host Info
+  hostName: "",
+  hostPhoto: "",
+  hostDescription: "",
+  hostIsSuperhost: false,
 };
+
 const fuelTypes = ["Petrol", "Diesel", "Electric", "Hybrid", "CNG"];
 const transmissionTypes = ["Manual", "Automatic"];
 const vehicleTypes = ["Sedan", "SUV", "Hatchback", "MUV", "Luxury", "Convertible"];
@@ -123,6 +194,7 @@ export default function HostEditListing() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [originalData, setOriginalData] = useState<any>(null);
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -175,11 +247,11 @@ export default function HostEditListing() {
       const priceField = priceFieldMap[section as Section];
       const extraFields = extraSelectMap[section as Section];
       const { data, error } = await supabase
-        .from(table as any)
-        .select(`id,title,description,location,availability_status,images,discounts,${priceField},${extraFields}`)
-        .eq("id", listingId)
-        .eq("host_id", user.id)
-        .maybeSingle();
+         .from(table as any)
+         .select(`id,title,description,location,availability_status,images,discounts,approval_status,${priceField},${extraFields}`)
+         .eq("id", listingId)
+         .eq("host_id", user.id)
+         .maybeSingle();
 
       if (error || !data) {
         toast.error("Could not load listing for editing.");
@@ -187,6 +259,7 @@ export default function HostEditListing() {
         return;
       }
 
+      setOriginalData(data);
       const discountConfig = parseListingDiscountConfig((data as any).discounts);
       const richAmenities = parseRichAmenities((data as any).amenities);
 
@@ -247,6 +320,13 @@ export default function HostEditListing() {
           name: b.name,
           bedType: b.bedType,
           count: String(b.count),
+          description: b.description ?? "",
+          photos: b.photos ?? [],
+          sizeSqFt: b.sizeSqFt ? String(b.sizeSqFt) : "",
+          bathrooms: b.bathrooms ? String(b.bathrooms) : "1",
+          occupancyCapacity: b.occupancyCapacity ? String(b.occupancyCapacity) : "2",
+          amenities: b.amenities ?? [],
+          amenityInput: "",
         })) ?? [emptyBedroom()],
         coupons: discountConfig.coupons.map(c => ({
           code: c.code,
@@ -267,6 +347,46 @@ export default function HostEditListing() {
         amenityFreeCancellation: !!richAmenities.freeCancellation,
         amenityBreakfast: !!richAmenities.breakfast,
         amenityGym: !!richAmenities.gym,
+
+        // Premium fields
+        propertyCategory: richAmenities.propertyCategory ?? "Premium",
+        googleMapsUrl: richAmenities.googleMapsUrl ?? "",
+        videos: richAmenities.videos ?? [],
+        virtualTourUrl: richAmenities.virtualTourUrl ?? "",
+
+        // Room plans
+        planRoomOnly: richAmenities.roomPlans?.roomOnly !== false,
+        planFreeBreakfast: !!richAmenities.roomPlans?.freeBreakfast,
+        planHalfBoard: !!richAmenities.roomPlans?.halfBoard,
+        planAllInclusive: !!richAmenities.roomPlans?.allInclusive,
+        customPlans: richAmenities.roomPlans?.customPlans ?? [],
+
+        // Pricing additions
+        originalPrice: richAmenities.originalPrice ? String(richAmenities.originalPrice) : "",
+        discountedPrice: richAmenities.discountedPrice ? String(richAmenities.discountedPrice) : "",
+        dailyPrice: richAmenities.dailyPrice ? String(richAmenities.dailyPrice) : "",
+        taxesAndFees: richAmenities.taxesAndFees ? String(richAmenities.taxesAndFees) : "",
+        offerPercentage: richAmenities.offerPercentage ? String(richAmenities.offerPercentage) : "",
+        bookAtZero: !!richAmenities.bookAtZero,
+
+        // Policies
+        policySmokingAllowed: !!richAmenities.policySmokingAllowed,
+        policyPetAllowed: !!richAmenities.policyPetAllowed,
+        policyChildAllowed: richAmenities.policyChildAllowed !== false,
+        policyChildDescription: richAmenities.policyChildDescription ?? "",
+
+        // Nearby Info
+        nearbyRestaurants: richAmenities.nearbyInfo?.restaurants ?? [],
+        nearbyAttractions: richAmenities.nearbyInfo?.attractions ?? [],
+        nearbyTransport: richAmenities.nearbyInfo?.transport ?? [],
+        nearbyHospitals: richAmenities.nearbyInfo?.hospitals ?? [],
+        nearbyShopping: richAmenities.nearbyInfo?.shopping ?? [],
+
+        // Host Info
+        hostName: richAmenities.hostInfo?.name ?? "",
+        hostPhoto: richAmenities.hostInfo?.photo ?? "",
+        hostDescription: richAmenities.hostInfo?.description ?? "",
+        hostIsSuperhost: !!richAmenities.hostInfo?.isSuperhost,
       }));
       setIsLoading(false);
     };
@@ -274,8 +394,20 @@ export default function HostEditListing() {
     void loadListing();
   }, [listingId, navigate, section, user]);
 
-  const set = (key: string, value: string | boolean | string[]) =>
+  const set = (key: string, value: any) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  const updateBedroom = (i: number, field: string, value: any) =>
+    setForm(p => ({
+      ...p,
+      bedroomDetails: p.bedroomDetails.map((b, idx) => idx === i ? { ...b, [field]: value } : b),
+    }));
+
+  const updateCoupon = (i: number, field: string, value: string) =>
+    setForm(p => ({
+      ...p,
+      coupons: p.coupons.map((c, idx) => idx === i ? { ...c, [field]: value } : c),
+    }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -294,6 +426,210 @@ export default function HostEditListing() {
         .map(c => ({ code: c.code, type: c.type, value: Number(c.value) }));
       const discountConfig = createDiscountConfig(Number(form.hostDiscountPercent || 0), validCoupons);
 
+      // Determine major change status by comparing with originalData
+      let isMajorChange = false;
+      if (originalData) {
+        if (form.title !== (originalData.title ?? "") ||
+            form.description !== (originalData.description ?? "") ||
+            form.location !== (originalData.location ?? "")) {
+          isMajorChange = true;
+        }
+
+        if (section === "stays" || section === "hotels" || section === "resorts") {
+          const origMaxGuests = originalData.max_guests ? String(originalData.max_guests) : "";
+          const origBedrooms = originalData.bedrooms ? String(originalData.bedrooms) : "";
+          const origBathrooms = originalData.bathrooms ? String(originalData.bathrooms) : "";
+          const origPropType = originalData.property_type ?? "";
+          const origCheckIn = originalData.check_in_time ?? "";
+          const origCheckOut = originalData.check_out_time ?? "";
+          const origCancelPolicy = originalData.cancellation_policy ?? "moderate";
+
+          if (form.max_guests !== origMaxGuests ||
+              form.bedrooms !== origBedrooms ||
+              form.bathrooms !== origBathrooms ||
+              form.property_type !== origPropType ||
+              form.check_in_time !== origCheckIn ||
+              form.check_out_time !== origCheckOut ||
+              form.cancellation_policy !== origCancelPolicy) {
+            isMajorChange = true;
+          }
+
+          const origAmenities = parseRichAmenities(originalData.amenities);
+          const origWifi = !!origAmenities.wifi;
+          const origAc = !!origAmenities.ac;
+          const origTv = !!origAmenities.tv;
+          const origKitchen = !!origAmenities.kitchen;
+          const origParking = !!origAmenities.parking;
+          const origPool = !!origAmenities.pool;
+          const origPetFriendly = !!origAmenities.petFriendly;
+          const origWorkspace = !!origAmenities.dedicatedWorkspace;
+          const origSelfCheckIn = !!origAmenities.selfCheckIn;
+          const origFreeCancel = !!origAmenities.freeCancellation;
+          const origBreakfast = !!origAmenities.breakfast;
+          const origGym = !!origAmenities.gym;
+          const origCustom = origAmenities.custom ?? [];
+          const origShortDesc = origAmenities.shortDescription ?? "";
+          const origState = origAmenities.state ?? "";
+          const origCity = origAmenities.city ?? "";
+          const origFullAddress = origAmenities.fullAddress ?? "";
+          const origPropSize = origAmenities.propertySize ?? "";
+          const origBeds = origAmenities.beds ? String(origAmenities.beds) : "";
+          const origHouseRules = origAmenities.houseRules ?? "";
+          const origHealthSafety = origAmenities.healthSafety ?? "";
+
+          // Premium fields comparison
+          const origPropCategory = origAmenities.propertyCategory ?? "Premium";
+          const origGoogleMapsUrl = origAmenities.googleMapsUrl ?? "";
+          const origVirtualTourUrl = origAmenities.virtualTourUrl ?? "";
+
+          const origSmoking = !!origAmenities.policySmokingAllowed;
+          const origPet = !!origAmenities.policyPetAllowed;
+          const origChild = origAmenities.policyChildAllowed !== false;
+          const origChildDesc = origAmenities.policyChildDescription ?? "";
+
+          const origNearby = origAmenities.nearbyInfo ?? {};
+          const currentNearby = {
+            restaurants: form.nearbyRestaurants.length > 0 ? form.nearbyRestaurants : undefined,
+            attractions: form.nearbyAttractions.length > 0 ? form.nearbyAttractions : undefined,
+            transport: form.nearbyTransport.length > 0 ? form.nearbyTransport : undefined,
+            hospitals: form.nearbyHospitals.length > 0 ? form.nearbyHospitals : undefined,
+            shopping: form.nearbyShopping.length > 0 ? form.nearbyShopping : undefined,
+          };
+
+          const origHost = origAmenities.hostInfo ?? {};
+          const currentHost = {
+            name: form.hostName || undefined,
+            photo: form.hostPhoto || undefined,
+            description: form.hostDescription || undefined,
+            isSuperhost: form.hostIsSuperhost,
+          };
+
+          const origPlans = origAmenities.roomPlans ?? {};
+          const currentPlans = {
+            roomOnly: form.planRoomOnly,
+            freeBreakfast: form.planFreeBreakfast,
+            halfBoard: form.planHalfBoard,
+            allInclusive: form.planAllInclusive,
+            customPlans: form.customPlans.length > 0 ? form.customPlans : undefined,
+          };
+
+          if (form.amenityWifi !== origWifi ||
+              form.amenityAc !== origAc ||
+              form.amenityTv !== origTv ||
+              form.amenityKitchen !== origKitchen ||
+              form.amenityParking !== origParking ||
+              form.amenityPool !== origPool ||
+              form.amenityPetFriendly !== origPetFriendly ||
+              form.amenityDedicatedWorkspace !== origWorkspace ||
+              form.amenitySelfCheckIn !== origSelfCheckIn ||
+              form.amenityFreeCancellation !== origFreeCancel ||
+              form.amenityBreakfast !== origBreakfast ||
+              form.amenityGym !== origGym ||
+              form.shortDescription !== origShortDesc ||
+              form.state !== origState ||
+              form.city !== origCity ||
+              form.fullAddress !== origFullAddress ||
+              form.propertySize !== origPropSize ||
+              form.beds !== origBeds ||
+              form.houseRules !== origHouseRules ||
+              form.healthSafety !== origHealthSafety ||
+              form.propertyCategory !== origPropCategory ||
+              form.googleMapsUrl !== origGoogleMapsUrl ||
+              form.virtualTourUrl !== origVirtualTourUrl ||
+              form.policySmokingAllowed !== origSmoking ||
+              form.policyPetAllowed !== origPet ||
+              form.policyChildAllowed !== origChild ||
+              form.policyChildDescription !== origChildDesc ||
+              JSON.stringify(currentNearby) !== JSON.stringify(origNearby) ||
+              JSON.stringify(currentHost) !== JSON.stringify(origHost) ||
+              JSON.stringify(currentPlans) !== JSON.stringify(origPlans)) {
+            isMajorChange = true;
+          }
+
+          if (JSON.stringify(form.customAmenities.slice().sort()) !== JSON.stringify(origCustom.slice().sort())) {
+            isMajorChange = true;
+          }
+
+          const origRooms = origAmenities.bedroomDetails?.map(b => ({
+            name: b.name,
+            bedType: b.bedType,
+            count: String(b.count),
+            description: b.description ?? "",
+            photos: b.photos ?? [],
+            sizeSqFt: b.sizeSqFt ? String(b.sizeSqFt) : "",
+            bathrooms: b.bathrooms ? String(b.bathrooms) : "1",
+            occupancyCapacity: b.occupancyCapacity ? String(b.occupancyCapacity) : "2",
+            amenities: b.amenities ?? [],
+          })) ?? [];
+          const validRooms = form.bedroomDetails.filter(b => b.name.trim() || Number(b.count) > 0);
+          const currentRooms = validRooms.map(b => ({
+            name: b.name,
+            bedType: b.bedType,
+            count: String(b.count),
+            description: b.description || "",
+            photos: b.photos || [],
+            sizeSqFt: b.sizeSqFt ? String(b.sizeSqFt) : "",
+            bathrooms: b.bathrooms ? String(b.bathrooms) : "1",
+            occupancyCapacity: b.occupancyCapacity ? String(b.occupancyCapacity) : "2",
+            amenities: b.amenities || [],
+          }));
+          if (JSON.stringify(currentRooms) !== JSON.stringify(origRooms)) {
+            isMajorChange = true;
+          }
+        }
+
+        if (section === "cars" || section === "cabs") {
+          if (form.brand !== (originalData.brand ?? "") ||
+              form.model !== (originalData.model ?? "") ||
+              form.year !== (originalData.year ? String(originalData.year) : "") ||
+              form.fuel_type !== (originalData.fuel_type ?? "") ||
+              form.transmission !== (originalData.transmission ?? "") ||
+              form.vehicle_type !== (originalData.vehicle_type ?? "") ||
+              form.seating_capacity !== (originalData.seating_capacity ? String(originalData.seating_capacity) : "") ||
+              form.mileage_limit !== (originalData.mileage_limit ? String(originalData.mileage_limit) : "")) {
+            isMajorChange = true;
+          }
+        }
+
+        if (section === "bikes") {
+          if (form.brand !== (originalData.brand ?? "") ||
+              form.model !== (originalData.model ?? "") ||
+              form.year !== (originalData.year ? String(originalData.year) : "") ||
+              form.engine_capacity !== (originalData.engine_capacity ? String(originalData.engine_capacity) : "") ||
+              form.vehicle_type !== (originalData.vehicle_type ?? "") ||
+              form.mileage_limit !== (originalData.mileage_limit ? String(originalData.mileage_limit) : "") ||
+              form.helmet_included !== Boolean(originalData.helmet_included ?? true)) {
+            isMajorChange = true;
+          }
+        }
+
+        if (section === "experiences") {
+          if (form.category !== (originalData.category ?? "") ||
+              form.duration !== (originalData.duration ?? "") ||
+              form.group_size !== (originalData.group_size ? String(originalData.group_size) : "") ||
+              JSON.stringify(form.inclusions.filter(i => i.trim())) !== JSON.stringify(originalData.inclusions ?? []) ||
+              JSON.stringify(form.exclusions.filter(e => e.trim())) !== JSON.stringify(originalData.exclusions ?? [])) {
+            isMajorChange = true;
+          }
+        }
+      }
+
+      // Read rules from settings
+      const isApproved = originalData?.approval_status === "approved";
+      const reviewMinor = localStorage.getItem("review_minor_changes") === "true";
+      const reviewMajor = localStorage.getItem("review_major_changes") !== "false"; // default true
+
+      let triggerPending = false;
+      if (!isApproved) {
+        triggerPending = true;
+      } else {
+        if (isMajorChange && reviewMajor) {
+          triggerPending = true;
+        } else if (!isMajorChange && reviewMinor) {
+          triggerPending = true;
+        }
+      }
+
       const payload: Record<string, unknown> = {
         title: form.title,
         description: form.description || null,
@@ -305,12 +641,15 @@ export default function HostEditListing() {
           discountConfig.hostDiscountPercent > 0 || discountConfig.coupons.length > 0
             ? discountConfig
             : null,
-        approval_status: 'pending',
-        rejection_reason: null,
-        marketplace_requested: true,
-        marketplace_visible: false,
-        submitted_for_review_at: new Date().toISOString(),
       };
+
+      if (triggerPending) {
+        payload.approval_status = 'pending';
+        payload.rejection_reason = null;
+        payload.marketplace_requested = true;
+        payload.marketplace_visible = false;
+        payload.submitted_for_review_at = new Date().toISOString();
+      }
 
       if (section === "stays" || section === "hotels" || section === "resorts") {
         payload.max_guests = form.max_guests ? Number(form.max_guests) : null;
@@ -344,17 +683,70 @@ export default function HostEditListing() {
         if (form.beds) richAmenities.beds = Number(form.beds);
         if (form.houseRules) richAmenities.houseRules = form.houseRules;
         if (form.healthSafety) richAmenities.healthSafety = form.healthSafety;
+
         const validRooms = form.bedroomDetails.filter(b => b.name.trim() || Number(b.count) > 0);
         if (validRooms.length) richAmenities.bedroomDetails = validRooms.map(b => ({
           name: b.name,
           bedType: b.bedType,
           count: Number(b.count) || 1,
+          description: b.description || undefined,
+          photos: b.photos.length > 0 ? b.photos : undefined,
+          sizeSqFt: b.sizeSqFt ? Number(b.sizeSqFt) : undefined,
+          bathrooms: b.bathrooms ? Number(b.bathrooms) : undefined,
+          occupancyCapacity: b.occupancyCapacity ? Number(b.occupancyCapacity) : undefined,
+          amenities: b.amenities.length > 0 ? b.amenities : undefined,
         }));
         if (form.roomImages.length) richAmenities.roomImages = form.roomImages;
         if (form.weeklyPrice) richAmenities.weeklyPrice = Number(form.weeklyPrice);
         if (form.monthlyPrice) richAmenities.monthlyPrice = Number(form.monthlyPrice);
         if (form.cleaningFee) richAmenities.cleaningFee = Number(form.cleaningFee);
         if (form.securityDeposit) richAmenities.securityDeposit = Number(form.securityDeposit);
+
+        // Premium fields
+        if (form.propertyCategory) richAmenities.propertyCategory = form.propertyCategory;
+        if (form.googleMapsUrl) richAmenities.googleMapsUrl = form.googleMapsUrl;
+        if (form.videos.length) richAmenities.videos = form.videos;
+        if (form.virtualTourUrl) richAmenities.virtualTourUrl = form.virtualTourUrl;
+
+        // Room plans
+        richAmenities.roomPlans = {
+          roomOnly: form.planRoomOnly,
+          freeBreakfast: form.planFreeBreakfast,
+          halfBoard: form.planHalfBoard,
+          allInclusive: form.planAllInclusive,
+          customPlans: form.customPlans.length > 0 ? form.customPlans : undefined,
+        };
+
+        // Detailed pricing additions
+        if (form.originalPrice) richAmenities.originalPrice = Number(form.originalPrice);
+        if (form.discountedPrice) richAmenities.discountedPrice = Number(form.discountedPrice);
+        if (form.dailyPrice) richAmenities.dailyPrice = Number(form.dailyPrice);
+        if (form.taxesAndFees) richAmenities.taxesAndFees = Number(form.taxesAndFees);
+        if (form.offerPercentage) richAmenities.offerPercentage = Number(form.offerPercentage);
+        richAmenities.bookAtZero = form.bookAtZero;
+
+        // Policies
+        richAmenities.policySmokingAllowed = form.policySmokingAllowed;
+        richAmenities.policyPetAllowed = form.policyPetAllowed;
+        richAmenities.policyChildAllowed = form.policyChildAllowed;
+        if (form.policyChildDescription) richAmenities.policyChildDescription = form.policyChildDescription;
+
+        // Nearby Info
+        richAmenities.nearbyInfo = {
+          restaurants: form.nearbyRestaurants.length > 0 ? form.nearbyRestaurants : undefined,
+          attractions: form.nearbyAttractions.length > 0 ? form.nearbyAttractions : undefined,
+          transport: form.nearbyTransport.length > 0 ? form.nearbyTransport : undefined,
+          hospitals: form.nearbyHospitals.length > 0 ? form.nearbyHospitals : undefined,
+          shopping: form.nearbyShopping.length > 0 ? form.nearbyShopping : undefined,
+        };
+
+        // Host Info
+        richAmenities.hostInfo = {
+          name: form.hostName || undefined,
+          photo: form.hostPhoto || undefined,
+          description: form.hostDescription || undefined,
+          isSuperhost: form.hostIsSuperhost,
+        };
 
         payload.amenities = Object.keys(richAmenities).length > 0 ? richAmenities : null;
       }
@@ -395,7 +787,11 @@ export default function HostEditListing() {
         .eq("host_id", user.id);
 
       if (error) throw error;
-      toast.success(`${sectionLabel} listing updated.`);
+      if (triggerPending && isApproved) {
+        toast.success(`${sectionLabel} updated. Changes require admin approval before going live.`);
+      } else {
+        toast.success(`${sectionLabel} updated successfully.`);
+      }
       navigate(`/host/${section}`);
     } catch (error: any) {
       toast.error(error?.message || "Failed to update listing");
@@ -442,6 +838,20 @@ export default function HostEditListing() {
               <div><Label>Title *</Label><Input value={form.title} onChange={(e) => set("title", e.target.value)} /></div>
               <div><Label>Description</Label><Textarea rows={4} value={form.description} onChange={(e) => set("description", e.target.value)} /></div>
               <div><Label>Location *</Label><Input value={form.location} onChange={(e) => set("location", e.target.value)} /></div>
+              
+              {(section === "stays" || section === "hotels" || section === "resorts") && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Property Category</Label>
+                    <Select value={form.propertyCategory} onValueChange={v => set('propertyCategory', v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {['Budget', 'Luxury', 'Premium', 'Heritage', 'Standard'].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -457,24 +867,8 @@ export default function HostEditListing() {
                     <Label>Property Type</Label>
                     <Select value={form.property_type} onValueChange={(v) => set("property_type", v)}>
                       <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                      <SelectContent>{propertyTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader><CardTitle>Check-in/out</CardTitle></CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div><Label>Check-in</Label><Input type="time" value={form.check_in_time} onChange={(e) => set("check_in_time", e.target.value)} /></div>
-                  <div><Label>Check-out</Label><Input type="time" value={form.check_out_time} onChange={(e) => set("check_out_time", e.target.value)} /></div>
-                  <div>
-                    <Label>Cancellation Policy</Label>
-                    <Select value={form.cancellation_policy} onValueChange={(v) => set("cancellation_policy", v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="flexible">Flexible</SelectItem>
-                        <SelectItem value="moderate">Moderate</SelectItem>
-                        <SelectItem value="strict">Strict</SelectItem>
+                        {propertyTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -604,6 +998,10 @@ export default function HostEditListing() {
                     <Label>Full Address</Label>
                     <Input value={form.fullAddress} onChange={e => set("fullAddress", e.target.value)} placeholder="Street, Area, PIN code" />
                   </div>
+                  <div>
+                    <Label>Google Maps Link</Label>
+                    <Input value={form.googleMapsUrl} onChange={e => set("googleMapsUrl", e.target.value)} placeholder="https://maps.google.com/?q=..." />
+                  </div>
                 </CardContent>
               </Card>
 
@@ -632,6 +1030,72 @@ export default function HostEditListing() {
                     label="Click to upload room / interior photos"
                     showFeaturedBadge={false}
                   />
+                </CardContent>
+              </Card>
+
+              {/* Videos & Virtual Tour */}
+              <Card>
+                <CardHeader><CardTitle>Videos & Virtual Tours</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="virtualTourUrl">Virtual Tour URL</Label>
+                    <Input
+                      id="virtualTourUrl"
+                      value={form.virtualTourUrl}
+                      onChange={e => set("virtualTourUrl", e.target.value)}
+                      placeholder="https://my.matterport.com/show/?m=..."
+                    />
+                  </div>
+                  <div>
+                    <Label>Video Links</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Input
+                        value={form.videoInput}
+                        onChange={e => set("videoInput", e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const val = form.videoInput.trim();
+                            if (val && !form.videos.includes(val)) {
+                              setForm(p => ({ ...p, videos: [...p.videos, val], videoInput: '' }));
+                            }
+                          }
+                        }}
+                        placeholder="https://youtube.com/watch?v=... or MP4 URL"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          const val = form.videoInput.trim();
+                          if (val && !form.videos.includes(val)) {
+                            setForm(p => ({ ...p, videos: [...p.videos, val], videoInput: '' }));
+                          }
+                        }}
+                        className="shrink-0"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {form.videos.length > 0 && (
+                      <div className="space-y-2 mt-2">
+                        {form.videos.map((vid, idx) => (
+                          <div key={idx} className="flex items-center justify-between bg-secondary/50 rounded px-3 py-1.5 text-xs">
+                            <span className="truncate flex-1 mr-2">{vid}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                              onClick={() => setForm(p => ({ ...p, videos: p.videos.filter((_, i) => i !== idx) }))}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -695,45 +1159,185 @@ export default function HostEditListing() {
               {/* Sleeping Arrangements */}
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Where You'll Sleep</CardTitle>
+                  <CardTitle>Room Options & Details</CardTitle>
                   <Button type="button" variant="outline" size="sm" onClick={() => setForm(p => ({ ...p, bedroomDetails: [...p.bedroomDetails, emptyBedroom()] }))}>
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Bedroom
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Room Option
                   </Button>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {form.bedroomDetails.map((b, i) => (
-                    <div key={i} className="grid grid-cols-3 gap-3 p-3 rounded-lg border border-border">
-                      <div>
-                        <Label className="text-xs">Room Name</Label>
-                        <Input value={b.name} onChange={e => setForm(p => ({ ...p, bedroomDetails: p.bedroomDetails.map((bd, idx) => idx === i ? { ...bd, name: e.target.value } : bd) }))} placeholder={`Bedroom ${i + 1}`} className="mt-1 h-8 text-sm" />
-                      </div>
-                      <div>
-                        <Label className="text-xs">Bed Type</Label>
-                        <Select value={b.bedType} onValueChange={v => setForm(p => ({ ...p, bedroomDetails: p.bedroomDetails.map((bd, idx) => idx === i ? { ...bd, bedType: v } : bd) }))}>
-                          <SelectTrigger className="mt-1 h-8 text-sm"><SelectValue /></SelectTrigger>
-                          <SelectContent>{bedTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex items-end gap-2">
-                        <div className="flex-1">
-                          <Label className="text-xs">Beds</Label>
-                          <Input type="number" min={1} value={b.count} onChange={e => setForm(p => ({ ...p, bedroomDetails: p.bedroomDetails.map((bd, idx) => idx === i ? { ...bd, count: e.target.value } : bd) }))} className="mt-1 h-8 text-sm" />
-                        </div>
+                    <div key={i} className="p-4 rounded-lg border border-border space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold">Room Option #{i + 1}</span>
                         {form.bedroomDetails.length > 1 && (
-                          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setForm(p => ({ ...p, bedroomDetails: p.bedroomDetails.filter((_, idx) => idx !== i) }))}>
-                            <X className="h-3.5 w-3.5" />
+                          <Button type="button" variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => setForm(p => ({ ...p, bedroomDetails: p.bedroomDetails.filter((_, idx) => idx !== i) }))}>
+                            Remove Room
                           </Button>
                         )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs">Room Name / Type</Label>
+                          <Input value={b.name} onChange={e => updateBedroom(i, 'name', e.target.value)} placeholder="e.g. Deluxe Suite" className="h-8 text-sm" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Room Description</Label>
+                          <Input value={b.description} onChange={e => updateBedroom(i, 'description', e.target.value)} placeholder="e.g. Spacious suite" className="h-8 text-sm" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <Label className="text-xs">Bed Type</Label>
+                          <Select value={b.bedType} onValueChange={v => updateBedroom(i, 'bedType', v)}>
+                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>{bedTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Number of Beds</Label>
+                          <Input type="number" min={1} value={b.count} onChange={e => updateBedroom(i, 'count', e.target.value)} className="h-8 text-sm" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Number of Bathrooms</Label>
+                          <Input type="number" min={0} value={b.bathrooms} onChange={e => updateBedroom(i, 'bathrooms', e.target.value)} className="h-8 text-sm" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <Label className="text-xs">Room Size (sq ft)</Label>
+                          <Input type="number" min={1} value={b.sizeSqFt} onChange={e => updateBedroom(i, 'sizeSqFt', e.target.value)} placeholder="e.g. 450" className="h-8 text-sm" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Occupancy Capacity</Label>
+                          <Input type="number" min={1} value={b.occupancyCapacity} onChange={e => updateBedroom(i, 'occupancyCapacity', e.target.value)} className="h-8 text-sm" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Room Amenities</Label>
+                          <div className="flex gap-1 mt-1">
+                            <Input
+                              value={b.amenityInput}
+                              onChange={e => updateBedroom(i, 'amenityInput', e.target.value)}
+                              placeholder="e.g. Mini-fridge, Balcony"
+                              className="h-8 text-sm"
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const val = b.amenityInput.trim();
+                                  if (val && !b.amenities.includes(val)) {
+                                    setForm(p => ({
+                                      ...p,
+                                      bedroomDetails: p.bedroomDetails.map((rm, idx) =>
+                                        idx === i ? { ...rm, amenities: [...rm.amenities, val], amenityInput: '' } : rm
+                                      )
+                                    }));
+                                  }
+                                }
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const val = b.amenityInput.trim();
+                                if (val && !b.amenities.includes(val)) {
+                                  setForm(p => ({
+                                    ...p,
+                                    bedroomDetails: p.bedroomDetails.map((rm, idx) =>
+                                      idx === i ? { ...rm, amenities: [...rm.amenities, val], amenityInput: '' } : rm
+                                    )
+                                  }));
+                                }
+                              }}
+                              className="h-8 px-2"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          {b.amenities && b.amenities.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {b.amenities.map((amenity, idx) => (
+                                <span key={idx} className="inline-flex items-center bg-secondary/80 text-[10px] rounded px-1.5 py-0.5">
+                                  {amenity}
+                                  <button
+                                    type="button"
+                                    className="ml-1 text-muted-foreground hover:text-destructive"
+                                    onClick={() => setForm(p => ({
+                                      ...p,
+                                      bedroomDetails: p.bedroomDetails.map((rm, idx2) =>
+                                        idx2 === i ? { ...rm, amenities: rm.amenities.filter((_, aIdx) => aIdx !== idx) } : rm
+                                      )
+                                    }))}
+                                  >
+                                    &times;
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Room Photo URLs (one per line)</Label>
+                        <Textarea
+                          value={b.photos.join('\n')}
+                          onChange={e => updateBedroom(i, 'photos', e.target.value.split('\n').filter(Boolean))}
+                          placeholder="https://images.unsplash.com/...&#10;https://images.unsplash.com/..."
+                          rows={2}
+                          className="text-xs"
+                        />
                       </div>
                     </div>
                   ))}
                 </CardContent>
               </Card>
 
-              {/* House Rules & Safety */}
+              {/* Policies */}
               <Card>
                 <CardHeader><CardTitle>Policies</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="checkin">Check-in Time</Label>
+                      <Input id="checkin" type="time" value={form.check_in_time} onChange={e => set("check_in_time", e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="checkout">Check-out Time</Label>
+                      <Input id="checkout" type="time" value={form.check_out_time} onChange={e => set("check_out_time", e.target.value)} />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Cancellation Policy</Label>
+                    <Select value={form.cancellation_policy} onValueChange={v => set('cancellation_policy', v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="flexible">Flexible — free cancellation up to 24 hrs</SelectItem>
+                        <SelectItem value="moderate">Moderate — free cancellation up to 5 days</SelectItem>
+                        <SelectItem value="strict">Strict — no refunds after 48 hrs</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 py-2 border-y border-border">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox checked={form.policySmokingAllowed} onCheckedChange={v => set('policySmokingAllowed', !!v)} />
+                      <span className="text-xs">Smoking Allowed</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox checked={form.policyPetAllowed} onCheckedChange={v => set('policyPetAllowed', !!v)} />
+                      <span className="text-xs">Pets Allowed</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox checked={form.policyChildAllowed} onCheckedChange={v => set('policyChildAllowed', !!v)} />
+                      <span className="text-xs">Children Allowed</span>
+                    </label>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="policyChildDescription">Child Policy Details</Label>
+                    <Input id="policyChildDescription" value={form.policyChildDescription} onChange={e => set('policyChildDescription', e.target.value)} placeholder="e.g. Free stay for children below 5 years" />
+                  </div>
+
                   <div>
                     <Label>House Rules</Label>
                     <Textarea value={form.houseRules} onChange={e => set("houseRules", e.target.value)} placeholder="No smoking, no parties, quiet hours after 10 PM..." rows={3} />
@@ -741,6 +1345,189 @@ export default function HostEditListing() {
                   <div>
                     <Label>Health & Safety</Label>
                     <Textarea value={form.healthSafety} onChange={e => set("healthSafety", e.target.value)} placeholder="Smoke alarm installed, CO detector, first aid kit..." rows={3} />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Nearby Attractions & Services */}
+              <Card>
+                <CardHeader><CardTitle>Nearby Attractions & Services</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Nearby Restaurants */}
+                  <div>
+                    <Label className="text-xs font-semibold">Restaurants & Cafes</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Input
+                        value={form.nearbyRestaurantsInput}
+                        onChange={e => set('nearbyRestaurantsInput', e.target.value)}
+                        placeholder="e.g. Cafe Live (0.5 km)"
+                        className="h-8 text-sm"
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const val = form.nearbyRestaurantsInput.trim();
+                            if (val && !form.nearbyRestaurants.includes(val)) {
+                              setForm(p => ({ ...p, nearbyRestaurants: [...p.nearbyRestaurants, val], nearbyRestaurantsInput: '' }));
+                            }
+                          }
+                        }}
+                      />
+                      <Button type="button" variant="outline" size="sm" onClick={() => {
+                        const val = form.nearbyRestaurantsInput.trim();
+                        if (val && !form.nearbyRestaurants.includes(val)) {
+                          setForm(p => ({ ...p, nearbyRestaurants: [...p.nearbyRestaurants, val], nearbyRestaurantsInput: '' }));
+                        }
+                      }} className="h-8">Add</Button>
+                    </div>
+                    {form.nearbyRestaurants.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {form.nearbyRestaurants.map((item, idx) => (
+                          <span key={idx} className="inline-flex items-center gap-1 bg-secondary text-xs rounded-full px-2.5 py-0.5">
+                            {item}
+                            <button type="button" onClick={() => setForm(p => ({ ...p, nearbyRestaurants: p.nearbyRestaurants.filter((_, i) => i !== idx) }))} className="text-muted-foreground hover:text-destructive ml-1">&times;</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nearby Attractions */}
+                  <div>
+                    <Label className="text-xs font-semibold">Attractions</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Input
+                        value={form.nearbyAttractionsInput}
+                        onChange={e => set('nearbyAttractionsInput', e.target.value)}
+                        placeholder="e.g. Mall Road (2 km)"
+                        className="h-8 text-sm"
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const val = form.nearbyAttractionsInput.trim();
+                            if (val && !form.nearbyAttractions.includes(val)) {
+                              setForm(p => ({ ...p, nearbyAttractions: [...p.nearbyAttractions, val], nearbyAttractionsInput: '' }));
+                            }
+                          }
+                        }}
+                      />
+                      <Button type="button" variant="outline" size="sm" onClick={() => {
+                        const val = form.nearbyAttractionsInput.trim();
+                        if (val && !form.nearbyAttractions.includes(val)) {
+                          setForm(p => ({ ...p, nearbyAttractions: [...p.nearbyAttractions, val], nearbyAttractionsInput: '' }));
+                        }
+                      }} className="h-8">Add</Button>
+                    </div>
+                    {form.nearbyAttractions.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {form.nearbyAttractions.map((item, idx) => (
+                          <span key={idx} className="inline-flex items-center gap-1 bg-secondary text-xs rounded-full px-2.5 py-0.5">
+                            {item}
+                            <button type="button" onClick={() => setForm(p => ({ ...p, nearbyAttractions: p.nearbyAttractions.filter((_, i) => i !== idx) }))} className="text-muted-foreground hover:text-destructive ml-1">&times;</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nearby Transport */}
+                  <div>
+                    <Label className="text-xs font-semibold">Transport Stations</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Input
+                        value={form.nearbyTransportInput}
+                        onChange={e => set('nearbyTransportInput', e.target.value)}
+                        placeholder="e.g. Bus Stand (1.8 km)"
+                        className="h-8 text-sm"
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const val = form.nearbyTransportInput.trim();
+                            if (val && !form.nearbyTransport.includes(val)) {
+                              setForm(p => ({ ...p, nearbyTransport: [...p.nearbyTransport, val], nearbyTransportInput: '' }));
+                            }
+                          }
+                        }}
+                      />
+                      <Button type="button" variant="outline" size="sm" onClick={() => {
+                        const val = form.nearbyTransportInput.trim();
+                        if (val && !form.nearbyTransport.includes(val)) {
+                          setForm(p => ({ ...p, nearbyTransport: [...p.nearbyTransport, val], nearbyTransportInput: '' }));
+                        }
+                      }} className="h-8">Add</Button>
+                    </div>
+                    {form.nearbyTransport.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {form.nearbyTransport.map((item, idx) => (
+                          <span key={idx} className="inline-flex items-center gap-1 bg-secondary text-xs rounded-full px-2.5 py-0.5">
+                            {item}
+                            <button type="button" onClick={() => setForm(p => ({ ...p, nearbyTransport: p.nearbyTransport.filter((_, i) => i !== idx) }))} className="text-muted-foreground hover:text-destructive ml-1">&times;</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nearby Hospitals */}
+                  <div>
+                    <Label className="text-xs font-semibold">Hospitals & Medical Care</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Input
+                        value={form.nearbyHospitalsInput}
+                        onChange={e => set('nearbyHospitalsInput', e.target.value)}
+                        placeholder="e.g. City Hospital (3.5 km)"
+                        className="h-8 text-sm"
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const val = form.nearbyHospitalsInput.trim();
+                            if (val && !form.nearbyHospitals.includes(val)) {
+                              setForm(p => ({ ...p, nearbyHospitals: [...p.nearbyHospitals, val], nearbyHospitalsInput: '' }));
+                            }
+                          }
+                        }}
+                      />
+                      <Button type="button" variant="outline" size="sm" onClick={() => {
+                        const val = form.nearbyHospitalsInput.trim();
+                        if (val && !form.nearbyHospitals.includes(val)) {
+                          setForm(p => ({ ...p, nearbyHospitals: [...p.nearbyHospitals, val], nearbyHospitalsInput: '' }));
+                        }
+                      }} className="h-8">Add</Button>
+                    </div>
+                    {form.nearbyHospitals.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {form.nearbyHospitals.map((item, idx) => (
+                          <span key={idx} className="inline-flex items-center gap-1 bg-secondary text-xs rounded-full px-2.5 py-0.5">
+                            {item}
+                            <button type="button" onClick={() => setForm(p => ({ ...p, nearbyHospitals: p.nearbyHospitals.filter((_, i) => i !== idx) }))} className="text-muted-foreground hover:text-destructive ml-1">&times;</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Host Information */}
+              <Card>
+                <CardHeader><CardTitle>Host Information</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="hostName">Host Display Name</Label>
+                      <Input id="hostName" value={form.hostName} onChange={e => set('hostName', e.target.value)} placeholder="e.g. John Doe" />
+                    </div>
+                    <div>
+                      <Label htmlFor="hostPhoto">Host Photo URL</Label>
+                      <Input id="hostPhoto" value={form.hostPhoto} onChange={e => set('hostPhoto', e.target.value)} placeholder="https://..." />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="hostIsSuperhost" checked={form.hostIsSuperhost} onCheckedChange={v => set('hostIsSuperhost', !!v)} />
+                    <Label htmlFor="hostIsSuperhost" className="text-xs font-semibold cursor-pointer">Mark as Superhost</Label>
+                  </div>
+                  <div>
+                    <Label htmlFor="hostDescription">Host Description</Label>
+                    <Textarea id="hostDescription" value={form.hostDescription} onChange={e => set('hostDescription', e.target.value)} placeholder="A short bio..." rows={3} />
                   </div>
                 </CardContent>
               </Card>
@@ -760,6 +1547,67 @@ export default function HostEditListing() {
         </div>
 
         <div className="space-y-6">
+          {(section === "stays" || section === "hotels" || section === "resorts") && (
+            <Card>
+              <CardHeader><CardTitle>Room Plans Selection</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox checked={form.planRoomOnly} onCheckedChange={v => set('planRoomOnly', !!v)} />
+                  <span className="text-sm">Room Only</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox checked={form.planFreeBreakfast} onCheckedChange={v => set('planFreeBreakfast', !!v)} />
+                  <span className="text-sm">Free Breakfast</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox checked={form.planHalfBoard} onCheckedChange={v => set('planHalfBoard', !!v)} />
+                  <span className="text-sm">Half Board (Breakfast + Dinner)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox checked={form.planAllInclusive} onCheckedChange={v => set('planAllInclusive', !!v)} />
+                  <span className="text-sm">All Inclusive</span>
+                </label>
+
+                <div className="pt-2 border-t border-border">
+                  <Label className="text-xs">Custom Meal / Room Plans</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      value={form.customPlanInput}
+                      onChange={e => set('customPlanInput', e.target.value)}
+                      placeholder="e.g. Spa package"
+                      className="h-8 text-sm"
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const val = form.customPlanInput.trim();
+                          if (val && !form.customPlans.includes(val)) {
+                            setForm(p => ({ ...p, customPlans: [...p.customPlans, val], customPlanInput: '' }));
+                          }
+                        }
+                      }}
+                    />
+                    <Button type="button" variant="outline" size="sm" onClick={() => {
+                      const val = form.customPlanInput.trim();
+                      if (val && !form.customPlans.includes(val)) {
+                        setForm(p => ({ ...p, customPlans: [...p.customPlans, val], customPlanInput: '' }));
+                      }
+                    }} className="h-8">Add</Button>
+                  </div>
+                  {form.customPlans.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {form.customPlans.map((item, idx) => (
+                        <span key={idx} className="inline-flex items-center gap-1 bg-secondary text-xs rounded-full px-2 py-0.5">
+                          {item}
+                          <button type="button" onClick={() => setForm(p => ({ ...p, customPlans: p.customPlans.filter((_, i) => i !== idx) }))} className="text-muted-foreground hover:text-destructive ml-1">&times;</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader><CardTitle>Pricing (₹)</CardTitle></CardHeader>
             <CardContent className="space-y-4">
@@ -769,6 +1617,26 @@ export default function HostEditListing() {
               </div>
               {(section === "stays" || section === "hotels" || section === "resorts") && (
                 <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Original Price</Label>
+                      <Input type="number" min={0} value={form.originalPrice} onChange={e => set("originalPrice", e.target.value)} placeholder="3000" className="h-8 text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Discounted Price</Label>
+                      <Input type="number" min={0} value={form.discountedPrice} onChange={e => set("discountedPrice", e.target.value)} placeholder="2500" className="h-8 text-sm" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Daily Price</Label>
+                      <Input type="number" min={0} value={form.dailyPrice} onChange={e => set("dailyPrice", e.target.value)} placeholder="2500" className="h-8 text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Taxes & Fees</Label>
+                      <Input type="number" min={0} value={form.taxesAndFees} onChange={e => set("taxesAndFees", e.target.value)} placeholder="150" className="h-8 text-sm" />
+                    </div>
+                  </div>
                   <div>
                     <Label>Weekly Price</Label>
                     <Input type="number" min={1} value={form.weeklyPrice} onChange={e => set("weeklyPrice", e.target.value)} placeholder="Auto-calculated if blank" />
@@ -777,13 +1645,23 @@ export default function HostEditListing() {
                     <Label>Monthly Price</Label>
                     <Input type="number" min={1} value={form.monthlyPrice} onChange={e => set("monthlyPrice", e.target.value)} placeholder="Auto-calculated if blank" />
                   </div>
-                  <div>
-                    <Label>Cleaning Fee</Label>
-                    <Input type="number" min={0} value={form.cleaningFee} onChange={e => set("cleaningFee", e.target.value)} placeholder="0" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Cleaning Fee</Label>
+                      <Input type="number" min={0} value={form.cleaningFee} onChange={e => set("cleaningFee", e.target.value)} placeholder="0" className="h-8 text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Security Deposit</Label>
+                      <Input type="number" min={0} value={form.securityDeposit} onChange={e => set("securityDeposit", e.target.value)} placeholder="0" className="h-8 text-sm" />
+                    </div>
                   </div>
                   <div>
-                    <Label>Security Deposit</Label>
-                    <Input type="number" min={0} value={form.securityDeposit} onChange={e => set("securityDeposit", e.target.value)} placeholder="0" />
+                    <Label className="text-xs">Offer Percentage</Label>
+                    <Input type="number" min={0} max={100} value={form.offerPercentage} onChange={e => set("offerPercentage", e.target.value)} placeholder="15" className="h-8 text-sm" />
+                  </div>
+                  <div className="flex items-center gap-2 pt-2 border-t border-border">
+                    <Checkbox id="bookAtZero" checked={form.bookAtZero} onCheckedChange={v => set('bookAtZero', !!v)} />
+                    <Label htmlFor="bookAtZero" className="text-xs font-semibold cursor-pointer">Allow Book @ ₹0 Option</Label>
                   </div>
                 </>
               )}

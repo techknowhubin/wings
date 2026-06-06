@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { calculateHostBookingAmounts, createNotification } from '@/lib/supabase-helpers';
 
 // ─── Helper: generate unique WingID ─────────────────────────────────────────
 async function generateUniqueWingId(): Promise<string> {
@@ -56,8 +57,9 @@ export function useAdminMetrics() {
         allProfiles,
         wingIdsIssued,
         staysPending, hotelsPending, resortsPending, carsPending, bikesPending, expPending,
+        listingTypeRequestsPending,
       ] = await Promise.all([
-        safeQuery(() => supabase.from('bookings').select('total_price').eq('payment_status', 'completed')),
+        safeQuery(() => supabase.from('bookings').select('total_price, commission_amount, booking_channel').eq('payment_status', 'completed')),
         safeCount(() => supabase.from('bookings').select('*', { count: 'exact', head: true }).gte('created_at', today)),
         safeQuery(() => supabase.from('user_documents' as any).select('user_id, status')),
         safeQuery(() => supabase.from('user_roles').select('user_id, role')),
@@ -69,11 +71,19 @@ export function useAdminMetrics() {
         safeQuery(() => supabase.from('cars').select('id').eq('approval_status', 'pending')),
         safeQuery(() => supabase.from('bikes').select('id').eq('approval_status', 'pending')),
         safeQuery(() => supabase.from('experiences').select('id').eq('approval_status', 'pending')),
+        safeQuery(() => supabase.from('listing_type_requests').select('id').eq('status', 'pending')),
       ]);
 
-      const totalGmv = (gmvData as any[] ?? []).reduce((s: number, r: any) => s + Number(r.total_price || 0), 0);
-      // Commission is computed as 20% of GMV (no dedicated column)
-      const platformRevenue = Math.round(totalGmv * 0.2);
+      const paidBookings = gmvData as any[] ?? [];
+      const totalGmv = paidBookings.reduce((s: number, r: any) => {
+        const { totalAmount } = calculateHostBookingAmounts(r);
+        return s + totalAmount;
+      }, 0);
+      
+      const platformRevenue = paidBookings.reduce((s: number, r: any) => {
+        const { commission } = calculateHostBookingAmounts(r);
+        return s + commission;
+      }, 0);
       const pendingListings =
         ((staysPending as any[])?.length ?? 0) +
         ((hotelsPending as any[])?.length ?? 0) +
@@ -81,6 +91,8 @@ export function useAdminMetrics() {
         ((carsPending as any[])?.length ?? 0) +
         ((bikesPending as any[])?.length ?? 0) +
         ((expPending as any[])?.length ?? 0);
+
+      const pendingListingTypesCount = (listingTypeRequestsPending as any[])?.length ?? 0;
 
       const pendingKyc = new Set(
         (kycDocs as any[] ?? [])
@@ -112,6 +124,7 @@ export function useAdminMetrics() {
         wingIdsIssued,
         platformRevenue,
         pendingListings,
+        pendingListingTypesCount,
         activeProviders: activeProvidersCount,
       };
     },
@@ -142,6 +155,78 @@ export function useAdminRecentBookings() {
   });
 }
 
+// ─── Analytics: All bookings for revenue analytics page ──────────────────────
+// Uses SECURITY DEFINER RPC to bypass RLS — works without login
+export function useAdminAnalyticsData() {
+  return useQuery({
+    queryKey: ['admin', 'analytics-bookings'],
+    queryFn: async () => {
+      // Try the SECURITY DEFINER RPC first (bypasses RLS, works without auth)
+      let bookingsRaw: any[] | null = null;
+
+      const { data: rpcData, error: rpcError } = await (supabase as any)
+        .rpc('get_all_bookings_for_analytics');
+
+      if (!rpcError && Array.isArray(rpcData)) {
+        bookingsRaw = rpcData;
+      } else {
+        // Fallback: direct query (requires admin session)
+        bookingsRaw = await safeQuery(() =>
+          supabase
+            .from('bookings')
+            .select('id, listing_type, host_id, total_price, commission_amount, booking_channel, booking_status, payment_status, created_at, user_id, guests_count, start_date, end_date')
+            .order('created_at', { ascending: false })
+        );
+      }
+
+      const bookings = (bookingsRaw ?? []) as any[];
+      if (bookings.length === 0) return [];
+
+      const userIds = [...new Set(bookings.map((b: any) => b.user_id).filter(Boolean))];
+      const names = await resolveProfileNames(userIds);
+
+      return bookings.map((b: any) => {
+        const { totalAmount, hostEarnings, commission } = calculateHostBookingAmounts(b);
+
+        const categoryMap: Record<string, string> = {
+          stay: 'Homestays', hotel: 'Hotels', resort: 'Resorts',
+          car: 'Car Rentals', bike: 'Bike Rentals', experience: 'Packages/Experiences',
+          cab: 'Cab Bookings',
+        };
+        const category = categoryMap[b.listing_type] || b.listing_type || 'Other';
+
+        return {
+          booking_id: b.id,
+          user_id: b.user_id,
+          user_name: names.get(b.user_id)?.full_name || '—',
+          host_id: b.host_id || '',
+          host_name: '',
+          category,
+          city: '',
+          amount: totalAmount,
+          coupon_applied: 'None',
+          coupon_discount: 0,
+          coupon_funded_by: 'None',
+          booking_fee: commission,
+          platform_revenue: commission,
+          referral_commission: 0,
+          host_earning: hostEarnings,
+          payment_status: b.payment_status || 'pending',
+          booking_status: b.booking_status || 'pending',
+          referral_partner: '',
+          partner_type: '',
+          created_at: b.created_at,
+          start_date: b.start_date,
+          end_date: b.end_date,
+          guests_count: b.guests_count,
+          listing_type: b.listing_type,
+        };
+      });
+    },
+    staleTime: 30_000,
+  });
+}
+
 // ─── KYC / Document Review ──────────────────────────────────────────────────
 export function useKycSubmissions(statusFilter?: string) {
   return useQuery({
@@ -164,9 +249,9 @@ export function useKycSubmissions(statusFilter?: string) {
         resolveProfileNames(userIds),
         userIds.length > 0
           ? supabase
-              .from('host_profiles')
-              .select('id, business_name, host_type, service_types, aadhaar_last_four, pan_number, city, state, onboarding_status, gst_number, phone as host_phone, email as host_email')
-              .in('id', userIds)
+            .from('host_profiles')
+            .select('id, business_name, host_type, service_types, aadhaar_last_four, pan_number, city, state, onboarding_status, gst_number, phone as host_phone, email as host_email')
+            .in('id', userIds)
           : Promise.resolve({ data: [] }),
       ]);
 
@@ -241,6 +326,17 @@ export function useApproveKyc() {
       if (profileRes.error) throw new Error(`Profile update failed: ${profileRes.error.message}`);
       // host_profiles update is best-effort — host may not have a host_profiles row yet
 
+      // Send KYC Approved Notification
+      await createNotification({
+        user_id: userId,
+        title: "KYC Approved! ✅",
+        message: "Your identity verification documents have been approved. WingID has been assigned to your profile.",
+        type: "security",
+        link: "/profile/kyc",
+        reference_id: submissionId,
+        reference_type: "document",
+      });
+
       return { wingId };
     },
     onSuccess: () => {
@@ -264,6 +360,17 @@ export function useRejectKyc() {
       ]);
       if (k.error) throw k.error;
       if (p.error) throw p.error;
+
+      // Send KYC Rejected Notification
+      await createNotification({
+        user_id: userId,
+        title: "KYC Documents Rejected ❌",
+        message: `Your identity verification documents were rejected. Reason: ${reason}. Please submit valid documents.`,
+        type: "security",
+        link: "/profile/kyc",
+        reference_id: submissionId,
+        reference_type: "document",
+      });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'kyc'] });
@@ -286,6 +393,17 @@ export function useRequestReupload() {
       ]);
       if (k.error) throw k.error;
       if (p.error) throw p.error;
+
+      // Send KYC Re-upload Notification
+      await createNotification({
+        user_id: userId,
+        title: "KYC Re-upload Requested ⚠️",
+        message: `Re-upload requested for identity verification. Notes: ${notes}. Please update your documents.`,
+        type: "security",
+        link: "/profile/kyc",
+        reference_id: submissionId,
+        reference_type: "document",
+      });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'kyc'] });
@@ -335,28 +453,32 @@ export function useApproveListing() {
         .select('host_id, title')
         .eq('id', id)
         .single();
-      
+
       if (fetchError || !listing) throw new Error('Listing not found');
 
       // 2. Update listing status in database
-      const { error } = await supabase.from(table as any).update({
-        is_verified: true,
+      const updateData: any = {
         marketplace_visible: true,
         approval_status: 'approved',
         rejection_reason: null,
         updated_at: new Date().toISOString(),
-      } as any).eq('id', id);
+      };
+      if (table !== 'hotels' && table !== 'resorts') {
+        updateData.is_verified = true;
+      }
+      const { error } = await supabase.from(table as any).update(updateData).eq('id', id);
       if (error) throw error;
 
       // 3. Create a notification for the host
       const sectionName = table === 'stays' ? 'Home stays' : table === 'hotels' ? 'Hotels' : table === 'resorts' ? 'Resorts' : table === 'cars' ? 'Car Rentals' : table === 'bikes' ? 'Bike Rentals' : 'Packages/Experiences';
-      await supabase.from('notifications').insert({
+      await createNotification({
         user_id: (listing as any).host_id,
         title: 'Listing Approved! 🎉',
         message: `Your listing "${(listing as any).title}" under ${sectionName} has been approved by the admin and is now live on the marketplace.`,
-        type: 'system',
-        is_read: false,
+        type: 'listings',
         link: `/host/${table}`,
+        reference_id: id,
+        reference_type: table,
       });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'listings'] }),
@@ -373,28 +495,32 @@ export function useRejectListing() {
         .select('host_id, title')
         .eq('id', id)
         .single();
-      
+
       if (fetchError || !listing) throw new Error('Listing not found');
 
       // 2. Update listing status in database
-      const { error } = await supabase.from(table as any).update({
-        is_verified: false,
+      const updateData: any = {
         marketplace_visible: false,
         approval_status: 'rejected',
         rejection_reason: reason,
         updated_at: new Date().toISOString(),
-      } as any).eq('id', id);
+      };
+      if (table !== 'hotels' && table !== 'resorts') {
+        updateData.is_verified = false;
+      }
+      const { error } = await supabase.from(table as any).update(updateData).eq('id', id);
       if (error) throw error;
 
       // 3. Create a notification for the host
       const sectionName = table === 'stays' ? 'Home stays' : table === 'hotels' ? 'Hotels' : table === 'resorts' ? 'Resorts' : table === 'cars' ? 'Car Rentals' : table === 'bikes' ? 'Bike Rentals' : 'Packages/Experiences';
-      await supabase.from('notifications').insert({
+      await createNotification({
         user_id: (listing as any).host_id,
         title: 'Listing Rejected ❌',
         message: `Your listing "${(listing as any).title}" under ${sectionName} was not approved. Reason: ${reason}. Please update it and submit again.`,
-        type: 'system',
-        is_read: false,
+        type: 'listings',
         link: `/host/${table}`,
+        reference_id: id,
+        reference_type: table,
       });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'listings'] }),
@@ -422,28 +548,104 @@ export function useRequestRevision() {
         .select('host_id, title')
         .eq('id', id)
         .single();
-      
+
+      if (fetchError || !listing) throw new Error('Listing not found');
+
+      // 2. Update listing status in database
+      const updateData: any = {
+        marketplace_visible: false,
+        approval_status: 'needs_revision',
+        rejection_reason: reason,
+        updated_at: new Date().toISOString(),
+      };
+      if (table !== 'hotels' && table !== 'resorts') {
+        updateData.is_verified = false;
+      }
+      const { error } = await supabase.from(table as any).update(updateData).eq('id', id);
+      if (error) throw error;
+
+      // 3. Create a notification for the host
+      const sectionName = table === 'stays' ? 'Home stays' : table === 'hotels' ? 'Hotels' : table === 'resorts' ? 'Resorts' : table === 'cars' ? 'Car Rentals' : table === 'bikes' ? 'Bike Rentals' : 'Packages/Experiences';
+      await createNotification({
+        user_id: (listing as any).host_id,
+        title: 'Revision Required 🔄',
+        message: `Changes are requested for your listing "${(listing as any).title}" under ${sectionName}. Note: ${reason}`,
+        type: 'listings',
+        link: `/host/${table}`,
+        reference_id: id,
+        reference_type: table,
+      });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'listings'] }),
+  });
+}
+
+export function useSuspendListing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, table }: { id: string; table: string }) => {
+      // 1. Fetch listing details to get host_id and title
+      const { data: listing, error: fetchError } = await supabase
+        .from(table as any)
+        .select('host_id, title')
+        .eq('id', id)
+        .single();
+
       if (fetchError || !listing) throw new Error('Listing not found');
 
       // 2. Update listing status in database
       const { error } = await supabase.from(table as any).update({
-        is_verified: false,
         marketplace_visible: false,
-        approval_status: 'needs_revision',
-        rejection_reason: reason,
         updated_at: new Date().toISOString(),
       } as any).eq('id', id);
       if (error) throw error;
 
       // 3. Create a notification for the host
       const sectionName = table === 'stays' ? 'Home stays' : table === 'hotels' ? 'Hotels' : table === 'resorts' ? 'Resorts' : table === 'cars' ? 'Car Rentals' : table === 'bikes' ? 'Bike Rentals' : 'Packages/Experiences';
-      await supabase.from('notifications').insert({
+      await createNotification({
         user_id: (listing as any).host_id,
-        title: 'Revision Required 🔄',
-        message: `Changes are requested for your listing "${(listing as any).title}" under ${sectionName}. Note: ${reason}`,
-        type: 'system',
-        is_read: false,
+        title: 'Listing Suspended ⚠️',
+        message: `Your listing "${(listing as any).title}" under ${sectionName} has been suspended by the admin.`,
+        type: 'listings',
         link: `/host/${table}`,
+        reference_id: id,
+        reference_type: table,
+      });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'listings'] }),
+  });
+}
+
+export function useReactivateListing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, table }: { id: string; table: string }) => {
+      // 1. Fetch listing details to get host_id and title
+      const { data: listing, error: fetchError } = await supabase
+        .from(table as any)
+        .select('host_id, title')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !listing) throw new Error('Listing not found');
+
+      // 2. Update listing status in database
+      const { error } = await supabase.from(table as any).update({
+        marketplace_visible: true,
+        updated_at: new Date().toISOString(),
+      } as any).eq('id', id);
+      if (error) throw error;
+
+      // 3. Create a notification for the host
+      const sectionName = table === 'stays' ? 'Home stays' : table === 'hotels' ? 'Hotels' : table === 'resorts' ? 'Resorts' : table === 'cars' ? 'Car Rentals' : table === 'bikes' ? 'Bike Rentals' : 'Packages/Experiences';
+      await createNotification({
+        user_id: (listing as any).host_id,
+        title: 'Listing Reactivated 🟢',
+        message: `Your listing "${(listing as any).title}" under ${sectionName} has been reactivated and is now visible.`,
+        type: 'listings',
+        link: `/host/${table}`,
+        reference_id: id,
+        reference_type: table,
       });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'listings'] }),
@@ -527,7 +729,7 @@ export function useAdminUsers(kycFilter?: string, search?: string) {
         .from('user_roles')
         .select('user_id')
         .in('role', ['host', 'admin']);
-      
+
       if (ntError) throw ntError;
       const excludeIds = new Set((nonTravelers ?? []).map((r: any) => r.user_id));
 
@@ -582,15 +784,18 @@ export function useAdminBookings(filters?: { status?: string; paymentStatus?: st
       ].filter(Boolean))];
       const names = await resolveProfileNames(allIds);
 
-      return bookings.map((b: any) => ({
-        ...b,
-        // Normalize to names expected by AdminBookings page
-        total_amount: b.total_price,
-        status: b.booking_status,
-        guests: b.guests_count,
-        traveler: names.get(b.user_id) ?? { full_name: '—', phone: null },
-        host: names.get(b.host_id) ?? { full_name: '—' },
-      }));
+      return bookings.map((b: any) => {
+        const { totalAmount } = calculateHostBookingAmounts(b);
+        return {
+          ...b,
+          // Normalize to names expected by AdminBookings page
+          total_amount: totalAmount,
+          status: b.booking_status,
+          guests: b.guests_count,
+          traveler: names.get(b.user_id) ?? { full_name: '—', phone: null },
+          host: names.get(b.host_id) ?? { full_name: '—' },
+        };
+      });
     },
   });
 }
@@ -686,14 +891,22 @@ export function useAdminAnalytics(days: number = 30) {
       const from = new Date(Date.now() - days * 86400000).toISOString();
       const { data: bookings, error } = await supabase
         .from('bookings')
-        .select('total_price, listing_type, created_at, payment_status, booking_status')
+        .select('total_price, commission_amount, booking_channel, listing_type, created_at, payment_status, booking_status')
         .gte('created_at', from)
         .order('created_at', { ascending: true });
       if (error) throw error;
 
       const paid = (bookings ?? []).filter((b: any) => b.payment_status === 'completed');
-      const totalGmv = paid.reduce((s: number, b: any) => s + Number(b.total_price || 0), 0);
-      const platformRevenue = Math.round(totalGmv * 0.2);
+      const totalGmv = paid.reduce((s: number, b: any) => {
+        const { totalAmount } = calculateHostBookingAmounts(b);
+        return s + totalAmount;
+      }, 0);
+      
+      const platformRevenue = paid.reduce((s: number, b: any) => {
+        const { commission } = calculateHostBookingAmounts(b);
+        return s + commission;
+      }, 0);
+
       const avgBookingValue = paid.length ? totalGmv / paid.length : 0;
 
       // Group by day
@@ -701,8 +914,9 @@ export function useAdminAnalytics(days: number = 30) {
       paid.forEach((b: any) => {
         const day = b.created_at.split('T')[0];
         if (!byDay[day]) byDay[day] = { gmv: 0, revenue: 0, count: 0 };
-        byDay[day].gmv += Number(b.total_price || 0);
-        byDay[day].revenue += Math.round(Number(b.total_price || 0) * 0.2);
+        const { totalAmount, commission } = calculateHostBookingAmounts(b);
+        byDay[day].gmv += totalAmount;
+        byDay[day].revenue += commission;
         byDay[day].count += 1;
       });
       const gmvOverTime = Object.entries(byDay).map(([date, v]) => ({ date, ...v }));

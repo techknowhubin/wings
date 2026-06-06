@@ -66,7 +66,7 @@ export default function AdminLayout() {
     {
       title: 'Management',
       items: [
-        { label: 'Hosts', to: '/admin/providers', icon: Store },
+        { label: 'Hosts', to: '/admin/providers', icon: Store, badge: metrics?.pendingListingTypesCount },
         { label: 'Travelers', to: '/admin/users', icon: Users },
         { label: 'All Bookings', to: '/admin/bookings', icon: CalendarCheck },
         { label: 'Hub Partners', to: '/admin/hubs', icon: Building2 },

@@ -62,7 +62,7 @@ interface DashboardLayoutProps {
 const mainMenuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/host/dashboard' },
   { icon: Bell, label: 'Notifications', path: '/host/notifications', badge: true },
-  { icon: Calendar, label: 'Reservations', path: '/host/bookings' },
+  { icon: Calendar, label: 'Bookings', path: '/host/bookings' },
 ];
 
 // All possible listing types with their sidebar config
@@ -70,7 +70,7 @@ const ALL_LISTING_TYPES = [
   { key: 'stays',       icon: Home,    label: 'Home Stays',             path: '/host/stays' },
   { key: 'hotels',      icon: Building, label: 'Hotels',                path: '/host/hotels' },
   { key: 'resorts',     icon: Palmtree, label: 'Resorts',               path: '/host/resorts' },
-  { key: 'cars',        icon: Car,     label: 'Car Rentals / Cabs',     path: '/host/cars' },
+  { key: 'cars',        icon: Car,     label: 'Car Rentals',            path: '/host/cars' },
   { key: 'bikes',       icon: Bike,    label: 'Bike Rentals',           path: '/host/bikes' },
   { key: 'experiences', icon: Compass, label: 'Packages/Experiences',   path: '/host/experiences' },
 ] as const;

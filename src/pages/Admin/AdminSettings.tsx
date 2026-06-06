@@ -82,6 +82,12 @@ export default function AdminSettings() {
   const { data: admins, isLoading: aLoading, refetch } = useAdminTeam();
 
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
+  const [reviewMinorChanges, setReviewMinorChanges] = useState(() => {
+    return localStorage.getItem('review_minor_changes') === 'true';
+  });
+  const [reviewMajorChanges, setReviewMajorChanges] = useState(() => {
+    return localStorage.getItem('review_major_changes') !== 'false';
+  });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tableMissing, setTableMissing] = useState(false);
@@ -390,6 +396,50 @@ ON CONFLICT (id) DO NOTHING;`}
           {saving.kyc ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
           Save KYC Settings
         </Button>
+      </SettingSection>
+
+      {/* ── 3.5. Listing Approval Rules ───────────────────────────────────── */}
+      <SettingSection icon={Shield} title="Listing Approval Rules"
+        description="Configure rules for new listings and host updates.">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-3 rounded-xl border border-border">
+            <div>
+              <p className="text-sm font-medium">New Listings Require Approval</p>
+              <p className="text-xs text-muted-foreground">Always require admin approval before new listings go live</p>
+            </div>
+            <Switch checked={true} disabled />
+          </div>
+
+          <div className="flex items-center justify-between p-3 rounded-xl border border-border">
+            <div>
+              <p className="text-sm font-medium">Review Major Updates</p>
+              <p className="text-xs text-muted-foreground">Require approval when host changes location, property details, room types, or amenities</p>
+            </div>
+            <Switch 
+              checked={reviewMajorChanges}
+              onCheckedChange={(v) => {
+                setReviewMajorChanges(v);
+                localStorage.setItem('review_major_changes', String(v));
+                toast({ title: 'Approval rule updated', description: `Major changes will ${v ? 'now' : 'no longer'} require admin approval.` });
+              }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-3 rounded-xl border border-border">
+            <div>
+              <p className="text-sm font-medium">Review Minor Updates</p>
+              <p className="text-xs text-muted-foreground">Require approval when host changes pricing, availability status, or gallery photos</p>
+            </div>
+            <Switch 
+              checked={reviewMinorChanges}
+              onCheckedChange={(v) => {
+                setReviewMinorChanges(v);
+                localStorage.setItem('review_minor_changes', String(v));
+                toast({ title: 'Approval rule updated', description: `Minor changes will ${v ? 'now' : 'no longer'} require admin approval.` });
+              }}
+            />
+          </div>
+        </div>
       </SettingSection>
 
       {/* ── 4. Payment & Payouts ─────────────────────────────────────────── */}

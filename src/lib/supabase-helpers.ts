@@ -396,12 +396,12 @@ export async function isModerator(userId: string): Promise<boolean> {
 
 // ============ Notification Helpers ============
 
-export async function getUserNotifications(userId: string) {
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+export async function getUserNotifications(userId?: string) {
+  let query = supabase.from('notifications').select('*');
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
+  const { data, error } = await query.order('created_at', { ascending: false });
   
   if (error) throw error;
   return data;
@@ -416,23 +416,28 @@ export async function markNotificationAsRead(notificationId: string) {
   if (error) throw error;
 }
 
-export async function getUnreadNotificationCount(userId: string): Promise<number> {
-  const { count, error } = await supabase
+export async function getUnreadNotificationCount(userId?: string): Promise<number> {
+  let query = supabase
     .from('notifications')
     .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId)
     .eq('is_read', false);
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
+  const { count, error } = await query;
   
   if (error) throw error;
   return count || 0;
 }
 
-export async function markAllNotificationsAsRead(userId: string) {
-  const { error } = await supabase
+export async function markAllNotificationsAsRead(userId?: string) {
+  let query = supabase
     .from('notifications')
-    .update({ is_read: true })
-    .eq('user_id', userId)
-    .eq('is_read', false);
+    .update({ is_read: true });
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
+  const { error } = await query.eq('is_read', false);
   
   if (error) throw error;
 }
@@ -863,14 +868,37 @@ export async function createNotification(notification: {
   message: string;
   type: string;
   link?: string;
+  reference_id?: string;
+  reference_type?: string;
 }) {
-  const { data, error } = await supabase
-    .from('notifications')
-    .insert({ ...notification, is_read: false })
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .insert({ ...notification, is_read: false })
+      .select()
+      .single();
+    if (error) {
+      if (error.code === 'PGRST204' || error.message?.includes('reference_id') || error.message?.includes('reference_type')) {
+        const { reference_id, reference_type, ...rest } = notification;
+        let enrichedLink = rest.link;
+        if (reference_id && reference_type) {
+          enrichedLink = `${rest.link || ''}${rest.link?.includes('?') ? '&' : '?'}ref_id=${reference_id}&ref_type=${reference_type}`;
+        }
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('notifications')
+          .insert({ ...rest, link: enrichedLink, is_read: false })
+          .select()
+          .single();
+        if (fallbackError) throw fallbackError;
+        return fallbackData;
+      }
+      throw error;
+    }
+    return data;
+  } catch (err) {
+    console.error('Failed to create notification:', err);
+    throw err;
+  }
 }
 
 // ============ Host Profile Helpers ============

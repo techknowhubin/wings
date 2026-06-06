@@ -24,9 +24,10 @@ import { useTheme } from "@/components/ThemeProvider";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { DynamicLogo } from "@/components/DynamicLogo";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO, isValid } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { createNotification } from "@/lib/supabase-helpers";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
@@ -99,6 +100,7 @@ function PasswordStrength({ password }: { password: string }) {
 
 export default function UserProfile() {
   const { user, loading: authLoading, signOut } = useAuth();
+  const queryClient = useQueryClient();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -147,6 +149,9 @@ export default function UserProfile() {
   // Password form
   const [passwords, setPasswords] = useState({ current: "", newPw: "", confirm: "" });
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [isModifyingDates, setIsModifyingDates] = useState(false);
+  const [newStartDate, setNewStartDate] = useState<Date | undefined>(undefined);
+  const [newEndDate, setNewEndDate] = useState<Date | undefined>(undefined);
 
   // Notifications
   const [notifs, setNotifs] = useState({
@@ -364,6 +369,14 @@ export default function UserProfile() {
       } as any);
       
       if (error) throw error;
+
+      await createNotification({
+        user_id: user.id,
+        title: "Password Changed Successfully 🔒",
+        message: "Your account password was recently changed. If you didn't perform this action, please contact support immediately.",
+        type: "security",
+        link: "/profile/security",
+      });
       
       toast.success("Password changed successfully!");
       setPasswords({ current: "", newPw: "", confirm: "" });
@@ -823,11 +836,162 @@ export default function UserProfile() {
                               )}
                             </div>
 
-                            {/* Booking ID */}
-                            <div className="pt-2 border-t border-border">
-                              <p className="text-[10px] text-muted-foreground font-mono">Booking ID: {selectedBooking.id}</p>
-                              {selectedBooking.transaction_id && (
-                                <p className="text-[10px] text-muted-foreground font-mono mt-0.5">Transaction ID: {selectedBooking.transaction_id}</p>
+                            {/* Booking ID and Actions */}
+                            <div className="pt-3 border-t border-border flex flex-col gap-3">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <p className="text-[10px] text-muted-foreground font-mono">Booking ID: {selectedBooking.id}</p>
+                                  {selectedBooking.transaction_id && (
+                                    <p className="text-[10px] text-muted-foreground font-mono mt-0.5">Transaction ID: {selectedBooking.transaction_id}</p>
+                                  )}
+                                </div>
+                                <div className="flex gap-2">
+                                  {(selectedBooking.booking_status === "pending" || selectedBooking.booking_status === "confirmed") && !isModifyingDates && (
+                                    <>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 text-xs border-primary text-primary hover:bg-primary/5"
+                                        onClick={() => {
+                                          setNewStartDate(new Date(selectedBooking.start_date));
+                                          setNewEndDate(new Date(selectedBooking.end_date));
+                                          setIsModifyingDates(true);
+                                        }}
+                                      >
+                                        Modify Dates
+                                      </Button>
+                                      <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        className="h-8 text-xs"
+                                        onClick={async () => {
+                                          if (confirm("Are you sure you want to cancel this booking?")) {
+                                            try {
+                                              const { error } = await supabase
+                                                .from("bookings")
+                                                .update({ booking_status: "cancelled" } as any)
+                                                .eq("id", selectedBooking.id);
+                                              if (error) throw error;
+
+                                              if (selectedBooking.host_id) {
+                                                await createNotification({
+                                                  user_id: selectedBooking.host_id,
+                                                  title: "Booking Cancelled ❌",
+                                                  message: `Booking #${selectedBooking.id} has been cancelled by the customer.`,
+                                                  type: "bookings",
+                                                  link: "/host/bookings",
+                                                  reference_id: selectedBooking.id,
+                                                  reference_type: "booking",
+                                                });
+                                              }
+
+                                              toast.success("Booking cancelled successfully");
+                                              setSelectedBooking(null);
+                                              queryClient.invalidateQueries({ queryKey: ["user-bookings"] });
+                                            } catch (err: any) {
+                                              toast.error("Failed to cancel booking: " + err.message);
+                                            }
+                                          }
+                                        }}
+                                      >
+                                        Cancel Booking
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Date Modification Form */}
+                              {isModifyingDates && (
+                                <div className="p-3 bg-muted/40 rounded-xl space-y-3 border border-border">
+                                  <p className="text-xs font-semibold text-foreground">Select New Dates</p>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px]">Start Date</Label>
+                                      <Popover>
+                                        <PopoverTrigger asChild>
+                                          <Button variant="outline" size="sm" className="w-full text-left font-normal h-8 text-xs justify-start">
+                                            <CalendarIcon className="mr-1.5 h-3.5 w-3.5 text-primary" />
+                                            {newStartDate ? format(newStartDate, "MMM d, yyyy") : <span>Start Date</span>}
+                                          </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                          <CalendarPicker
+                                            mode="single"
+                                            selected={newStartDate}
+                                            onSelect={setNewStartDate}
+                                            disabled={(date) => date < new Date()}
+                                            initialFocus
+                                          />
+                                        </PopoverContent>
+                                      </Popover>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px]">End Date</Label>
+                                      <Popover>
+                                        <PopoverTrigger asChild>
+                                          <Button variant="outline" size="sm" className="w-full text-left font-normal h-8 text-xs justify-start">
+                                            <CalendarIcon className="mr-1.5 h-3.5 w-3.5 text-primary" />
+                                            {newEndDate ? format(newEndDate, "MMM d, yyyy") : <span>End Date</span>}
+                                          </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                          <CalendarPicker
+                                            mode="single"
+                                            selected={newEndDate}
+                                            onSelect={setNewEndDate}
+                                            disabled={(date) => date <= (newStartDate || new Date())}
+                                            initialFocus
+                                          />
+                                        </PopoverContent>
+                                      </Popover>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2 justify-end">
+                                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setIsModifyingDates(false)}>
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      className="h-7 text-xs bg-primary text-primary-foreground"
+                                      disabled={!newStartDate || !newEndDate || newStartDate >= newEndDate}
+                                      onClick={async () => {
+                                        try {
+                                          const startStr = format(newStartDate!, "yyyy-MM-dd");
+                                          const endStr = format(newEndDate!, "yyyy-MM-dd");
+                                          
+                                          const { error } = await supabase
+                                            .from("bookings")
+                                            .update({ start_date: startStr, end_date: endStr } as any)
+                                            .eq("id", selectedBooking.id);
+                                          
+                                          if (error) throw error;
+                                          
+                                          if (selectedBooking.host_id) {
+                                            await createNotification({
+                                              user_id: selectedBooking.host_id,
+                                              title: "Booking Dates Modified 📅",
+                                              message: `Customer has updated check-in/check-out dates for Booking #${selectedBooking.id} to ${format(newStartDate!, "MMM d")} — ${format(newEndDate!, "MMM d, yyyy")}.`,
+                                              type: "bookings",
+                                              link: "/host/bookings",
+                                              reference_id: selectedBooking.id,
+                                              reference_type: "booking",
+                                            });
+                                          }
+                                          
+                                          toast.success("Booking dates modified successfully!");
+                                          setIsModifyingDates(false);
+                                          setSelectedBooking(null);
+                                          queryClient.invalidateQueries({ queryKey: ["user-bookings"] });
+                                        } catch (err: any) {
+                                          toast.error("Failed to modify dates: " + err.message);
+                                        }
+                                      }}
+                                    >
+                                      Save New Dates
+                                    </Button>
+                                  </div>
+                                </div>
                               )}
                             </div>
                           </div>

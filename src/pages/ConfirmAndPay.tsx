@@ -17,6 +17,7 @@ import type { BookingDetails } from "@/types/booking";
 import type { CouponOffer } from "@/lib/discounts";
 import { getReferralCode, clearReferral } from "@/lib/referral";
 import type { Enums } from "@/integrations/supabase/types";
+import { createNotification } from "@/lib/supabase-helpers";
 
 type ConfirmAndPayState = {
   booking?: BookingDetails;
@@ -427,14 +428,15 @@ const ConfirmAndPay = () => {
 
       // Notify the host about the new booking request
       if (booking.hostId) {
-        await supabase.from("notifications").insert({
+        await createNotification({
           user_id: booking.hostId,
           title: "New Booking Request!",
           message: `${name} has booked "${booking.listingTitle}". Check-in: ${format(new Date(booking.startDate), "MMM d, yyyy")} — Check-out: ${format(new Date(booking.endDate), "MMM d, yyyy")}.`,
-          type: "booking",
+          type: "bookings",
           link: "/host/bookings",
-          is_read: false,
-        } as any);
+          reference_id: newBooking.id,
+          reference_type: "booking",
+        });
       }
     } catch (err: any) {
       console.error("Booking init exception:", err);

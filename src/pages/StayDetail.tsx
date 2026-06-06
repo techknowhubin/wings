@@ -156,6 +156,11 @@ const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
   const currencySymbol = stay.currency === 'INR' ? '₹' : '$';
   const discountConfig = parseListingDiscountConfig(stay.discounts);
 
+  const hostName = richAmenities.hostInfo?.name || hostProfile?.full_name || "Host Name";
+  const hostPhoto = richAmenities.hostInfo?.photo || hostProfile?.profile_image || "";
+  const hostBio = richAmenities.hostInfo?.description || hostProfile?.bio || "";
+  const isSuperhost = richAmenities.hostInfo?.isSuperhost || hostProfile?.is_superhost || false;
+
   const isHotel = tableType === "hotels";
   const isResort = tableType === "resorts";
   
@@ -192,6 +197,11 @@ const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
               <Badge variant="outline" className="bg-accent/10 text-accent border-accent/30 font-medium">
                 {stay.property_type || "Homestay"}
               </Badge>
+              {richAmenities.propertyCategory && (
+                <Badge variant="secondary" className="bg-[#D4E034] text-black border-none font-medium">
+                  {richAmenities.propertyCategory}
+                </Badge>
+              )}
               <span className="text-sm text-muted-foreground flex items-center gap-1">
                 <MapPin className="h-3.5 w-3.5" />
                 {stay.location}
@@ -280,24 +290,29 @@ const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
             <div className="pb-8 border-b border-border">
               <p className="text-sm text-muted-foreground mb-2">Hosted by:</p>
               <div className="flex items-center gap-3">
-                {hostProfile?.profile_image ? (
+                {hostPhoto ? (
                   <img
-                    src={hostProfile.profile_image}
-                    alt={hostProfile.full_name || "Host"}
+                    src={hostPhoto}
+                    alt={hostName}
                     className="w-12 h-12 rounded-full object-cover border border-border"
                   />
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold text-lg">
-                    {(hostProfile?.full_name ?? "H")[0].toUpperCase()}
+                    {(hostName)[0].toUpperCase()}
                   </div>
                 )}
                 <div>
-                  <h4 className="font-semibold text-foreground">{hostProfile?.full_name || "Host Name"}</h4>
+                  <h4 className="font-semibold text-foreground flex items-center gap-1.5">
+                    {hostName}
+                    {isSuperhost && (
+                      <Badge variant="outline" className="text-[10px] bg-amber-400/10 text-amber-400 border-amber-400/20 py-0 px-1 font-normal">Superhost</Badge>
+                    )}
+                  </h4>
                   <p className="text-xs text-muted-foreground">
                     Joined in{" "}
                     {hostProfile?.created_at
                       ? new Date(hostProfile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })
-                      : ""}
+                      : "June 2026"}
                   </p>
                 </div>
               </div>
@@ -323,12 +338,25 @@ const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
               <div className="flex gap-4 overflow-x-auto pb-2">
                 {richAmenities.bedroomDetails && richAmenities.bedroomDetails.length > 0
                   ? richAmenities.bedroomDetails.map((room, i) => (
-                      <Card key={i} className="min-w-[200px] p-6 border-border shrink-0">
-                        <BedDouble className="h-8 w-8 text-foreground mb-3" />
-                        <h3 className="font-semibold text-foreground mb-1">{room.name || `Bedroom ${i + 1}`}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {room.count} {room.bedType} {room.count === 1 ? "bed" : "beds"}
-                        </p>
+                      <Card key={i} className="min-w-[260px] p-5 border-border shrink-0 bg-secondary/10 flex flex-col justify-between">
+                        <div>
+                          <BedDouble className="h-8 w-8 text-foreground mb-3" />
+                          <h3 className="font-semibold text-foreground mb-1">{room.name || `Bedroom ${i + 1}`}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {room.count} {room.bedType} {room.count === 1 ? "bed" : "beds"}
+                          </p>
+                          {room.sizeSqFt && <p className="text-xs text-muted-foreground mt-1">{room.sizeSqFt} sq ft</p>}
+                          {room.bathrooms !== undefined && <p className="text-xs text-muted-foreground">{room.bathrooms} {room.bathrooms === 1 ? "Bathroom" : "Bathrooms"}</p>}
+                          {room.occupancyCapacity && <p className="text-xs text-muted-foreground">Up to {room.occupancyCapacity} guests</p>}
+                          {room.description && <p className="text-xs text-muted-foreground italic mt-2 border-t border-border pt-2">{room.description}</p>}
+                        </div>
+                        {room.amenities && room.amenities.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-3 pt-2 border-t border-border">
+                            {room.amenities.map((amenity, idx) => (
+                              <Badge key={idx} variant="outline" className="text-[9px] px-1 py-0">{amenity}</Badge>
+                            ))}
+                          </div>
+                        )}
                       </Card>
                     ))
                   : Array.from({ length: Math.max(stay.bedrooms || 1, 1) }).map((_, i) => (
@@ -365,6 +393,133 @@ const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
                 })}
               </div>
             </div>
+
+            {/* Videos & Virtual Tour */}
+            {(richAmenities.virtualTourUrl || (richAmenities.videos && richAmenities.videos.length > 0)) && (
+              <div className="pb-8 border-b border-border">
+                <h2 className="text-2xl font-semibold text-foreground mb-4">Videos & Virtual Tours</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {richAmenities.virtualTourUrl && (
+                    <Card className="p-4 border-border bg-secondary/20 flex flex-col justify-between">
+                      <div>
+                        <h4 className="font-semibold text-foreground mb-1">3D Virtual Tour</h4>
+                        <p className="text-xs text-muted-foreground mb-4">Explore the property in a 3D immersive walk-through.</p>
+                      </div>
+                      <Button asChild className="w-full bg-[#013220] hover:bg-[#013220]/90 text-white">
+                        <a href={richAmenities.virtualTourUrl} target="_blank" rel="noreferrer">Launch Virtual Tour</a>
+                      </Button>
+                    </Card>
+                  )}
+                  {richAmenities.videos && richAmenities.videos.map((vid, i) => (
+                    <Card key={i} className="p-4 border-border bg-secondary/20 flex flex-col justify-between">
+                      <div>
+                        <h4 className="font-semibold text-foreground mb-1">Video Walkthrough #{i + 1}</h4>
+                        <p className="text-xs text-muted-foreground mb-4">Watch a video showcase of the space.</p>
+                      </div>
+                      <Button asChild variant="outline" className="w-full">
+                        <a href={vid} target="_blank" rel="noreferrer">Watch Video</a>
+                      </Button>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Room Plans */}
+            {richAmenities.roomPlans && (
+              <div className="pb-8 border-b border-border">
+                <h2 className="text-2xl font-semibold text-foreground mb-4">Available Room Plans</h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {richAmenities.roomPlans.roomOnly && (
+                    <div className="p-3 rounded-xl border border-border bg-secondary/10 flex items-center gap-2">
+                      <Check className="h-4 w-4 text-[#D4E034]" />
+                      <span className="text-sm font-medium">Room Only</span>
+                    </div>
+                  )}
+                  {richAmenities.roomPlans.freeBreakfast && (
+                    <div className="p-3 rounded-xl border border-border bg-secondary/10 flex items-center gap-2">
+                      <Check className="h-4 w-4 text-[#D4E034]" />
+                      <span className="text-sm font-medium">Free Breakfast</span>
+                    </div>
+                  )}
+                  {richAmenities.roomPlans.halfBoard && (
+                    <div className="p-3 rounded-xl border border-border bg-secondary/10 flex items-center gap-2">
+                      <Check className="h-4 w-4 text-[#D4E034]" />
+                      <span className="text-sm font-medium">Half Board</span>
+                    </div>
+                  )}
+                  {richAmenities.roomPlans.allInclusive && (
+                    <div className="p-3 rounded-xl border border-border bg-secondary/10 flex items-center gap-2">
+                      <Check className="h-4 w-4 text-[#D4E034]" />
+                      <span className="text-sm font-medium">All Inclusive</span>
+                    </div>
+                  )}
+                  {richAmenities.roomPlans.customPlans?.map((plan, i) => (
+                    <div key={i} className="p-3 rounded-xl border border-border bg-secondary/10 flex items-center gap-2">
+                      <Check className="h-4 w-4 text-[#D4E034]" />
+                      <span className="text-sm font-medium">{plan}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Nearby attractions */}
+            {richAmenities.nearbyInfo && (
+              <div className="pb-8 border-b border-border">
+                <h2 className="text-2xl font-semibold text-foreground mb-4">What's Nearby</h2>
+                <div className="grid grid-cols-2 gap-6">
+                  {richAmenities.nearbyInfo.restaurants && (
+                    <div>
+                      <h4 className="font-semibold text-sm text-foreground mb-2">Dining & Cafes</h4>
+                      <ul className="space-y-1">
+                        {richAmenities.nearbyInfo.restaurants.map((item, idx) => (
+                          <li key={idx} className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-accent" /> {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {richAmenities.nearbyInfo.attractions && (
+                    <div>
+                      <h4 className="font-semibold text-sm text-foreground mb-2">Attractions & Sightseeing</h4>
+                      <ul className="space-y-1">
+                        {richAmenities.nearbyInfo.attractions.map((item, idx) => (
+                          <li key={idx} className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-accent" /> {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {richAmenities.nearbyInfo.transport && (
+                    <div>
+                      <h4 className="font-semibold text-sm text-foreground mb-2">Transport Stations</h4>
+                      <ul className="space-y-1">
+                        {richAmenities.nearbyInfo.transport.map((item, idx) => (
+                          <li key={idx} className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-accent" /> {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {richAmenities.nearbyInfo.hospitals && (
+                    <div>
+                      <h4 className="font-semibold text-sm text-foreground mb-2">Hospitals & Medical Care</h4>
+                      <ul className="space-y-1">
+                        {richAmenities.nearbyInfo.hospitals.map((item, idx) => (
+                          <li key={idx} className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-accent" /> {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Vehicle Rentals */}
             <div className="pb-8 border-b border-border relative">
@@ -452,41 +607,53 @@ const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
             <div className="pb-8 border-b border-border">
               <h2 className="text-2xl font-semibold text-foreground mb-4">Where you'll be</h2>
               <p className="text-muted-foreground mb-4">{stay.location}</p>
-              <div className="aspect-[16/9] bg-muted rounded-2xl border border-border flex items-center justify-center">
-                <MapPin className="h-16 w-16 text-muted-foreground" />
-              </div>
+              {richAmenities.googleMapsUrl ? (
+                <a href={richAmenities.googleMapsUrl} target="_blank" rel="noreferrer" className="block group">
+                  <div className="aspect-[16/9] bg-muted hover:bg-muted/80 transition-colors rounded-2xl border border-border flex flex-col items-center justify-center gap-2">
+                    <MapPin className="h-12 w-12 text-[#D4E034] group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-semibold text-foreground">Open in Google Maps</span>
+                    <span className="text-xs text-muted-foreground">Click to view location map</span>
+                  </div>
+                </a>
+              ) : (
+                <div className="aspect-[16/9] bg-muted rounded-2xl border border-border flex items-center justify-center">
+                  <MapPin className="h-16 w-16 text-muted-foreground" />
+                </div>
+              )}
             </div>
 
             {/* Host Profile */}
             <Card className="bg-secondary/30 border-border p-6">
               <div className="flex gap-4 mb-4">
-                {hostProfile?.profile_image ? (
+                {hostPhoto ? (
                   <img
-                    src={hostProfile.profile_image}
-                    alt={hostProfile.full_name || "Host"}
+                    src={hostPhoto}
+                    alt={hostName}
                     className="w-16 h-16 rounded-full object-cover border border-border shrink-0"
                   />
                 ) : (
                   <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold text-xl shrink-0">
-                    {(hostProfile?.full_name ?? "H")[0].toUpperCase()}
+                    {(hostName)[0].toUpperCase()}
                   </div>
                 )}
                 <div>
-                  <h3 className="text-xl font-semibold text-foreground">Hosted by {hostProfile?.full_name || "Host Name"}</h3>
+                  <h3 className="text-xl font-semibold text-foreground">Hosted by {hostName}</h3>
                   <p className="text-sm text-muted-foreground">
                     Joined in{" "}
                     {hostProfile?.created_at
                       ? new Date(hostProfile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })
-                      : ""}
+                      : "June 2026"}
                   </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                    <span className="text-sm font-semibold">Superhost</span>
-                  </div>
+                  {isSuperhost && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                      <span className="text-sm font-semibold">Superhost</span>
+                    </div>
+                  )}
                 </div>
               </div>
-              {hostProfile?.bio && (
-                <p className="text-muted-foreground mb-4">{hostProfile.bio}</p>
+              {hostBio && (
+                <p className="text-muted-foreground mb-4">{hostBio}</p>
               )}
               <Button variant="outline" className="w-full">Contact host</Button>
             </Card>
@@ -500,30 +667,75 @@ const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
                   <ul className="space-y-2">
                     {stay.check_in_time && (
                       <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                        <Check className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        <Check className="h-4 w-4 mt-0.5 text-green-500 flex-shrink-0" />
                         Check-in: {stay.check_in_time}
                       </li>
                     )}
                     {stay.check_out_time && (
                       <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                        <Check className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        <Check className="h-4 w-4 mt-0.5 text-green-500 flex-shrink-0" />
                         Checkout: {stay.check_out_time}
                       </li>
                     )}
-                    {richAmenities.houseRules
-                      ? richAmenities.houseRules.split('\n').filter(Boolean).map((rule, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                            <Check className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                            {rule}
-                          </li>
-                        ))
-                      : (
-                          <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                            <X className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                            No smoking
-                          </li>
-                        )
-                    }
+                    
+                    {/* Smoking allowed rule */}
+                    <li className="flex items-start gap-2 text-sm text-muted-foreground">
+                      {richAmenities.policySmokingAllowed ? (
+                        <>
+                          <Check className="h-4 w-4 mt-0.5 text-green-500 flex-shrink-0" />
+                          Smoking allowed
+                        </>
+                      ) : (
+                        <>
+                          <X className="h-4 w-4 mt-0.5 text-destructive flex-shrink-0" />
+                          No smoking
+                        </>
+                      )}
+                    </li>
+
+                    {/* Pets allowed rule */}
+                    <li className="flex items-start gap-2 text-sm text-muted-foreground">
+                      {richAmenities.policyPetAllowed ? (
+                        <>
+                          <Check className="h-4 w-4 mt-0.5 text-green-500 flex-shrink-0" />
+                          Pets allowed
+                        </>
+                      ) : (
+                        <>
+                          <X className="h-4 w-4 mt-0.5 text-destructive flex-shrink-0" />
+                          No pets allowed
+                        </>
+                      )}
+                    </li>
+
+                    {/* Children allowed rule */}
+                    <li className="flex items-start gap-2 text-sm text-muted-foreground flex-col">
+                      <div className="flex items-start gap-2">
+                        {richAmenities.policyChildAllowed ? (
+                          <>
+                            <Check className="h-4 w-4 mt-0.5 text-green-500 flex-shrink-0" />
+                            Children allowed
+                          </>
+                        ) : (
+                          <>
+                            <X className="h-4 w-4 mt-0.5 text-destructive flex-shrink-0" />
+                            No children allowed
+                          </>
+                        )}
+                      </div>
+                      {richAmenities.policyChildDescription && (
+                        <span className="text-xs text-muted-foreground italic ml-6 mt-0.5">
+                          {richAmenities.policyChildDescription}
+                        </span>
+                      )}
+                    </li>
+
+                    {richAmenities.houseRules && richAmenities.houseRules.split('\n').filter(Boolean).map((rule, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <Check className="h-4 w-4 mt-0.5 text-green-500 flex-shrink-0" />
+                        {rule}
+                      </li>
+                    ))}
                   </ul>
                 </div>
                 <div>

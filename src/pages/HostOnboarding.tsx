@@ -78,7 +78,7 @@ const LISTING_TYPE_OPTIONS = [
   { value: "stays",       label: "Home Stays",             emoji: "🏡", desc: "Eco-stays, treehouses, farm stays, homestays" },
   { value: "hotels",      label: "Hotels",                 emoji: "🏨", desc: "Budget to luxury hotel rooms" },
   { value: "resorts",     label: "Resorts",                emoji: "🌴", desc: "Beach, hill station or jungle resorts" },
-  { value: "cars",        label: "Car Rentals / Cabs",     emoji: "🚗", desc: "Self-drive cars or outstation cab service" },
+  { value: "cars",        label: "Car Rentals",            emoji: "🚗", desc: "Self-drive cars or outstation cab service" },
   { value: "bikes",       label: "Bike Rentals",           emoji: "🏍️", desc: "Two-wheelers for city rides or adventure trails" },
   { value: "experiences", label: "Packages / Experiences", emoji: "🧭", desc: "Tours, treks, travel packages & activities" },
 ];

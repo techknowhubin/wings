@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostBookings, useUpdateBookingStatus, useListingTitles } from '@/hooks/useListings';
-import { formatPrice, calculateHostBookingAmounts } from '@/lib/supabase-helpers';
+import { formatPrice, calculateHostBookingAmounts, createNotification } from '@/lib/supabase-helpers';
 import { format, differenceInDays } from 'date-fns';
 import type { BookingStatus } from '@/types/database';
 import { toast } from 'sonner';
@@ -117,14 +117,15 @@ export function BookingsManager() {
         };
         const notif = notifMap[status];
         if (notif) {
-          await supabase.from('notifications').insert({
+          await createNotification({
             user_id: booking.user_id,
             title: notif.title,
             message: notif.message,
-            type: 'booking',
-            link: '/my-bookings',
-            is_read: false,
-          } as any);
+            type: 'bookings',
+            link: '/profile/bookings',
+            reference_id: booking.id,
+            reference_type: 'booking',
+          });
         }
       }
     } catch {
@@ -148,7 +149,7 @@ export function BookingsManager() {
     >
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Reservations</h1>
+        <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Bookings</h1>
         <p className="text-muted-foreground mt-1">Manage bookings for your listings</p>
       </div>
 
@@ -397,7 +398,7 @@ export function BookingsManager() {
                             </div>
                             <div className="pt-3 border-t border-border flex justify-between">
                               <span className="font-medium">Your Earnings</span>
-                              <span className="font-bold text-primary">{formatPrice(hostEarnings)}</span>
+                              <span className="font-bold text-primary-text">{formatPrice(hostEarnings)}</span>
                             </div>
                           </div>
 

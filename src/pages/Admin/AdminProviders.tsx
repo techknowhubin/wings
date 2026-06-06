@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAdminProviders, useApproveHost, useRejectHost, useListingTypeRequests, useApproveListingTypeRequest, useRejectListingTypeRequest } from '@/hooks/useAdmin';
+import { useAdminProviders, useApproveHost, useRejectHost, useListingTypeRequests, useApproveListingTypeRequest, useRejectListingTypeRequest, useAdminMetrics } from '@/hooks/useAdmin';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,7 @@ const LISTING_TYPE_META: Record<string, { label: string; icon: React.ElementType
   stays:       { label: 'Home Stays',           icon: Home },
   hotels:      { label: 'Hotels',               icon: Building },
   resorts:     { label: 'Resorts',              icon: Palmtree },
-  cars:        { label: 'Car Rentals / Cabs',   icon: Car },
+  cars:        { label: 'Car Rentals',          icon: Car },
   bikes:       { label: 'Bike Rentals',         icon: Bike },
   experiences: { label: 'Packages/Experiences', icon: Compass },
 };
@@ -288,6 +288,7 @@ function ListingRequestsTab() {
 }
 
 export default function AdminProviders() {
+  const { data: metrics } = useAdminMetrics();
   return (
     <div className="space-y-6">
       <div>
@@ -298,7 +299,14 @@ export default function AdminProviders() {
       <Tabs defaultValue="providers">
         <TabsList className="mb-4">
           <TabsTrigger value="providers">Hosts</TabsTrigger>
-          <TabsTrigger value="requests">Listing Type Requests</TabsTrigger>
+          <TabsTrigger value="requests" className="relative flex items-center gap-2">
+            Listing Type Requests
+            {metrics?.pendingListingTypesCount ? (
+              <span className="bg-destructive text-destructive-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                {metrics.pendingListingTypesCount}
+              </span>
+            ) : null}
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="providers">
           <ProvidersTab />

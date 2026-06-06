@@ -2,6 +2,35 @@ export interface BedroomDetail {
   name: string;
   bedType: string;
   count: number;
+  description?: string;
+  photos?: string[];
+  sizeSqFt?: number;
+  bathrooms?: number;
+  occupancyCapacity?: number;
+  amenities?: string[];
+}
+
+export interface RoomPlan {
+  roomOnly: boolean;
+  freeBreakfast: boolean;
+  halfBoard: boolean; // Breakfast + Dinner
+  allInclusive: boolean;
+  customPlans?: string[];
+}
+
+export interface NearbyInfo {
+  restaurants?: string[];
+  attractions?: string[];
+  transport?: string[];
+  hospitals?: string[];
+  shopping?: string[];
+}
+
+export interface HostInfo {
+  name?: string;
+  photo?: string;
+  description?: string;
+  isSuperhost?: boolean;
 }
 
 export interface RichAmenities {
@@ -32,17 +61,46 @@ export interface RichAmenities {
   houseRules?: string;
   healthSafety?: string;
 
-  // Bedroom details
+  // Bedroom / Room details
   bedroomDetails?: BedroomDetail[];
 
   // Room images (separate from gallery)
   roomImages?: string[];
 
-  // Extra pricing
+  // Extra pricing & checkout options
   weeklyPrice?: number;
   monthlyPrice?: number;
   cleaningFee?: number;
   securityDeposit?: number;
+
+  // Premium listing fields
+  propertyCategory?: string; // Budget, Luxury, Premium, Heritage, etc.
+  googleMapsUrl?: string;
+  videos?: string[];
+  virtualTourUrl?: string;
+
+  // Room plans selection
+  roomPlans?: RoomPlan;
+
+  // Detailed pricing fields
+  originalPrice?: number;
+  discountedPrice?: number;
+  dailyPrice?: number;
+  taxesAndFees?: number;
+  offerPercentage?: number;
+  bookAtZero?: boolean;
+
+  // Policies
+  policySmokingAllowed?: boolean;
+  policyPetAllowed?: boolean;
+  policyChildAllowed?: boolean;
+  policyChildDescription?: string;
+
+  // Nearby Info
+  nearbyInfo?: NearbyInfo;
+
+  // Host Info
+  hostInfo?: HostInfo;
 }
 
 /** Parse raw DB JSON value into RichAmenities (handles old string-array format too). */

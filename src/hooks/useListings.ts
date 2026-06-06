@@ -269,17 +269,15 @@ export function useUpdateProfile() {
 
 export function useNotifications(userId: string | undefined) {
   return useQuery({
-    queryKey: ['notifications', userId],
-    queryFn: () => getUserNotifications(userId!),
-    enabled: !!userId,
+    queryKey: ['notifications', userId || 'all'],
+    queryFn: () => getUserNotifications(userId),
   });
 }
 
 export function useUnreadNotificationCount(userId: string | undefined) {
   return useQuery({
-    queryKey: ['notifications', userId, 'unread-count'],
-    queryFn: () => getUnreadNotificationCount(userId!),
-    enabled: !!userId,
+    queryKey: ['notifications', userId || 'all', 'unread-count'],
+    queryFn: () => getUnreadNotificationCount(userId),
   });
 }
 

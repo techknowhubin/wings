@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
+import {
   getStays, getStayById, getStayBySlug,
   getCars, getCarById, getCarBySlug,
   getBikes, getBikeById, getBikeBySlug,
@@ -9,6 +9,7 @@ import {
   getUserWishlist, addToWishlist, removeFromWishlist, isInWishlist,
   getProfile, updateProfile, getHostProfile,
   getUserNotifications, getUnreadNotificationCount, markNotificationAsRead, markAllNotificationsAsRead,
+  deleteNotification, updateHostProfile, getListingTitlesBatch,
   getHostStays, getHostCars, getHostBikes, getHostExperiences, getHostHotels, getHostResorts,
   getManagedListings, updateMarketplaceRequest, updateMarketplaceVisibility,
   isAdmin, isHost, isModerator,
@@ -626,5 +627,41 @@ export function useUpsertLinkInBioPage() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['link-in-bio', variables.user_id] });
     },
+  });
+}
+
+// ============ Additional Notification Hooks ============
+
+export function useDeleteNotification() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteNotification,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+// ============ Host Profile Update Hook ============
+
+export function useUpdateHostProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, updates }: { userId: string; updates: Parameters<typeof updateHostProfile>[1] }) =>
+      updateHostProfile(userId, updates),
+    onSuccess: (_, { userId }) => {
+      queryClient.invalidateQueries({ queryKey: ['host', 'profile', userId] });
+    },
+  });
+}
+
+// ============ Listing Titles Batch Hook ============
+
+export function useListingTitles(items: Array<{ listing_id: string; listing_type: string }>) {
+  return useQuery({
+    queryKey: ['listing-titles', items.map(i => i.listing_id).join(',')],
+    queryFn: () => getListingTitlesBatch(items),
+    enabled: items.length > 0,
+    staleTime: 5 * 60 * 1000,
   });
 }

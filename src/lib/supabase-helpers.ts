@@ -847,6 +847,92 @@ export async function deleteBlogPost(postId: string) {
   if (error) throw error;
 }
 
+// ============ Notification Helpers (additional) ============
+
+export async function deleteNotification(notificationId: string) {
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
+    .eq('id', notificationId);
+  if (error) throw error;
+}
+
+export async function createNotification(notification: {
+  user_id: string;
+  title: string;
+  message: string;
+  type: string;
+  link?: string;
+}) {
+  const { data, error } = await supabase
+    .from('notifications')
+    .insert({ ...notification, is_read: false })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// ============ Host Profile Helpers ============
+
+export async function updateHostProfile(
+  userId: string,
+  updates: {
+    bank_account_holder?: string | null;
+    bank_account_number?: string | null;
+    bank_ifsc?: string | null;
+    bank_name?: string | null;
+    business_name?: string | null;
+    business_type?: string | null;
+    gst_number?: string | null;
+    pan_number?: string | null;
+    msme_number?: string | null;
+  }
+) {
+  const { data, error } = await supabase
+    .from('host_profiles')
+    .upsert({ id: userId, ...updates, updated_at: new Date().toISOString() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// ============ Listing Title Helpers ============
+
+export async function getListingTitlesBatch(
+  items: Array<{ listing_id: string; listing_type: string }>
+): Promise<Record<string, string>> {
+  const grouped: Record<string, string[]> = {};
+  items.forEach(({ listing_id, listing_type }) => {
+    if (!grouped[listing_type]) grouped[listing_type] = [];
+    if (!grouped[listing_type].includes(listing_id)) {
+      grouped[listing_type].push(listing_id);
+    }
+  });
+
+  const tableMap: Record<string, string> = {
+    stay: 'stays', car: 'cars', bike: 'bikes',
+    experience: 'experiences', hotel: 'hotels', resort: 'resorts',
+  };
+
+  const titles: Record<string, string> = {};
+  await Promise.all(
+    Object.entries(grouped).map(async ([type, ids]) => {
+      const table = tableMap[type];
+      if (!table) return;
+      const { data } = await supabase
+        .from(table as any)
+        .select('id, title')
+        .in('id', ids);
+      (data ?? []).forEach((row: any) => {
+        if (row.title) titles[row.id] = row.title;
+      });
+    })
+  );
+  return titles;
+}
+
 // ============ Utility Functions ============
 
 export function generateSlug(text: string): string {

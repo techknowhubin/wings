@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -145,6 +146,7 @@ export default function UserProfile() {
 
   // Password form
   const [passwords, setPasswords] = useState({ current: "", newPw: "", confirm: "" });
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
 
   // Notifications
   const [notifs, setNotifs] = useState({
@@ -635,57 +637,60 @@ export default function UserProfile() {
                     <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
                   </TabsList>
 
-                  {["all", "confirmed", "completed", "cancelled", "pending"].map((tab) => (
-                    <TabsContent key={tab} value={tab === "all" ? "all" : tab} className="space-y-4 mt-4">
+                  {([
+                    { value: "all",       filter: (b: any) => true },
+                    { value: "active",    filter: (b: any) => b.booking_status === "confirmed" || b.booking_status === "pending" },
+                    { value: "completed", filter: (b: any) => b.booking_status === "completed" },
+                    { value: "cancelled", filter: (b: any) => b.booking_status === "cancelled" },
+                  ] as const).map(({ value, filter }) => (
+                    <TabsContent key={value} value={value} className="space-y-4 mt-4">
                       {bookingsLoading ? (
-                         <div className="space-y-4">
-                            {[1, 2].map(i => (
-                              <div key={i} className="h-28 w-full bg-muted animate-pulse rounded-xl" />
-                            ))}
-                         </div>
+                        <div className="space-y-4">
+                          {[1, 2].map(i => (
+                            <div key={i} className="h-28 w-full bg-muted animate-pulse rounded-xl" />
+                          ))}
+                        </div>
                       ) : (
                         <>
-                          {bookings
-                            .filter((b) => tab === "all" || b.booking_status === tab)
-                            .map((booking) => (
-                              <Card key={booking.id} className="overflow-hidden">
-                                <CardContent className="p-0 flex flex-col sm:flex-row">
-                                  <div className="sm:w-32 h-24 sm:h-auto bg-muted flex items-center justify-center overflow-hidden">
-                                    {booking.listing_image ? (
-                                      <img src={booking.listing_image} alt={booking.listing_title} className="w-full h-full object-cover" />
-                                    ) : (
-                                      <Calendar className="h-8 w-8 text-muted-foreground" />
-                                    )}
-                                  </div>
-                                  <div className="flex-1 p-4">
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div>
-                                        <p className="font-semibold text-foreground text-sm line-clamp-1">{booking.listing_title}</p>
-                                        <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">{booking.id}</p>
-                                      </div>
-                                      <Badge variant="outline" className={cn("text-[10px] capitalize", statusColor[booking.booking_status] || "bg-muted text-muted-foreground")}>
-                                        {booking.booking_status}
-                                      </Badge>
+                          {bookings.filter(filter).map((booking) => (
+                            <Card key={booking.id} className="overflow-hidden">
+                              <CardContent className="p-0 flex flex-col sm:flex-row">
+                                <div className="sm:w-32 h-24 sm:h-auto bg-muted flex items-center justify-center overflow-hidden">
+                                  {booking.listing_image ? (
+                                    <img src={booking.listing_image} alt={booking.listing_title} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <Calendar className="h-8 w-8 text-muted-foreground" />
+                                  )}
+                                </div>
+                                <div className="flex-1 p-4">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <p className="font-semibold text-foreground text-sm line-clamp-1">{booking.listing_title}</p>
+                                      <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">{booking.id}</p>
                                     </div>
-                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-xs text-muted-foreground">
-                                      <span className="flex items-center gap-1">
-                                        <Calendar className="h-3 w-3" />
-                                        {format(new Date(booking.start_date), "MMM d")} – {format(new Date(booking.end_date), "MMM d, yyyy")}
-                                      </span>
-                                      <span className="font-semibold text-foreground">₹{booking.total_price.toLocaleString()}</span>
-                                    </div>
-                                    <Button variant="ghost" size="sm" className="mt-2 text-xs h-8">
-                                      View Details <ChevronRight className="h-3 w-3 ml-1" />
-                                    </Button>
+                                    <Badge variant="outline" className={cn("text-[10px] capitalize", statusColor[booking.booking_status] || "bg-muted text-muted-foreground")}>
+                                      {booking.booking_status}
+                                    </Badge>
                                   </div>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          {bookings.filter((b) => tab === "all" || b.booking_status === tab).length === 0 && (
+                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-xs text-muted-foreground">
+                                    <span className="flex items-center gap-1">
+                                      <Calendar className="h-3 w-3" />
+                                      {format(new Date(booking.start_date), "MMM d")} – {format(new Date(booking.end_date), "MMM d, yyyy")}
+                                    </span>
+                                    <span className="font-semibold text-foreground">₹{booking.total_price.toLocaleString()}</span>
+                                  </div>
+                                  <Button variant="ghost" size="sm" className="mt-2 text-xs h-8 text-primary" onClick={() => setSelectedBooking(booking)}>
+                                    View Details <ChevronRight className="h-3 w-3 ml-1" />
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                          {bookings.filter(filter).length === 0 && (
                             <Card>
                               <CardContent className="p-12 text-center">
                                 <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                                <p className="text-muted-foreground mb-4">No {tab !== "all" ? tab : ""} bookings found</p>
+                                <p className="text-muted-foreground mb-4">No {value !== "all" ? value : ""} bookings found</p>
                                 <Button onClick={() => navigate("/stays")}>Start Exploring</Button>
                               </CardContent>
                             </Card>
@@ -695,6 +700,142 @@ export default function UserProfile() {
                     </TabsContent>
                   ))}
                 </Tabs>
+
+                {/* Booking Details Dialog */}
+                <Dialog open={!!selectedBooking} onOpenChange={(open) => { if (!open) setSelectedBooking(null); }}>
+                  <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+                    {selectedBooking && (() => {
+                      let parsed: any = null;
+                      try { if (selectedBooking.notes) parsed = JSON.parse(selectedBooking.notes); } catch { /* plain text */ }
+                      const primary = parsed?.primaryGuest;
+                      const extras = parsed?.additionalGuests?.filter((g: any) => g.name?.trim()) ?? [];
+                      const totalAmount = Number(selectedBooking.total_price) || 0;
+
+                      return (
+                        <>
+                          <DialogHeader>
+                            <DialogTitle className="text-lg">Booking Details</DialogTitle>
+                          </DialogHeader>
+
+                          {/* Listing Info */}
+                          <div className="space-y-5 mt-2">
+                            <div className="flex gap-4">
+                              {selectedBooking.listing_image ? (
+                                <img src={selectedBooking.listing_image} alt={selectedBooking.listing_title} className="w-24 h-20 rounded-xl object-cover shrink-0" />
+                              ) : (
+                                <div className="w-24 h-20 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                                  <Calendar className="h-6 w-6 text-muted-foreground" />
+                                </div>
+                              )}
+                              <div>
+                                <p className="font-semibold text-foreground">{selectedBooking.listing_title}</p>
+                                {selectedBooking.listing_location && (
+                                  <p className="text-xs text-muted-foreground mt-0.5">{selectedBooking.listing_location}</p>
+                                )}
+                                <Badge variant="outline" className="mt-1.5 capitalize text-[10px]">{selectedBooking.listing_type}</Badge>
+                              </div>
+                            </div>
+
+                            <Separator />
+
+                            {/* Dates & Status */}
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-xs text-muted-foreground">Check-in</p>
+                                <p className="font-medium text-sm">{format(new Date(selectedBooking.start_date), "MMM d, yyyy")}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground">Check-out</p>
+                                <p className="font-medium text-sm">{format(new Date(selectedBooking.end_date), "MMM d, yyyy")}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground">Booking Status</p>
+                                <Badge variant="outline" className={cn("mt-1 capitalize text-[10px]", statusColor[selectedBooking.booking_status] || "")}>
+                                  {selectedBooking.booking_status}
+                                </Badge>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground">Payment Status</p>
+                                <Badge variant="outline" className={cn("mt-1 capitalize text-[10px]", selectedBooking.payment_status === 'completed' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200')}>
+                                  {selectedBooking.payment_status || 'pending'}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            <Separator />
+
+                            {/* Pricing */}
+                            <div>
+                              <p className="text-sm font-semibold text-foreground mb-3">Pricing</p>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Amount Paid (Online)</span>
+                                  <span className="font-medium">₹{totalAmount.toLocaleString('en-IN')}</span>
+                                </div>
+                                {selectedBooking.booking_channel && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Booking Channel</span>
+                                    <span className="capitalize">{selectedBooking.booking_channel}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <Separator />
+
+                            {/* Guest Details */}
+                            <div>
+                              <p className="text-sm font-semibold text-foreground mb-3">Guest Details</p>
+                              {primary ? (
+                                <div className="space-y-3">
+                                  <div className="p-3 rounded-xl bg-muted/50">
+                                    <p className="text-xs font-medium text-muted-foreground mb-1">Primary Guest</p>
+                                    <p className="text-sm font-medium text-foreground">{primary.name}</p>
+                                    {primary.email && <p className="text-xs text-muted-foreground">{primary.email}</p>}
+                                    {primary.phone && <p className="text-xs text-muted-foreground">{primary.phone}</p>}
+                                  </div>
+                                  {extras.length > 0 && (
+                                    <div className="p-3 rounded-xl bg-muted/30">
+                                      <p className="text-xs font-medium text-muted-foreground mb-2">Additional Guests ({extras.length})</p>
+                                      <div className="space-y-2">
+                                        {extras.map((g: any, i: number) => (
+                                          <div key={i} className="text-sm border-t border-border pt-2 first:border-0 first:pt-0">
+                                            <span className="font-medium text-foreground">{g.name}</span>
+                                            {g.phone && <span className="text-muted-foreground"> · {g.phone}</span>}
+                                            {g.age && <span className="text-muted-foreground"> · Age {g.age}</span>}
+                                            {g.id_proof && <span className="text-muted-foreground"> · ID: {g.id_proof}</span>}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-muted-foreground">
+                                  {selectedBooking.guests_count ? `${selectedBooking.guests_count} guest${selectedBooking.guests_count > 1 ? 's' : ''}` : 'No guest details available'}
+                                </p>
+                              )}
+                              {!parsed && selectedBooking.notes && (
+                                <div className="mt-2 p-3 rounded-xl bg-muted/50">
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Notes</p>
+                                  <p className="text-sm text-foreground">{selectedBooking.notes}</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Booking ID */}
+                            <div className="pt-2 border-t border-border">
+                              <p className="text-[10px] text-muted-foreground font-mono">Booking ID: {selectedBooking.id}</p>
+                              {selectedBooking.transaction_id && (
+                                <p className="text-[10px] text-muted-foreground font-mono mt-0.5">Transaction ID: {selectedBooking.transaction_id}</p>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </DialogContent>
+                </Dialog>
               </div>
             )}
 

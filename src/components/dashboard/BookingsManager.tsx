@@ -29,6 +29,9 @@ import { formatPrice, calculateCommission } from '@/lib/supabase-helpers';
 import { format, differenceInDays } from 'date-fns';
 import type { BookingStatus } from '@/types/database';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
 const statusConfig: Record<BookingStatus, { label: string; color: string; icon: React.ElementType }> = {
   pending:   { label: 'Pending',   color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Clock },
@@ -41,10 +44,28 @@ export function BookingsManager() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<string>('all');
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   // Fetch only this host's bookings (filtered server-side by host_id)
   const { data: bookings = [], isLoading } = useHostBookings(user?.id);
   const updateStatus = useUpdateBookingStatus();
+
+  // Real-time subscription: invalidate on any bookings change for this host
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel('bookings-manager-live')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'bookings',
+        filter: `host_id=eq.${user.id}`,
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ['host', 'bookings', user.id] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, queryClient]);
 
   // Batch-fetch listing titles for all bookings
   const listingItems = useMemo(
@@ -72,9 +93,40 @@ export function BookingsManager() {
   }, [bookings, activeTab, searchQuery, listingTitles]);
 
   const handleStatusChange = async (bookingId: string, status: BookingStatus) => {
+    const booking = bookings.find(b => b.id === bookingId);
     try {
       await updateStatus.mutateAsync({ bookingId, status });
       toast.success(`Booking ${status}`);
+
+      // Notify the guest about the status change
+      if (booking?.user_id) {
+        const listingTitle = listingTitles[booking.listing_id] || 'your booking';
+        const notifMap: Partial<Record<BookingStatus, { title: string; message: string }>> = {
+          confirmed: {
+            title: 'Booking Confirmed!',
+            message: `Your booking for "${listingTitle}" has been confirmed by the host. Check-in: ${format(new Date(booking.start_date), 'MMM d, yyyy')}.`,
+          },
+          cancelled: {
+            title: 'Booking Cancelled',
+            message: `Your booking for "${listingTitle}" has been cancelled by the host.`,
+          },
+          completed: {
+            title: 'Stay Completed',
+            message: `Your stay at "${listingTitle}" is marked as completed. We hope you had a great time! Please leave a review.`,
+          },
+        };
+        const notif = notifMap[status];
+        if (notif) {
+          await supabase.from('notifications').insert({
+            user_id: booking.user_id,
+            title: notif.title,
+            message: notif.message,
+            type: 'booking',
+            link: '/my-bookings',
+            is_read: false,
+          } as any);
+        }
+      }
     } catch {
       toast.error('Failed to update booking status');
     }
@@ -283,17 +335,49 @@ export function BookingsManager() {
                             </DropdownMenu>
                           </div>
 
-                          {booking.guests_count ? (
-                            <p className="text-sm text-muted-foreground mt-4">
-                              {booking.guests_count} guest{booking.guests_count > 1 ? 's' : ''}
-                            </p>
-                          ) : null}
-
-                          {booking.notes && (
-                            <div className="mt-4 p-3 rounded-lg bg-secondary/50">
-                              <p className="text-sm text-muted-foreground">{booking.notes}</p>
-                            </div>
-                          )}
+                          {/* Customer Details from booking notes */}
+                          {(() => {
+                            let parsed: { primaryGuest?: { name?: string; email?: string; phone?: string }; additionalGuests?: Array<{ name?: string; email?: string; phone?: string; age?: string; id_proof?: string }> } | null = null;
+                            try { if (booking.notes) parsed = JSON.parse(booking.notes); } catch { /* plain text note */ }
+                            const primary = parsed?.primaryGuest;
+                            const extras = parsed?.additionalGuests?.filter(g => g.name?.trim()) ?? [];
+                            return (
+                              <div className="mt-4 space-y-2">
+                                {primary ? (
+                                  <div className="p-3 rounded-lg bg-secondary/50 text-sm">
+                                    <p className="font-medium text-foreground mb-1 flex items-center gap-1.5">
+                                      <User className="h-3.5 w-3.5" /> Primary Guest
+                                    </p>
+                                    <p className="text-muted-foreground">{primary.name}</p>
+                                    {primary.email && <p className="text-muted-foreground">{primary.email}</p>}
+                                    {primary.phone && <p className="text-muted-foreground">{primary.phone}</p>}
+                                  </div>
+                                ) : booking.guests_count ? (
+                                  <p className="text-sm text-muted-foreground">
+                                    {booking.guests_count} guest{booking.guests_count > 1 ? 's' : ''}
+                                  </p>
+                                ) : null}
+                                {extras.length > 0 && (
+                                  <div className="p-3 rounded-lg bg-secondary/30 text-sm space-y-1">
+                                    <p className="font-medium text-foreground mb-1">Additional Guests ({extras.length})</p>
+                                    {extras.map((g, gi) => (
+                                      <div key={gi} className="text-muted-foreground border-t border-border pt-1 first:border-0 first:pt-0">
+                                        <span className="font-medium text-foreground">{g.name}</span>
+                                        {g.phone && <> · {g.phone}</>}
+                                        {g.age && <> · Age {g.age}</>}
+                                        {g.id_proof && <> · ID: {g.id_proof}</>}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {!parsed && booking.notes && (
+                                  <div className="mt-2 p-3 rounded-lg bg-secondary/50">
+                                    <p className="text-sm text-muted-foreground">{booking.notes}</p>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         {/* Right Section — Pricing */}

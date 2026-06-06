@@ -15,6 +15,7 @@ import VehicleSelectionModal from "@/components/stay-detail/VehicleSelectionModa
 import StayFeatureHighlights from "@/components/stay-detail/StayFeatureHighlights";
 import StayBookingPanel from "@/components/stay-detail/StayBookingPanel";
 import { parseListingDiscountConfig } from "@/lib/discounts";
+import { parseRichAmenities, getAmenityNames } from "@/lib/listing-helpers";
 import manaliImage from "@/assets/stays/manali-mountain-homestay.jpg";
 import goaImage from "@/assets/stays/goa-beach-villa.jpg";
 import jaipurImage from "@/assets/stays/jaipur-heritage-haveli.jpg";
@@ -98,7 +99,7 @@ const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
         if (data.host_id) {
           const { data: profileData } = await supabase
             .from("profiles")
-            .select("full_name, created_at, bio")
+            .select("full_name, created_at, bio, profile_image, phone")
             .eq("id", data.host_id)
             .single();
           if (profileData) setHostProfile(profileData);
@@ -145,10 +146,13 @@ const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
     );
   }
 
-  const amenitiesList = Array.isArray(stay.amenities) ? stay.amenities : [];
+  const richAmenities = parseRichAmenities(stay.amenities);
+  const amenitiesList = getAmenityNames(stay.amenities);
   const resolvedImages = stay.images?.length > 0
     ? stay.images.map((img: string) => img.startsWith('http') ? img : (imageMap[img] || manaliImage))
     : [manaliImage];
+  const resolvedRoomImages = (richAmenities.roomImages ?? [])
+    .filter(img => img.startsWith('http'));
   const currencySymbol = stay.currency === 'INR' ? '₹' : '$';
   const discountConfig = parseListingDiscountConfig(stay.discounts);
 
@@ -230,9 +234,12 @@ const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
           <div className="lg:col-span-2 space-y-8">
             {/* Property Specs */}
             <div className="pb-8 border-b border-border">
-              <h2 className="text-xl font-semibold text-foreground mb-4">
+              <h2 className="text-xl font-semibold text-foreground mb-2">
                 Entire {stay.property_type || "Homestay"} Details
               </h2>
+              {richAmenities.shortDescription && (
+                <p className="text-muted-foreground text-sm mb-4">{richAmenities.shortDescription}</p>
+              )}
               <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
                 <span className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
@@ -242,27 +249,56 @@ const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
                   <BedDouble className="h-4 w-4" />
                   {stay.bedrooms} {stay.bedrooms === 1 ? "Bedroom" : "Bedrooms"}
                 </span>
+                {richAmenities.beds && (
+                  <span className="flex items-center gap-2">
+                    <BedDouble className="h-4 w-4" />
+                    {richAmenities.beds} {richAmenities.beds === 1 ? "Bed" : "Beds"}
+                  </span>
+                )}
                 <span className="flex items-center gap-2">
                   <Bath className="h-4 w-4" />
                   {stay.bathrooms} Private {stay.bathrooms === 1 ? "bath" : "baths"}
                 </span>
+                {richAmenities.propertySize && (
+                  <span className="flex items-center gap-2">
+                    <Map className="h-4 w-4" />
+                    {richAmenities.propertySize}
+                  </span>
+                )}
               </div>
+              {(richAmenities.city || richAmenities.state || richAmenities.fullAddress) && (
+                <div className="mt-3 text-sm text-muted-foreground flex items-start gap-1.5">
+                  <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>
+                    {[richAmenities.fullAddress, richAmenities.city, richAmenities.state].filter(Boolean).join(', ')}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Host Info */}
             <div className="pb-8 border-b border-border">
-              <div className="flex items-start gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Hosted by:</p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold">
-                      H
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-foreground">{hostProfile?.full_name || "Host Name"}</h4>
-                      <p className="text-xs text-muted-foreground">Joined in {hostProfile?.created_at ? new Date(hostProfile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "March 2020"}</p>
-                    </div>
+              <p className="text-sm text-muted-foreground mb-2">Hosted by:</p>
+              <div className="flex items-center gap-3">
+                {hostProfile?.profile_image ? (
+                  <img
+                    src={hostProfile.profile_image}
+                    alt={hostProfile.full_name || "Host"}
+                    className="w-12 h-12 rounded-full object-cover border border-border"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold text-lg">
+                    {(hostProfile?.full_name ?? "H")[0].toUpperCase()}
                   </div>
+                )}
+                <div>
+                  <h4 className="font-semibold text-foreground">{hostProfile?.full_name || "Host Name"}</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Joined in{" "}
+                    {hostProfile?.created_at
+                      ? new Date(hostProfile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+                      : ""}
+                  </p>
                 </div>
               </div>
             </div>
@@ -285,14 +321,33 @@ const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
             <div className="pb-8 border-b border-border">
               <h2 className="text-2xl font-semibold text-foreground mb-6">Where you'll sleep</h2>
               <div className="flex gap-4 overflow-x-auto pb-2">
-                {Array.from({ length: stay.bedrooms }).map((_, i) => (
-                  <Card key={i} className="min-w-[200px] p-6 border-border">
-                    <BedDouble className="h-8 w-8 text-foreground mb-3" />
-                    <h3 className="font-semibold text-foreground mb-1">Bedroom {i + 1}</h3>
-                    <p className="text-sm text-muted-foreground">1 queen bed</p>
-                  </Card>
-                ))}
+                {richAmenities.bedroomDetails && richAmenities.bedroomDetails.length > 0
+                  ? richAmenities.bedroomDetails.map((room, i) => (
+                      <Card key={i} className="min-w-[200px] p-6 border-border shrink-0">
+                        <BedDouble className="h-8 w-8 text-foreground mb-3" />
+                        <h3 className="font-semibold text-foreground mb-1">{room.name || `Bedroom ${i + 1}`}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {room.count} {room.bedType} {room.count === 1 ? "bed" : "beds"}
+                        </p>
+                      </Card>
+                    ))
+                  : Array.from({ length: Math.max(stay.bedrooms || 1, 1) }).map((_, i) => (
+                      <Card key={i} className="min-w-[200px] p-6 border-border shrink-0">
+                        <BedDouble className="h-8 w-8 text-foreground mb-3" />
+                        <h3 className="font-semibold text-foreground mb-1">Bedroom {i + 1}</h3>
+                        <p className="text-sm text-muted-foreground">1 queen bed</p>
+                      </Card>
+                    ))
+                }
               </div>
+              {/* Room Photos */}
+              {resolvedRoomImages.length > 0 && (
+                <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
+                  {resolvedRoomImages.map((img, i) => (
+                    <img key={i} src={img} alt={`Room ${i + 1}`} className="h-32 w-48 rounded-xl object-cover shrink-0 border border-border" />
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Amenities */}
@@ -405,21 +460,34 @@ const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
             {/* Host Profile */}
             <Card className="bg-secondary/30 border-border p-6">
               <div className="flex gap-4 mb-4">
-                <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold text-xl">
-                  H
-                </div>
+                {hostProfile?.profile_image ? (
+                  <img
+                    src={hostProfile.profile_image}
+                    alt={hostProfile.full_name || "Host"}
+                    className="w-16 h-16 rounded-full object-cover border border-border shrink-0"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold text-xl shrink-0">
+                    {(hostProfile?.full_name ?? "H")[0].toUpperCase()}
+                  </div>
+                )}
                 <div>
                   <h3 className="text-xl font-semibold text-foreground">Hosted by {hostProfile?.full_name || "Host Name"}</h3>
-                  <p className="text-sm text-muted-foreground">Joined in {hostProfile?.created_at ? new Date(hostProfile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "March 2020"}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Joined in{" "}
+                    {hostProfile?.created_at
+                      ? new Date(hostProfile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+                      : ""}
+                  </p>
                   <div className="flex items-center gap-2 mt-1">
                     <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
                     <span className="text-sm font-semibold">Superhost</span>
                   </div>
                 </div>
               </div>
-              <p className="text-muted-foreground mb-4">
-                {hostProfile?.bio || "I love hosting travelers and sharing the beauty of our region. I'm always available to help make your stay memorable!"}
-              </p>
+              {hostProfile?.bio && (
+                <p className="text-muted-foreground mb-4">{hostProfile.bio}</p>
+              )}
               <Button variant="outline" className="w-full">Contact host</Button>
             </Card>
 
@@ -430,36 +498,62 @@ const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
                 <div>
                   <h3 className="font-semibold text-foreground mb-3">House rules</h3>
                   <ul className="space-y-2">
-                    <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Check className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      Check-in: {stay.check_in_time}
-                    </li>
-                    <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Check className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      Checkout: {stay.check_out_time}
-                    </li>
-                    <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <X className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      No smoking
-                    </li>
+                    {stay.check_in_time && (
+                      <li className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <Check className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        Check-in: {stay.check_in_time}
+                      </li>
+                    )}
+                    {stay.check_out_time && (
+                      <li className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <Check className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        Checkout: {stay.check_out_time}
+                      </li>
+                    )}
+                    {richAmenities.houseRules
+                      ? richAmenities.houseRules.split('\n').filter(Boolean).map((rule, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                            <Check className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                            {rule}
+                          </li>
+                        ))
+                      : (
+                          <li className="flex items-start gap-2 text-sm text-muted-foreground">
+                            <X className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                            No smoking
+                          </li>
+                        )
+                    }
                   </ul>
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground mb-3">Health & safety</h3>
                   <ul className="space-y-2">
-                    <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Shield className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      Smoke alarm installed
-                    </li>
-                    <li className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Shield className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      First aid kit available
-                    </li>
+                    {richAmenities.healthSafety
+                      ? richAmenities.healthSafety.split('\n').filter(Boolean).map((item, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                            <Shield className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                            {item}
+                          </li>
+                        ))
+                      : (
+                          <>
+                            <li className="flex items-start gap-2 text-sm text-muted-foreground">
+                              <Shield className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                              Smoke alarm installed
+                            </li>
+                            <li className="flex items-start gap-2 text-sm text-muted-foreground">
+                              <Shield className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                              First aid kit available
+                            </li>
+                          </>
+                        )
+                    }
                   </ul>
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground mb-3">Cancellation policy</h3>
-                  <p className="text-sm text-muted-foreground">{stay.cancellation_policy}</p>
+                  <p className="text-sm text-muted-foreground capitalize">{stay.cancellation_policy || "Moderate"}</p>
                 </div>
               </div>
             </div>
@@ -478,6 +572,10 @@ const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
               listingCouponType={listingCouponType}
               hostDiscountPercent={discountConfig.hostDiscountPercent}
               availableCoupons={discountConfig.coupons}
+              weeklyPrice={richAmenities.weeklyPrice}
+              monthlyPrice={richAmenities.monthlyPrice}
+              cleaningFee={richAmenities.cleaningFee}
+              securityDeposit={richAmenities.securityDeposit}
             />
           </div>
         </div>

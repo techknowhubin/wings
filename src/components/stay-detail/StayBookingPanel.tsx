@@ -21,6 +21,10 @@ interface StayBookingPanelProps {
   listingCouponType?: "stays" | "hotels" | "resorts";
   hostDiscountPercent?: number;
   availableCoupons?: CouponOffer[];
+  weeklyPrice?: number;
+  monthlyPrice?: number;
+  cleaningFee?: number;
+  securityDeposit?: number;
 }
 
 const StayBookingPanel = ({
@@ -34,6 +38,10 @@ const StayBookingPanel = ({
   listingCouponType = "stays",
   hostDiscountPercent = 0,
   availableCoupons = [],
+  weeklyPrice: weeklyPriceProp,
+  monthlyPrice: monthlyPriceProp,
+  cleaningFee = 0,
+  securityDeposit = 0,
 }: StayBookingPanelProps) => {
   const navigate = useNavigate();
   const [guests, setGuests] = useState(1);
@@ -54,14 +62,14 @@ const StayBookingPanel = ({
     setCheckOut(addDays(checkIn, getDurationDays(pricingOption)));
   }, [pricingOption, checkIn]);
 
-  const weeklyPrice = pricePerNight * 7 * 0.85;
-  const monthlyPrice = pricePerNight * 30 * 0.7;
+  const weeklyPrice = weeklyPriceProp ?? Math.round(pricePerNight * 7 * 0.85);
+  const monthlyPrice = monthlyPriceProp ?? Math.round(pricePerNight * 30 * 0.7);
 
   const nights = Math.max(differenceInDays(checkOut, checkIn), 1);
   const subtotal = pricePerNight * nights;
   const discount = Math.round((subtotal * hostDiscountPercent) / 100);
   const serviceFee = 0;
-  const total = subtotal - discount + serviceFee;
+  const total = subtotal - discount + serviceFee + cleaningFee + securityDeposit;
 
   return (
     <Card className="border-border shadow-strong sticky top-24 p-4 rounded-2xl bg-white dark:bg-card">
@@ -230,7 +238,7 @@ const StayBookingPanel = ({
             description: `${nights} night stay at ${title}`,
             subtotal,
             discount,
-            serviceFee,
+            serviceFee: serviceFee + cleaningFee + securityDeposit,
             total,
             hostDiscountPercent,
             availableCoupons,
@@ -260,10 +268,24 @@ const StayBookingPanel = ({
             <span className="text-accent font-medium">-{currencySymbol}{discount}</span>
           </div>
         ) : null}
-        <div className="flex justify-between text-xs">
-          <span className="text-muted-foreground">Service fee</span>
-          <span className="text-foreground font-medium">{currencySymbol}{serviceFee}</span>
-        </div>
+        {serviceFee > 0 && (
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Service fee</span>
+            <span className="text-foreground font-medium">{currencySymbol}{serviceFee}</span>
+          </div>
+        )}
+        {cleaningFee > 0 && (
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Cleaning fee</span>
+            <span className="text-foreground font-medium">{currencySymbol}{cleaningFee.toLocaleString()}</span>
+          </div>
+        )}
+        {securityDeposit > 0 && (
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Security deposit (refundable)</span>
+            <span className="text-foreground font-medium">{currencySymbol}{securityDeposit.toLocaleString()}</span>
+          </div>
+        )}
         <div className="flex justify-between text-xs font-bold pt-2 border-t border-border">
           <span className="text-foreground">Total before taxes</span>
           <span className="text-foreground">{currencySymbol}{total.toLocaleString()}</span>

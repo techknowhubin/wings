@@ -1,14 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL             = (import.meta.env.VITE_SUPABASE_URL             ?? "").trim();
-const SUPABASE_PUBLISHABLE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "").trim();
+const SUPABASE_URL             = (import.meta.env.VITE_SUPABASE_URL             ?? "").trim() || "https://uhtwkajqpuazxpnbaojx.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "").trim() || "sb_publishable_kX4YhhekZFFrnYiSO0UEwg_u4CLPOJW";
 
 /** False when URL/key missing — UI should gate before relying on Supabase. */
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
 
-const resolvedUrl = SUPABASE_URL || "https://configuration-required.supabase.co";
-const resolvedKey = SUPABASE_PUBLISHABLE_KEY || "sb-publishable-api-key-not-configured";
+const resolvedUrl = SUPABASE_URL;
+const resolvedKey = SUPABASE_PUBLISHABLE_KEY;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

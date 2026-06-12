@@ -19,6 +19,9 @@ interface Experience {
   rating: number;
   images: string[];
   host_name?: string;
+  long_stay_discount_7?: number;
+  long_stay_discount_14?: number;
+  long_stay_discount_30?: number;
 }
 
 const Experiences = () => {
@@ -132,6 +135,11 @@ const Experiences = () => {
                 type="experience"
                 delay={index * 0.05}
                 hostName={(experience as any).host_name}
+                longStayDiscounts={{
+                  discount7: experience.long_stay_discount_7 || 0,
+                  discount14: experience.long_stay_discount_14 || 0,
+                  discount30: experience.long_stay_discount_30 || 0,
+                }}
               />
             ))}
           </div>

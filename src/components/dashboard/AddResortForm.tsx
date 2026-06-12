@@ -148,6 +148,11 @@ interface FormState {
   hostPhoto: string;
   hostDescription: string;
   hostIsSuperhost: boolean;
+
+  // Long stay discounts
+  discount7: string;
+  discount14: string;
+  discount30: string;
 }
 
 export function AddResortForm() {
@@ -187,6 +192,9 @@ export function AddResortForm() {
     cleaningFee: '', securityDeposit: '', hostDiscountPercent: '',
     coupons: [],
     availability_status: true,
+    discount7: '',
+    discount14: '',
+    discount30: '',
 
     // New premium fields
     propertyCategory: 'Premium',
@@ -365,6 +373,12 @@ export function AddResortForm() {
         isSuperhost: form.hostIsSuperhost,
       };
 
+      let d7 = Number(form.discount7 || 0);
+      let d14 = Number(form.discount14 || 0);
+      let d30 = Number(form.discount30 || 0);
+      if (d14 < d7) d14 = d7;
+      if (d30 < d14) d30 = d14;
+
       const validCoupons = form.coupons
         .filter(c => c.code.trim() && c.value)
         .map(c => ({ code: c.code, type: c.type, value: Number(c.value) }));
@@ -393,6 +407,9 @@ export function AddResortForm() {
           ? discountsConfig : null,
         slug: null,
         tags: null,
+        long_stay_discount_7: d7,
+        long_stay_discount_14: d14,
+        long_stay_discount_30: d30,
       });
       toast.success('Resort listing created successfully!');
       navigate('/host/resorts');
@@ -1101,64 +1118,39 @@ export function AddResortForm() {
 
           {/* Pricing */}
           <Card>
-            <CardHeader><CardTitle>Pricing & Fees (₹)</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
+            <CardHeader><CardTitle>Pricing (₹)</CardTitle></CardHeader>
+            <CardContent>
               <div>
                 <Label htmlFor="price">Price per Night *</Label>
                 <Input id="price" type="number" min={1} value={form.price_per_night} onChange={e => setF('price_per_night', e.target.value)} placeholder="8000" />
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label htmlFor="originalPrice" className="text-xs">Original Price</Label>
-                  <Input id="originalPrice" type="number" min={0} value={form.originalPrice} onChange={e => setF('originalPrice', e.target.value)} placeholder="10000" className="h-8 text-sm" />
-                </div>
-                <div>
-                  <Label htmlFor="discountedPrice" className="text-xs">Discounted Price</Label>
-                  <Input id="discountedPrice" type="number" min={0} value={form.discountedPrice} onChange={e => setF('discountedPrice', e.target.value)} placeholder="8000" className="h-8 text-sm" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label htmlFor="dailyPrice" className="text-xs">Daily Price</Label>
-                  <Input id="dailyPrice" type="number" min={0} value={form.dailyPrice} onChange={e => setF('dailyPrice', e.target.value)} placeholder="8000" className="h-8 text-sm" />
-                </div>
-                <div>
-                  <Label htmlFor="taxesAndFees" className="text-xs">Taxes & Fees</Label>
-                  <Input id="taxesAndFees" type="number" min={0} value={form.taxesAndFees} onChange={e => setF('taxesAndFees', e.target.value)} placeholder="500" className="h-8 text-sm" />
-                </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Long Stay Pricing Rules</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="discount7">7+ Days Discount (%)</Label>
+                <Input id="discount7" type="number" min={0} max={90} value={form.discount7} onChange={e => setF('discount7', e.target.value)} placeholder="e.g. 20" />
               </div>
               <div>
-                <Label htmlFor="weeklyPrice">Weekly Price</Label>
-                <Input id="weeklyPrice" type="number" min={1} value={form.weeklyPrice} onChange={e => setF('weeklyPrice', e.target.value)} placeholder="Leave blank to auto-calculate" />
+                <Label htmlFor="discount14">14+ Days Discount (%)</Label>
+                <Input id="discount14" type="number" min={0} max={90} value={form.discount14} onChange={e => setF('discount14', e.target.value)} placeholder="e.g. 25" />
+                {form.discount14 && form.discount7 && Number(form.discount14) < Number(form.discount7) && (
+                  <p className="text-xs text-destructive mt-1">⚠ Must be ≥ 7-day discount ({form.discount7}%). Will be auto-corrected on save.</p>
+                )}
               </div>
               <div>
-                <Label htmlFor="monthlyPrice">Monthly Price</Label>
-                <Input id="monthlyPrice" type="number" min={1} value={form.monthlyPrice} onChange={e => setF('monthlyPrice', e.target.value)} placeholder="Leave blank to auto-calculate" />
+                <Label htmlFor="discount30">30+ Days Discount (%)</Label>
+                <Input id="discount30" type="number" min={0} max={90} value={form.discount30} onChange={e => setF('discount30', e.target.value)} placeholder="e.g. 30" />
+                {form.discount30 && form.discount14 && Number(form.discount30) < Number(form.discount14) && (
+                  <p className="text-xs text-destructive mt-1">⚠ Must be ≥ 14-day discount ({form.discount14}%). Will be auto-corrected on save.</p>
+                )}
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label htmlFor="cleaningFee" className="text-xs">Cleaning Fee</Label>
-                  <Input id="cleaningFee" type="number" min={0} value={form.cleaningFee} onChange={e => setF('cleaningFee', e.target.value)} placeholder="0" className="h-8 text-sm" />
-                </div>
-                <div>
-                  <Label htmlFor="securityDeposit" className="text-xs">Security Deposit</Label>
-                  <Input id="securityDeposit" type="number" min={0} value={form.securityDeposit} onChange={e => setF('securityDeposit', e.target.value)} placeholder="0" className="h-8 text-sm" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label htmlFor="hostDiscount" className="text-xs">Host Discount (%)</Label>
-                  <Input id="hostDiscount" type="number" min={0} max={90} value={form.hostDiscountPercent} onChange={e => setF('hostDiscountPercent', e.target.value)} placeholder="0" className="h-8 text-sm" />
-                </div>
-                <div>
-                  <Label htmlFor="offerPercentage" className="text-xs">Offer Percentage</Label>
-                  <Input id="offerPercentage" type="number" min={0} max={100} value={form.offerPercentage} onChange={e => setF('offerPercentage', e.target.value)} placeholder="20" className="h-8 text-sm" />
-                </div>
-              </div>
-              <div className="flex items-center gap-2 pt-2 border-t border-border">
-                <Checkbox id="bookAtZero" checked={form.bookAtZero} onCheckedChange={v => setF('bookAtZero', !!v)} />
-                <Label htmlFor="bookAtZero" className="text-xs font-semibold cursor-pointer">Allow Book @ ₹0 Option</Label>
-              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Each tier discount must be ≥ the previous (30-day ≥ 14-day ≥ 7-day). Values are auto-corrected on save.
+              </p>
             </CardContent>
           </Card>
 

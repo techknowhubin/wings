@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getLinkInBioPageBySlug, formatPrice } from "@/lib/supabase-helpers";
 import { parseListingDiscountConfig } from "@/lib/discounts";
 import type { BookingDetails } from "@/types/booking";
+import { calculateLongStayPricing } from "@/lib/pricing";
 import {
   Globe, Instagram, Facebook, Twitter, Mail, Phone, MapPin, Youtube,
   ArrowUpRight, ChevronLeft, Star, Users, BedDouble, Bath,
@@ -14,7 +15,7 @@ import {
 } from "lucide-react";
 import logo from "@/assets/logo.png";
 import logoLight from "@/assets/logo-light.png";
-import { differenceInDays, format, addDays } from "date-fns";
+import { differenceInDays, format, addDays, startOfDay } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -41,6 +42,7 @@ interface Listing {
   host_id?: string; max_guests?: number; bedrooms?: number;
   bathrooms?: number; group_size?: number; seating_capacity?: number;
   brand?: string; model?: string; property_type?: string;
+  long_stay_discount_7?: number; long_stay_discount_14?: number; long_stay_discount_30?: number;
 }
 
 // ── Themes ────────────────────────────────────────────────────────────────
@@ -78,7 +80,8 @@ const getAmenityIcon = (amenity: string): LucideIcon => {
 function DetailScreen({
   listing, onBack, goToConfirm,
 }: { listing: Listing; onBack: () => void; goToConfirm: (b: BookingDetails) => void; }) {
-  const tomorrow = useMemo(() => addDays(new Date(), 1), []);
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const tomorrow = useMemo(() => addDays(today, 1), []);
   const [pricingOption, setPricingOption] = useState<"daily" | "weekly" | "monthly">("weekly");
   const [checkIn, setCheckIn] = useState<Date>(tomorrow);
   const [checkOut, setCheckOut] = useState<Date>(addDays(tomorrow, 7));
@@ -117,13 +120,17 @@ function DetailScreen({
   }
 
   const basePrice = listing.price; // original price
-  const subtotal = basePrice * nights;
-  const discount = Math.round((subtotal * discountPct) / 100);
+  const pricing = calculateLongStayPricing(basePrice, nights, {
+    discount7: listing.long_stay_discount_7 || 0,
+    discount14: listing.long_stay_discount_14 || 0,
+    discount30: listing.long_stay_discount_30 || 0,
+  });
+  const subtotal = pricing.finalTotal;
+  
+  // If there's an additional hostDiscountPercent (e.g. from general configuration), apply on top
+  const hostDiscountAmount = Math.round((subtotal * discountPct) / 100);
   const serviceFee = 0;
-  const total = subtotal - discount + serviceFee;
-
-  const weeklyPrice = basePrice * 7 * 0.85;
-  const monthlyPrice = basePrice * 30 * 0.7;
+  const total = subtotal - hostDiscountAmount + serviceFee;
 
   const maxG = listing.max_guests ?? listing.group_size ?? 10;
   const propType = listing.property_type ?? typeLabel(listing.type);
@@ -143,7 +150,7 @@ function DetailScreen({
       endDate: checkOut.toISOString(),
       description: `${nights} ${unitLabel} at ${listing.title}`,
       subtotal,
-      discount,
+      discount: hostDiscountAmount,
       serviceFee,
       total,
       hostDiscountPercent: discountPct,
@@ -156,10 +163,16 @@ function DetailScreen({
       className="absolute inset-0 z-10 bg-background text-foreground flex flex-col overflow-hidden"
       style={{ animation: "slideInUp 0.28s cubic-bezier(.4,0,.2,1)" }}
     >
-      <style>{`@keyframes slideInUp { from { transform:translateY(100%); opacity:0; } to { transform:translateY(0); opacity:1; } }`}</style>
+      <style>{`
+        @keyframes slideInUp { from { transform:translateY(100%); opacity:0; } to { transform:translateY(0); opacity:1; } }
+        .thin-scrollbar::-webkit-scrollbar { width: 2px !important; }
+        .thin-scrollbar::-webkit-scrollbar-track { background: transparent !important; }
+        .thin-scrollbar::-webkit-scrollbar-thumb { background: rgba(150, 150, 150, 0.4) !important; border-radius: 4px !important; border: none !important; }
+        .thin-scrollbar { scrollbar-width: thin !important; scrollbar-color: rgba(150, 150, 150, 0.4) transparent !important; }
+      `}</style>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto thin-scrollbar">
 
         {/* ── Title & meta ── */}
         <div className="px-4 pt-4 pb-2">
@@ -321,7 +334,7 @@ function DetailScreen({
                     mode="single"
                     selected={checkIn}
                     onSelect={(d) => d && setCheckIn(d)}
-                    disabled={(d) => d < new Date()}
+                    disabled={(d) => d < today}
                     initialFocus
                     className={cn("p-3 pointer-events-auto")}
                   />
@@ -352,7 +365,7 @@ function DetailScreen({
                       mode="single"
                       selected={checkOut}
                       onSelect={(d) => d && setCheckOut(d)}
-                      disabled={(d) => d < addDays(checkIn, 1)}
+                      disabled={(d) => isNightBased(listing.type) ? d <= checkIn : d < checkIn}
                       initialFocus
                       className={cn("p-3 pointer-events-auto")}
                     />
@@ -387,29 +400,32 @@ function DetailScreen({
           </div>
 
 
-          {/* Daily / Weekly / Monthly selector (stays only) */}
-          {isNightBased(listing.type) && (
-            <div className="grid grid-cols-3 gap-1.5 mb-3">
-              {(["daily", "weekly", "monthly"] as const).map((opt) => (
-                <button
-                  key={opt}
-                  onClick={() => setPricingOption(opt)}
-                  className={`py-1.5 px-1 border rounded-lg text-center transition-all relative ${pricingOption === opt
-                    ? "border-accent bg-accent/10 scale-[1.03]"
-                    : "border-border hover:border-muted-foreground"
-                    }`}
-                >
-                  {pricingOption === opt && opt === "weekly" && (
-                    <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-accent text-accent-foreground text-[8px] font-bold px-1 py-0.5 rounded-full">POPULAR</span>
-                  )}
-                  <p className="text-[9px] font-semibold text-muted-foreground capitalize mb-0.5">{opt.charAt(0).toUpperCase() + opt.slice(1)}</p>
-                  <p className="text-[10px] font-bold text-foreground">
-                    {symb}{opt === "daily" ? basePrice.toLocaleString() : opt === "weekly" ? Math.round(weeklyPrice).toLocaleString() : Math.round(monthlyPrice).toLocaleString()}
-                  </p>
-                </button>
-              ))}
+          {/* Pricing Summary */}
+          <div className="bg-secondary/20 rounded-xl p-3 mb-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Original Price:</span>
+              <span className={pricing.discountPercent > 0 ? "line-through text-muted-foreground" : "font-semibold text-foreground"}>
+                {symb}{pricing.originalTotal.toLocaleString()}
+              </span>
             </div>
-          )}
+            
+            {pricing.discountPercent > 0 && (
+              <>
+                <div className="flex justify-between text-sm text-green-600 font-medium bg-green-50 p-1.5 rounded">
+                  <span>{pricing.discountPercent}% Long Stay Discount Applied</span>
+                  <span>-{symb}{pricing.discountAmount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm font-semibold text-foreground">
+                  <span>Final Price:</span>
+                  <span>{symb}{pricing.finalTotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-xs text-accent font-bold">
+                  <span>You Save:</span>
+                  <span>{symb}{pricing.discountAmount.toLocaleString()}</span>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Book Now button */}
           <button
@@ -424,12 +440,18 @@ function DetailScreen({
           <div className="space-y-1.5 pt-3 border-t border-border">
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">{symb}{basePrice.toLocaleString()} × {nights} {unitLabel}</span>
-              <span className="text-foreground font-medium">{symb}{subtotal.toLocaleString()}</span>
+              <span className="text-foreground font-medium">{symb}{pricing.originalTotal.toLocaleString()}</span>
             </div>
+            {pricing.discountPercent > 0 && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Long stay discount ({pricing.discountPercent}%)</span>
+                <span className="text-accent font-medium">-{symb}{pricing.discountAmount.toLocaleString()}</span>
+              </div>
+            )}
             {discountPct > 0 && (
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Host discount ({discountPct}%)</span>
-                <span className="text-accent font-medium">-{symb}{discount.toLocaleString()}</span>
+                <span className="text-accent font-medium">-{symb}{hostDiscountAmount.toLocaleString()}</span>
               </div>
             )}
             <div className="flex justify-between text-xs">
@@ -503,11 +525,11 @@ export default function PublicLinkInBio() {
   const { data: listings = [] } = useQuery<Listing[]>({
     queryKey: ["link-in-bio-public-listings", featuredIds, hostUserId],
     queryFn: async () => {
-      const staysCols = "id,title,location,price_per_night,images,availability_status,discounts,description,rating,total_reviews,amenities,currency,host_id,max_guests,bedrooms,bathrooms,property_type";
-      const carsCols = "id,title,location,price_per_day,images,availability_status,discounts,description,rating,total_reviews,amenities,currency,host_id,seating_capacity,brand,model";
-      const bikesCols = "id,title,location,price_per_day,images,availability_status,discounts,description,rating,total_reviews,currency,host_id,brand,model";
-      const expCols = "id,title,location,price_per_person,images,availability_status,discounts,description,rating,total_reviews,currency,host_id,group_size";
-      const hotelCols = "id,title,location,price_per_night,images,availability_status,discounts,description,rating,total_reviews,currency,host_id";
+      const staysCols = "id,title,location,price_per_night,images,availability_status,discounts,description,rating,total_reviews,amenities,currency,host_id,max_guests,bedrooms,bathrooms,property_type,long_stay_discount_7,long_stay_discount_14,long_stay_discount_30";
+      const carsCols = "id,title,location,price_per_day,images,availability_status,discounts,description,rating,total_reviews,amenities,currency,host_id,seating_capacity,brand,model,long_stay_discount_7,long_stay_discount_14,long_stay_discount_30";
+      const bikesCols = "id,title,location,price_per_day,images,availability_status,discounts,description,rating,total_reviews,currency,host_id,brand,model,long_stay_discount_7,long_stay_discount_14,long_stay_discount_30";
+      const expCols = "id,title,location,price_per_person,images,availability_status,discounts,description,rating,total_reviews,currency,host_id,group_size,long_stay_discount_7,long_stay_discount_14,long_stay_discount_30";
+      const hotelCols = "id,title,location,price_per_night,images,availability_status,discounts,description,rating,total_reviews,currency,host_id,long_stay_discount_7,long_stay_discount_14,long_stay_discount_30";
 
       const byId = featuredIds.length > 0;
 
@@ -585,7 +607,7 @@ export default function PublicLinkInBio() {
             )}
 
             {/* ── Scrollable list area ── */}
-            <div className={`flex-1 ${selectedListing ? "overflow-hidden" : "overflow-y-auto"}`}>
+            <div className={`flex-1 thin-scrollbar ${selectedListing ? "overflow-hidden" : "overflow-y-auto"}`}>
               <div className="px-3 py-5">
                 {/* Profile */}
                 <div className="text-center mb-5">

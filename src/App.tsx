@@ -71,6 +71,7 @@ import AdminPayouts from "./pages/Admin/AdminPayouts";
 import AdminAnalytics from "./pages/Admin/AdminAnalytics";
 import AdminSettings from "./pages/Admin/AdminSettings";
 import AdminBlogPosts from "./pages/Admin/AdminBlogPosts";
+import AdminSecurityDashboard from "./pages/Admin/AdminSecurityDashboard";
 
 const queryClient = new QueryClient();
 
@@ -200,6 +201,7 @@ const App = () =>
               <Route path="payouts" element={<AdminPayouts />} />
               <Route path="analytics" element={<AdminAnalytics />} />
               <Route path="blog-posts" element={<AdminBlogPosts />} />
+              <Route path="security" element={<AdminSecurityDashboard />} />
               <Route path="settings" element={<AdminSettings />} />
             </Route>
 

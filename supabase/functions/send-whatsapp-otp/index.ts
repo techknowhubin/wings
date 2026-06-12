@@ -1,11 +1,25 @@
+/**
+ * WhatsApp OTP Edge Function — Hardened
+ * Rate limits: 3 OTPs per phone per 10 minutes (RLS enforced)
+ * CORS: restricted to ALLOWED_ORIGIN secret
+ */
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") ?? "https://xplorwing.com";
+
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin":  ALLOWED_ORIGIN,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "X-Content-Type-Options":       "nosniff",
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function validatePhone(phone: string): boolean {
+  return /^\+[0-9]{10,15}$/.test(phone);
+}
 
 function generateOtp(phone?: string): string {
   if (phone && (phone.startsWith("+91000") || phone === "+919999999999")) {
@@ -26,21 +40,25 @@ async function hashValue(value: string): Promise<string> {
     .join("");
 }
 
+async function hashPhone(phone: string): Promise<string> {
+  const digits = phone.replace(/\D/g, "").slice(-10);
+  return hashValue(digits);
+}
+
 async function sendWhatsAppOtp(phone: string, otp: string): Promise<void> {
   if (phone.startsWith("+91000") || phone === "+919999999999") {
-    console.log(`[Sandbox] Mock phone number ${phone} detected. Bypassing WhatsApp message send. OTP is ${otp}`);
+    console.log(`[Sandbox] Mock phone ${phone} — OTP: ${otp}`);
     return;
   }
 
-  const apiKey = Deno.env.get("AISENSY_API_KEY");
+  const apiKey      = Deno.env.get("AISENSY_API_KEY");
   const campaignName = Deno.env.get("AISENSY_CAMPAIGN_NAME");
 
   if (!apiKey || !campaignName) {
-    throw new Error("AiSensy credentials not configured in secrets.");
+    throw new Error("AiSensy credentials not configured.");
   }
 
   const destination = phone.replace(/^\+/, "");
-
   const res = await fetch("https://backend.aisensy.com/campaign/t1/api/v2", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -52,14 +70,7 @@ async function sendWhatsAppOtp(phone: string, otp: string): Promise<void> {
       templateParams: [otp],
       source: "xplorwing-auth",
       media: {},
-      buttons: [
-        {
-          type: "button",
-          sub_type: "url",
-          index: 0,
-          parameters: [{ type: "text", text: otp }],
-        },
-      ],
+      buttons: [{ type: "button", sub_type: "url", index: 0, parameters: [{ type: "text", text: otp }] }],
       carouselCards: [],
       location: {},
       attributes: {},
@@ -68,10 +79,16 @@ async function sendWhatsAppOtp(phone: string, otp: string): Promise<void> {
   });
 
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(`AiSensy [${res.status}]: ${JSON.stringify(body)}`);
-  }
-  console.log("[AiSensy] OTP sent to", destination, "→", body);
+  if (!res.ok) throw new Error(`AiSensy [${res.status}]: ${JSON.stringify(body)}`);
+}
+
+function getClientIp(req: Request): string {
+  return (
+    req.headers.get("cf-connecting-ip") ??
+    req.headers.get("x-real-ip") ??
+    req.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+    "unknown"
+  );
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
@@ -89,8 +106,8 @@ Deno.serve(async (req) => {
 
   try {
     const { action, phone, otp } = await req.json();
+    const clientIp = getClientIp(req);
 
-    // Admin client — service role, bypasses RLS
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -99,25 +116,36 @@ Deno.serve(async (req) => {
 
     // ── ACTION: send ──────────────────────────────────────────────────────────
     if (action === "send") {
-      if (!phone || !/^\+\d{10,15}$/.test(phone)) {
+      if (!phone || !validatePhone(phone)) {
         return json({ error: "Invalid phone number. Use format +91XXXXXXXXXX" }, 400);
       }
 
-      // Rate limit: 1 OTP per 60 seconds
-      const since = new Date(Date.now() - 60_000).toISOString();
-      const { data: recent } = await admin
-        .from("phone_otp_sessions")
-        .select("id")
-        .eq("phone", phone)
-        .gte("created_at", since)
-        .limit(1);
+      const phoneHash = await hashPhone(phone);
 
-      if (recent && recent.length > 0) {
-        return json({ error: "Please wait 60 seconds before requesting a new OTP." }, 429);
+      // ── Rate limit: 3 OTPs per phone per 10 minutes ───────────────────────
+      const rlPhoneResult = await admin.rpc("check_rate_limit", {
+        p_bucket_key:  `otp:${phoneHash}`,
+        p_max_count:   3,
+        p_window_secs: 600,
+      });
+      if (rlPhoneResult.data && !rlPhoneResult.data.allowed) {
+        return json({
+          error: `OTP limit reached. Please wait ${Math.ceil(rlPhoneResult.data.retry_after / 60)} minutes.`,
+        }, 429);
+      }
+
+      // ── Rate limit: 10 OTPs per IP per 10 minutes ─────────────────────────
+      const rlIpResult = await admin.rpc("check_rate_limit", {
+        p_bucket_key:  `otp_ip:${clientIp}`,
+        p_max_count:   10,
+        p_window_secs: 600,
+      });
+      if (rlIpResult.data && !rlIpResult.data.allowed) {
+        return json({ error: "Too many OTP requests from your network." }, 429);
       }
 
       const generatedOtp = generateOtp(phone);
-      const otpHash = await hashValue(generatedOtp);
+      const otpHash      = await hashValue(generatedOtp);
 
       const { error: insertErr } = await admin
         .from("phone_otp_sessions")
@@ -126,7 +154,6 @@ Deno.serve(async (req) => {
       if (insertErr) throw insertErr;
 
       await sendWhatsAppOtp(phone, generatedOtp);
-
       return json({ success: true });
 
     // ── ACTION: verify ────────────────────────────────────────────────────────
@@ -134,12 +161,25 @@ Deno.serve(async (req) => {
       if (!phone || !otp) {
         return json({ error: "Phone and OTP are required." }, 400);
       }
+      if (!validatePhone(phone)) {
+        return json({ error: "Invalid phone number format." }, 400);
+      }
+
+      const phoneHash = await hashPhone(phone);
+
+      // Rate limit verify attempts to prevent brute force
+      const rlVerify = await admin.rpc("check_rate_limit", {
+        p_bucket_key:  `otp_verify:${phoneHash}`,
+        p_max_count:   5,
+        p_window_secs: 300,
+      });
+      if (rlVerify.data && !rlVerify.data.allowed) {
+        return json({ error: "Too many verification attempts. Please request a new OTP." }, 429);
+      }
 
       const otpHash = await hashValue(String(otp));
-      console.log("[verify] phone:", phone, "otp len:", String(otp).length);
 
-      // Find valid, unused OTP session
-      const { data: session, error: sessionErr } = await admin
+      const { data: session } = await admin
         .from("phone_otp_sessions")
         .select("id, otp_hash")
         .eq("phone", phone)
@@ -149,122 +189,100 @@ Deno.serve(async (req) => {
         .limit(1)
         .maybeSingle();
 
-      console.log("[verify] session found:", !!session, "err:", sessionErr?.message ?? "none");
-
       if (!session) {
-        return json({ error: "[step:lookup] OTP expired or not found. Please request a new OTP." }, 401);
+        return json({ error: "OTP expired or not found. Please request a new OTP." }, 401);
       }
       if (session.otp_hash !== otpHash) {
-        return json({ error: "[step:hash] Incorrect OTP. Please try again." }, 401);
+        return json({ error: "Incorrect OTP. Please try again." }, 401);
       }
 
-      // Mark OTP as used
       await admin
         .from("phone_otp_sessions")
         .update({ verified: true })
         .eq("id", session.id);
 
-      // ── Resolve user — 3-step lookup to prevent duplicate accounts ───────
+      // ── Resolve user ──────────────────────────────────────────────────────
       const derivedEmail = `${phone.replace(/\D/g, "")}@wa.xplorwing.com`;
-
       let hashedToken: string;
       let userId: string;
       let isNewUser = false;
 
-      // Step 1: Check phone_auth_users (previous WhatsApp login) — match by last 10 digits
-      const phoneDigits10 = phone.replace(/\D/g, "").slice(-10);
+      const last10 = phone.replace(/\D/g, "").slice(-10);
+
+      // Step 1: Existing WhatsApp user
       const { data: mappingRow } = await admin
         .from("phone_auth_users")
         .select("user_id, phone")
-        .like("phone", `%${phoneDigits10}`)
+        .like("phone", `%${last10}`)
         .maybeSingle();
 
-      console.log("[verify] phone_auth_users match:", mappingRow?.user_id ?? "none");
-
       if (mappingRow?.user_id) {
-        // ── Returning WhatsApp user ───────────────────────────────────────
-        // Find their email to generate the magic link
         const { data: authUser } = await admin.auth.admin.getUserById(mappingRow.user_id);
         const existingEmail = authUser?.user?.email ?? derivedEmail;
-
         const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
           type: "magiclink",
           email: existingEmail,
         });
-        if (linkErr) {
-          console.error("[verify:magiclink]", linkErr.message);
-          return json({ error: `[step:link] ${linkErr.message}` }, 500);
-        }
+        if (linkErr) return json({ error: `[step:link] ${linkErr.message}` }, 500);
         hashedToken = linkData.properties.hashed_token;
         userId = linkData.user.id;
 
       } else {
-        // Step 2: Check profiles.phone — match by last 10 digits to handle format mismatches
-        // (profile may store "6362986420" while WhatsApp sends "+916362986420")
-        const last10 = phone.replace(/\D/g, "").slice(-10);
+        // Step 2: Existing email/Google account — link WhatsApp
         const { data: profileRow } = await admin
           .from("profiles")
           .select("id")
           .like("phone", `%${last10}`)
           .maybeSingle();
 
-        console.log("[verify] profiles.phone match:", profileRow?.id ?? "none");
-
         if (profileRow?.id) {
-          // ── Existing account (email/Google) — link WhatsApp to it ────────
           const { data: authUser } = await admin.auth.admin.getUserById(profileRow.id);
           const existingEmail = authUser?.user?.email ?? derivedEmail;
-
           const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
             type: "magiclink",
             email: existingEmail,
           });
-          if (linkErr) {
-            console.error("[verify:existing-magiclink]", linkErr.message);
-            return json({ error: `[step:link-existing] ${linkErr.message}` }, 500);
-          }
+          if (linkErr) return json({ error: `[step:link-existing] ${linkErr.message}` }, 500);
           hashedToken = linkData.properties.hashed_token;
           userId = profileRow.id;
-
-          // Register the phone → user_id mapping so future WhatsApp logins are instant
-          await admin
-            .from("phone_auth_users")
-            .insert({ phone, user_id: userId });
-
-          console.log("[verify] linked WhatsApp phone to existing account:", existingEmail);
+          await admin.from("phone_auth_users").insert({ phone, user_id: userId });
 
         } else {
-          // Step 3: Brand-new user — create via signup link
+          // Step 3: New user — no PII in generateLink options; seed profile directly
           isNewUser = true;
           const strongPassword = `Wa1!${crypto.randomUUID()}`;
           const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
             type: "signup",
             email: derivedEmail,
             password: strongPassword,
-            options: {
-              data: { phone, phone_provider: "whatsapp" },
-            },
           });
-          if (linkErr) {
-            console.error("[verify:signup-link]", linkErr.message);
-            return json({ error: `[step:create] ${linkErr.message}` }, 500);
-          }
+          if (linkErr) return json({ error: `[step:create] ${linkErr.message}` }, 500);
           hashedToken = linkData.properties.hashed_token;
           userId = linkData.user.id;
-
-          // Store phone → user mapping for future logins
-          await admin
-            .from("phone_auth_users")
-            .insert({ phone, user_id: userId });
+          // Seed phone into profiles before email confirmation fires the trigger,
+          // so the DO NOTHING conflict guard preserves it.
+          await admin.from("profiles").upsert(
+            { id: userId, phone, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+            { onConflict: "id" }
+          );
+          await admin.from("phone_auth_users").insert({ phone, user_id: userId });
         }
       }
 
-      console.log("[verify] ✅ hashed_token generated for user:", userId, "| isNewUser:", isNewUser);
+      // Log the successful OTP verification
+      await admin.from("audit_logs").insert({
+        user_id:    userId,
+        actor_id:   userId,
+        action:     "otp_verified",
+        ip_address: clientIp,
+        metadata:   { method: "whatsapp_otp", is_new_user: isNewUser },
+      }).then(() => {}).catch(() => {}); // non-blocking
+
       return json({
-        success: true,
+        success:      true,
         hashed_token: hashedToken,
-        is_new_user: isNewUser,
-        token_type: isNewUser ? "signup" : "magiclink",
+        is_new_user:  isNewUser,
+        token_type:   isNewUser ? "signup" : "magiclink",
       });
 
     } else {
@@ -273,6 +291,6 @@ Deno.serve(async (req) => {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[WhatsApp OTP] Unhandled error:", msg);
-    return json({ error: msg }, 500);
+    return json({ error: "An error occurred. Please try again." }, 500);
   }
 });

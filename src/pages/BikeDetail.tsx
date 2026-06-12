@@ -284,6 +284,11 @@ const BikeDetail = () => {
               listingCouponType="bikes"
               hostDiscountPercent={discountConfig.hostDiscountPercent}
               availableCoupons={discountConfig.coupons}
+              longStayDiscounts={{
+                discount7: bike.long_stay_discount_7 || 0,
+                discount14: bike.long_stay_discount_14 || 0,
+                discount30: bike.long_stay_discount_30 || 0,
+              }}
             />
           </div>
         </div>

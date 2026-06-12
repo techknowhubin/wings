@@ -13,6 +13,11 @@ interface ListingCardProps {
   type?: "stay" | "bike" | "car" | "experience" | "hotel" | "resort";
   id?: string;
   hostName?: string;
+  longStayDiscounts?: {
+    discount7?: number;
+    discount14?: number;
+    discount30?: number;
+  };
 }
 
 const ListingCard = ({ 
@@ -24,7 +29,8 @@ const ListingCard = ({
   delay = 0,
   type = "stay",
   id = "1",
-  hostName
+  hostName,
+  longStayDiscounts
 }: ListingCardProps) => {
   const [isWishlisted, setIsWishlisted] = useState(false);
 
@@ -92,12 +98,33 @@ const ListingCard = ({
               <span className="text-sm font-medium">{rating}</span>
             </div>
           </div>
-          <p className="text-sm">
-            <span className="font-semibold text-foreground">{price}</span>
-            <span className="text-muted-foreground">
-              / {type === "experience" ? "person" : (type === "stay" || type === "hotel" || type === "resort") ? "night" : "day"}
-            </span>
-          </p>
+          <div>
+            <p className="text-sm">
+              <span className="font-semibold text-foreground">{price}</span>
+              <span className="text-muted-foreground">
+                / {type === "experience" ? "person" : (type === "stay" || type === "hotel" || type === "resort") ? "night" : "day"}
+              </span>
+            </p>
+            {longStayDiscounts && (
+              <div className="mt-1 flex flex-col gap-0.5">
+                {longStayDiscounts.discount7 > 0 && (
+                  <span className="text-[10px] text-accent font-medium bg-accent/10 px-1.5 py-0.5 rounded-sm w-fit">
+                    🔥 Save {longStayDiscounts.discount7}% on 7+ day bookings
+                  </span>
+                )}
+                {longStayDiscounts.discount14 > 0 && (
+                  <span className="text-[10px] text-accent font-medium bg-accent/10 px-1.5 py-0.5 rounded-sm w-fit">
+                    🔥 Save {longStayDiscounts.discount14}% on 14+ day bookings
+                  </span>
+                )}
+                {longStayDiscounts.discount30 > 0 && (
+                  <span className="text-[10px] text-accent font-medium bg-accent/10 px-1.5 py-0.5 rounded-sm w-fit">
+                    🔥 Save {longStayDiscounts.discount30}% on monthly bookings
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </motion.div>
     </Link>

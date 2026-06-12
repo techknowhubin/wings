@@ -114,7 +114,7 @@ const ConfirmAndPay = () => {
           .maybeSingle();
 
         if (profile) {
-          setName(prev => prev || profile.full_name || user.user_metadata?.full_name || user.user_metadata?.name || "");
+          setName(prev => prev || profile.full_name || "");
           setPhone(prev => prev || profile.phone || user.phone || "");
         }
       } catch {
@@ -139,12 +139,12 @@ const ConfirmAndPay = () => {
 
       if (error) throw error;
 
-      setName(profile?.full_name || user.user_metadata?.full_name || user.user_metadata?.name || "");
+      setName(profile?.full_name || "");
       setPhone(profile?.phone || user.phone || "");
       setEmail(user.email || "");
       toast.success("Details filled from your profile.");
     } catch {
-      setName(user.user_metadata?.full_name || user.user_metadata?.name || "");
+      setName("");
       setPhone(user.phone || "");
       setEmail(user.email || "");
       toast.success("Details filled from login session.");

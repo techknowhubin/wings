@@ -8,6 +8,7 @@ import heroXplorwing from "@/assets/hero-xplorwing.jpg";
 import { DynamicLogo } from "@/components/DynamicLogo";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { supabase } from "@/integrations/supabase/client";
+import { useRateLimit } from "@/hooks/useRateLimit";
 import {
   Dialog,
   DialogContent,
@@ -24,7 +25,7 @@ const signupSchema = z.object({
   mobileNumber: z.string().regex(/^[0-9]{10}$/, "Mobile number must be 10 digits"),
   password: z.string().min(8, "Password must be at least 8 characters").regex(passwordRules, "Password must include uppercase, lowercase, number, and special character"),
   confirmPassword: z.string().min(8, "Confirm password is required"),
-  role: z.enum(['user','host']),
+  role: z.enum(['user','host','admin']),
 }).superRefine((values, ctx) => {
   if (values.password !== values.confirmPassword) {
     ctx.addIssue({
@@ -173,6 +174,7 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const { signUp, signIn, signOut, resendEmail, signInWithPopup, signInWithOtp, verifyOtp, user, getUserRole, checkEmailRegistered } = useAuth();
   const { toast } = useToast();
+  const { checkLimit } = useRateLimit();
   const navigate = useNavigate();
   const location = useLocation();
   // Guard: only route once per login event, ignore subsequent flickers
@@ -250,9 +252,6 @@ const Auth = () => {
   const handleSuccessRoleRouting = async (currentUser = user) => {
     setLoading(true);
     let r = await getUserRole();
-    if (!r && currentUser) {
-      r = currentUser.user_metadata?.role;
-    }
     const savedRole = localStorage.getItem("pending_role");
 
     const pendingBooking = localStorage.getItem("pending_booking");
@@ -604,6 +603,18 @@ const Auth = () => {
     if (isLoginMode) {
       try {
         loginSchema.parse({ email, password });
+        
+        const limitRes = await checkLimit('login', email);
+        if (!limitRes.allowed) {
+          toast({
+            variant: "destructive",
+            title: "Too many login attempts",
+            description: limitRes.message || "Rate limit exceeded. Please wait.",
+          });
+          setLoading(false);
+          return;
+        }
+
         const { error } = await signIn(email, password);
         if (error) throw error;
         toast({ title: "Welcome back!", description: "Signed in successfully." });
@@ -662,6 +673,17 @@ const Auth = () => {
         confirmPassword,
         role: targetRole === 'host' ? 'host' : selectedRole,
       });
+
+      const limitRes = await checkLimit('registration');
+      if (!limitRes.allowed) {
+        toast({
+          variant: "destructive",
+          title: "Too many registration attempts",
+          description: limitRes.message || "Rate limit exceeded. Please wait.",
+        });
+        setLoading(false);
+        return;
+      }
 
       const { data, error } = await signUp(parsed.email, parsed.password, parsed.fullName, parsed.mobileNumber, parsed.role);
       if (error) throw error;

@@ -22,6 +22,9 @@ interface Hotel {
   property_type?: string;
   host_id?: string;
   host_name?: string;
+  long_stay_discount_7?: number;
+  long_stay_discount_14?: number;
+  long_stay_discount_30?: number;
 }
 
 const Hotels = () => {
@@ -141,6 +144,11 @@ const Hotels = () => {
                 id={hotel.id}
                 delay={index * 0.05}
                 hostName={hotel.host_name}
+                longStayDiscounts={{
+                  discount7: hotel.long_stay_discount_7 || 0,
+                  discount14: hotel.long_stay_discount_14 || 0,
+                  discount30: hotel.long_stay_discount_30 || 0,
+                }}
               />
             ))}
           </div>

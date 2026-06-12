@@ -35,10 +35,10 @@ interface AuthContextValue {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string, mobileNumber: string, role?: 'user' | 'host') => Promise<{ data: any; error: any }>;
+  signUp: (email: string, password: string, fullName: string, mobileNumber: string, role: 'user' | 'host' | 'admin') => Promise<{ data: any; error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signInWithProvider: (provider: 'google' | 'apple' | 'facebook' | 'linkedin_oidc', role?: 'user' | 'host') => Promise<{ error: any }>;
-  signInWithPopup: (provider: 'google' | 'apple' | 'facebook' | 'linkedin_oidc', role?: 'user' | 'host') => Promise<{ error: any }>;
+  signInWithProvider: (provider: 'google' | 'apple' | 'facebook' | 'linkedin_oidc', role?: 'user' | 'host' | 'admin') => Promise<{ error: any }>;
+  signInWithPopup: (provider: 'google' | 'apple' | 'facebook' | 'linkedin_oidc', role?: 'user' | 'host' | 'admin') => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
   getUserRole: () => Promise<'user' | 'host' | 'admin' | 'moderator' | null>;
   signInWithOtp: (phone: string) => Promise<{ error: Error | null }>;
@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     fullName: string,
     mobileNumber: string,
-    role: 'user' | 'host' = 'user',
+    role: 'user' | 'host' | 'admin',
   ) => {
     const redirectUrl = `${window.location.origin}/auth`;
     const { data, error } = await supabase.auth.signUp({
@@ -115,12 +115,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: {
         emailRedirectTo: redirectUrl,
         data: {
-          full_name: fullName,
           role,
-          // Store in international format so it's consistent everywhere
-          phone: mobileNumber
-            ? (mobileNumber.startsWith('+') ? mobileNumber : `+91${mobileNumber.replace(/\D/g, '')}`)
-            : null,
+          full_name: fullName,
+          phone: mobileNumber ? `+91${mobileNumber.replace(/\D/g, '')}` : undefined,
         },
       },
     });
@@ -143,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithProvider = async (
     provider: 'google' | 'apple' | 'facebook' | 'linkedin_oidc',
-    role: 'user' | 'host' = 'user',
+    role: 'user' | 'host' | 'admin' = 'user',
   ) => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
@@ -157,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithPopup = async (
     provider: 'google' | 'apple' | 'facebook' | 'linkedin_oidc',
-    role: 'user' | 'host' = 'user',
+    role: 'user' | 'host' | 'admin' = 'user',
   ) => {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,

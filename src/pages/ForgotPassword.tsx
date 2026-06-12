@@ -5,6 +5,7 @@ import { Mail, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useRateLimit } from "@/hooks/useRateLimit";
 import { z } from "zod";
 import heroImage from "@/assets/hero-travel.jpg";
 import { DynamicLogo } from "@/components/DynamicLogo";
@@ -18,6 +19,7 @@ const ForgotPassword = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const { toast } = useToast();
+  const { checkLimit } = useRateLimit();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,6 +27,17 @@ const ForgotPassword = () => {
     try {
       forgotPasswordSchema.parse({ email });
       setLoading(true);
+
+      const limitRes = await checkLimit('password_reset', email);
+      if (!limitRes.allowed) {
+        toast({
+          variant: "destructive",
+          title: "Too many reset attempts",
+          description: limitRes.message || "Rate limit exceeded. Please wait.",
+        });
+        setLoading(false);
+        return;
+      }
 
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin + "/reset-password",

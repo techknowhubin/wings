@@ -4,11 +4,12 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
-import { format, differenceInDays, addDays } from "date-fns";
+import { format, differenceInDays, addDays, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import type { BookingDetails } from "@/types/booking";
 import type { CouponOffer } from "@/lib/discounts";
+import { calculateLongStayPricing } from "@/lib/pricing";
 
 interface VehicleBookingPanelProps {
   listingId?: string;
@@ -21,6 +22,7 @@ interface VehicleBookingPanelProps {
   listingCouponType?: "cars" | "bikes";
   hostDiscountPercent?: number;
   availableCoupons?: CouponOffer[];
+  longStayDiscounts?: { discount7?: number; discount14?: number; discount30?: number };
 }
 
 const VehicleBookingPanel = ({
@@ -34,32 +36,26 @@ const VehicleBookingPanel = ({
   listingCouponType = "cars",
   hostDiscountPercent = 0,
   availableCoupons = [],
+  longStayDiscounts = {},
 }: VehicleBookingPanelProps) => {
   const navigate = useNavigate();
-  const tomorrow = useMemo(() => addDays(new Date(), 1), []);
-  const [pricingOption, setPricingOption] = useState<"daily" | "weekly" | "monthly">("daily");
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const tomorrow = useMemo(() => addDays(today, 1), []);
   
-  const getDurationDays = (option: "daily" | "weekly" | "monthly") => {
-    if (option === "daily") return 1;
-    if (option === "weekly") return 7;
-    return 30;
-  };
-
   const [pickupDate, setPickupDate] = useState<Date>(tomorrow);
-  const [dropoffDate, setDropoffDate] = useState<Date>(addDays(tomorrow, getDurationDays("daily")));
+  const [dropoffDate, setDropoffDate] = useState<Date>(addDays(tomorrow, 1));
 
-  useEffect(() => {
-    setDropoffDate(addDays(pickupDate, getDurationDays(pricingOption)));
-  }, [pricingOption, pickupDate]);
-
-  const weeklyPrice = pricePerDay * 7 * 0.90;
-  const monthlyPrice = pricePerDay * 30 * 0.80;
-
+  // The duration logic
   const days = Math.max(differenceInDays(dropoffDate, pickupDate), 1);
-  const subtotal = pricePerDay * days;
-  const discount = Math.round((subtotal * hostDiscountPercent) / 100);
+
+  // Dynamic pricing calculation
+  const pricing = calculateLongStayPricing(pricePerDay, days, longStayDiscounts);
+  const subtotal = pricing.finalTotal; // Base calculation with duration discount
+
+  // If there's an additional hostDiscountPercent (from coupons or general host discount), apply it on top
+  const hostDiscountAmount = Math.round((subtotal * hostDiscountPercent) / 100);
   const serviceFee = 0;
-  const total = subtotal - discount + serviceFee;
+  const total = subtotal - hostDiscountAmount + serviceFee;
 
   return (
     <Card className="border-border shadow-strong sticky top-24 p-4 rounded-2xl bg-white dark:bg-card">
@@ -98,7 +94,7 @@ const VehicleBookingPanel = ({
                 mode="single"
                 selected={pickupDate}
                 onSelect={setPickupDate}
-                disabled={(date) => date < new Date()}
+                disabled={(date) => date < today}
                 initialFocus
                 className={cn("p-3 pointer-events-auto")}
               />
@@ -124,7 +120,7 @@ const VehicleBookingPanel = ({
                 mode="single"
                 selected={dropoffDate}
                 onSelect={(d) => d && setDropoffDate(d)}
-                disabled={(date) => date <= pickupDate}
+                disabled={(date) => date < pickupDate}
                 initialFocus
                 className={cn("p-3 pointer-events-auto")}
               />
@@ -133,49 +129,31 @@ const VehicleBookingPanel = ({
         </div>
       </div>
 
-      {/* Pricing Options */}
-      <div className="grid grid-cols-3 gap-1.5 mb-3">
-        <button
-          type="button"
-          onClick={() => setPricingOption("daily")}
-          className={`py-2 px-1 border rounded-lg text-center transition-all ${
-            pricingOption === "daily"
-              ? "border-accent bg-accent/10"
-              : "border-border hover:border-muted-foreground"
-          }`}
-        >
-          <p className="text-[10px] font-semibold text-muted-foreground mb-0.5">Daily</p>
-          <p className="text-xs font-bold text-foreground">{currencySymbol}{pricePerDay}</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setPricingOption("weekly")}
-          className={`py-2 px-1 border rounded-lg text-center transition-all relative ${
-            pricingOption === "weekly"
-              ? "border-accent bg-accent/10 scale-[1.03]"
-              : "border-border hover:border-muted-foreground"
-          }`}
-        >
-          {pricingOption === "weekly" && (
-            <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-accent text-accent-foreground text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-              POPULAR
-            </span>
-          )}
-          <p className="text-[10px] font-semibold text-muted-foreground mb-0.5">Weekly</p>
-          <p className="text-xs font-bold text-foreground">{currencySymbol}{Math.round(weeklyPrice)}</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setPricingOption("monthly")}
-          className={`py-2 px-1 border rounded-lg text-center transition-all ${
-            pricingOption === "monthly"
-              ? "border-accent bg-accent/10"
-              : "border-border hover:border-muted-foreground"
-          }`}
-        >
-          <p className="text-[10px] font-semibold text-muted-foreground mb-0.5">Monthly</p>
-          <p className="text-xs font-bold text-foreground">{currencySymbol}{Math.round(monthlyPrice)}</p>
-        </button>
+      {/* Pricing Summary */}
+      <div className="bg-secondary/20 rounded-xl p-3 mb-4 space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Original Price:</span>
+          <span className={pricing.discountPercent > 0 ? "line-through text-muted-foreground" : "font-semibold"}>
+            {currencySymbol}{pricing.originalTotal.toLocaleString()}
+          </span>
+        </div>
+        
+        {pricing.discountPercent > 0 && (
+          <>
+            <div className="flex justify-between text-sm text-green-600 font-medium bg-green-50 p-1.5 rounded">
+              <span>{pricing.discountPercent}% Long Stay Discount Applied</span>
+              <span>-{currencySymbol}{pricing.discountAmount.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-sm font-semibold">
+              <span>Final Price:</span>
+              <span>{currencySymbol}{pricing.finalTotal.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-xs text-accent font-bold">
+              <span>You Save:</span>
+              <span>{currencySymbol}{pricing.discountAmount.toLocaleString()}</span>
+            </div>
+          </>
+        )}
       </div>
 
       <Button
@@ -197,7 +175,7 @@ const VehicleBookingPanel = ({
             endDate: dropoffDate.toISOString(),
             description: `${days} day rental of ${title}`,
             subtotal,
-            discount,
+            discount: hostDiscountAmount,
             serviceFee,
             total,
             hostDiscountPercent,
@@ -219,12 +197,18 @@ const VehicleBookingPanel = ({
       <div className="space-y-1.5 pt-3 border-t border-border">
         <div className="flex justify-between text-xs">
           <span className="text-muted-foreground">{currencySymbol}{pricePerDay.toLocaleString()} × {days} day{days > 1 ? "s" : ""}</span>
-          <span className="text-foreground font-medium">{currencySymbol}{subtotal.toLocaleString()}</span>
+          <span className="text-foreground font-medium">{currencySymbol}{pricing.originalTotal.toLocaleString()}</span>
         </div>
+        {pricing.discountPercent > 0 ? (
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Long stay discount ({pricing.discountPercent}%)</span>
+            <span className="text-accent font-medium">-{currencySymbol}{pricing.discountAmount.toLocaleString()}</span>
+          </div>
+        ) : null}
         {hostDiscountPercent > 0 ? (
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Host discount ({hostDiscountPercent}%)</span>
-            <span className="text-accent font-medium">-{currencySymbol}{discount}</span>
+            <span className="text-accent font-medium">-{currencySymbol}{hostDiscountAmount}</span>
           </div>
         ) : null}
         <div className="flex justify-between text-xs">

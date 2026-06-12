@@ -19,6 +19,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { calculateHostBookingAmounts, formatPrice } from '@/lib/supabase-helpers';
+import { safeDecrypt } from '@/lib/crypto';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/components/ThemeProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { encryptField } from "@/lib/crypto";
 import { DynamicLogo } from "@/components/DynamicLogo";
 
 // ======================== Types ========================
@@ -215,7 +216,7 @@ export default function HostOnboarding() {
   // Step 2 state
   const [biz, setBiz] = useState<BusinessDetails>({
     hostType: "individual",
-    fullName: user?.user_metadata?.full_name || "",
+    fullName: "", // prefilled from profiles table via useEffect below
     displayName: "",
     phone: "",
     altPhone: "",
@@ -256,6 +257,17 @@ export default function HostOnboarding() {
   useEffect(() => {
     if (!authLoading && !user) navigate("/login");
   }, [user, authLoading, navigate]);
+
+  // Prefill host name from profile (avoids reading stale JWT metadata)
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("profiles").select("full_name, phone").eq("id", user.id).maybeSingle()
+      .then(({ data: profile }) => {
+        if (profile?.full_name) {
+          setBiz(prev => ({ ...prev, fullName: profile.full_name ?? "" }));
+        }
+      });
+  }, [user]);
 
   // IFSC auto-fetch
   const fetchIFSC = useCallback(async (code: string) => {
@@ -435,33 +447,42 @@ export default function HostOnboarding() {
       const addressString = [biz.street, biz.city, biz.state, biz.pin].filter(Boolean).join(", ");
 
       // Upsert profiles row first — host_profiles has a FK to profiles so this must exist
+      const maskedFullName = biz.hostType === "business" ? `${biz.businessName[0]}****` : `${biz.fullName[0]}****`;
+      const maskedPhone = biz.phone ? `****${biz.phone.slice(-4)}` : null;
+      const fullNameEncrypted = await encryptField(biz.hostType === "business" ? biz.businessName : biz.fullName);
+      const phoneEncrypted = biz.phone ? await encryptField(biz.phone) : null;
       const { error: primaryProfileError } = await supabase
         .from("profiles")
         .upsert({
           id: user.id,
-          full_name: biz.hostType === "business" ? biz.businessName : biz.fullName,
-          phone: biz.phone || null,
+          full_name: maskedFullName,
+          full_name_encrypted: fullNameEncrypted,
+          phone: maskedPhone,
+          phone_encrypted: phoneEncrypted,
         }, { onConflict: "id" });
 
       if (primaryProfileError) throw primaryProfileError;
 
+      const addressEncrypted = await encryptField(addressString);
+      const hostUpdates = {
+        id: user.id,
+        business_name: biz.hostType === "business" ? biz.businessName : biz.fullName,
+        business_type: biz.hostType === "business" ? biz.businessType : "Individual",
+        gst_number: biz.gstNumber || null,
+        bank_account_holder: bank.accountHolderName,
+        bank_account_number: bank.accountNumber,
+        bank_ifsc: bank.ifscCode,
+        aadhaar_last_four: identity.aadhaarNumber ? identity.aadhaarNumber.slice(-4) : null,
+        pan_number: identity.panNumber || null,
+        service_types: biz.primaryListingType ? [biz.primaryListingType] : [],
+        primary_listing_type: biz.primaryListingType || null,
+        approved_listing_types: biz.primaryListingType ? [biz.primaryListingType] : [],
+        address: null,
+        address_encrypted: addressEncrypted,
+      };
       const { error: profileError } = await supabase
         .from("host_profiles")
-        .upsert({
-          id: user.id,
-          business_name: biz.hostType === "business" ? biz.businessName : biz.fullName,
-          business_type: biz.hostType === "business" ? biz.businessType : "Individual",
-          gst_number: biz.gstNumber || null,
-          bank_account_holder: bank.accountHolderName,
-          bank_account_number: bank.accountNumber,
-          bank_ifsc: bank.ifscCode,
-          aadhaar_last_four: identity.aadhaarNumber ? identity.aadhaarNumber.slice(-4) : null,
-          pan_number: identity.panNumber || null,
-          service_types: biz.primaryListingType ? [biz.primaryListingType] : [],
-          primary_listing_type: biz.primaryListingType || null,
-          approved_listing_types: biz.primaryListingType ? [biz.primaryListingType] : [],
-          address: addressString || null,
-        });
+        .upsert(hostUpdates);
 
       if (profileError) throw profileError;
 

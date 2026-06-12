@@ -195,7 +195,7 @@ export default function AdminSettings() {
       }
       const { error } = await supabase.from('user_roles').upsert(
         { user_id: profile.id, role: 'admin' },
-        { onConflict: 'user_id,role', ignoreDuplicates: true }
+        { onConflict: 'user_id', ignoreDuplicates: true }
       );
       if (error) throw error;
       toast({ title: `Admin access granted to ${profile.full_name ?? newAdminPhone}.` });

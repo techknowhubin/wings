@@ -4,11 +4,12 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarDays, Minus, Plus } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
-import { format, differenceInDays, addDays } from "date-fns";
+import { format, differenceInDays, addDays, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import type { BookingDetails } from "@/types/booking";
 import type { CouponOffer } from "@/lib/discounts";
+import { calculateLongStayPricing } from "@/lib/pricing";
 
 interface StayBookingPanelProps {
   listingId?: string;
@@ -25,6 +26,7 @@ interface StayBookingPanelProps {
   monthlyPrice?: number;
   cleaningFee?: number;
   securityDeposit?: number;
+  longStayDiscounts?: { discount7?: number; discount14?: number; discount30?: number };
 }
 
 const StayBookingPanel = ({
@@ -42,34 +44,33 @@ const StayBookingPanel = ({
   monthlyPrice: monthlyPriceProp,
   cleaningFee = 0,
   securityDeposit = 0,
+  longStayDiscounts = {},
 }: StayBookingPanelProps) => {
   const navigate = useNavigate();
   const [guests, setGuests] = useState(1);
-  const [pricingOption, setPricingOption] = useState<"daily" | "weekly" | "monthly">("weekly");
-  const tomorrow = useMemo(() => addDays(new Date(), 1), []);
-
-  const getDurationDays = (option: "daily" | "weekly" | "monthly") => {
-    if (option === "daily") return 1;
-    if (option === "weekly") return 7;
-    return 30;
-  };
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const tomorrow = useMemo(() => addDays(today, 1), []);
 
   const [checkIn, setCheckIn] = useState<Date>(tomorrow);
-  const [checkOut, setCheckOut] = useState<Date>(addDays(tomorrow, getDurationDays("weekly")));
+  const [checkOut, setCheckOut] = useState<Date>(addDays(tomorrow, 1));
 
-  // Update checkout when pricing option changes
+  // Update checkOut if it becomes invalid compared to checkIn
   useEffect(() => {
-    setCheckOut(addDays(checkIn, getDurationDays(pricingOption)));
-  }, [pricingOption, checkIn]);
-
-  const weeklyPrice = weeklyPriceProp ?? Math.round(pricePerNight * 7 * 0.85);
-  const monthlyPrice = monthlyPriceProp ?? Math.round(pricePerNight * 30 * 0.7);
+    if (checkOut <= checkIn) {
+      setCheckOut(addDays(checkIn, 1));
+    }
+  }, [checkIn, checkOut]);
 
   const nights = Math.max(differenceInDays(checkOut, checkIn), 1);
-  const subtotal = pricePerNight * nights;
-  const discount = Math.round((subtotal * hostDiscountPercent) / 100);
+
+  // Dynamic pricing calculation
+  const pricing = calculateLongStayPricing(pricePerNight, nights, longStayDiscounts);
+  const subtotal = pricing.finalTotal; // Base calculation with duration discount
+
+  // If there's an additional hostDiscountPercent (from coupons or general host discount), apply it on top
+  const hostDiscountAmount = Math.round((subtotal * hostDiscountPercent) / 100);
   const serviceFee = 0;
-  const total = subtotal - discount + serviceFee + cleaningFee + securityDeposit;
+  const total = subtotal - hostDiscountAmount + serviceFee + cleaningFee + securityDeposit;
 
   return (
     <Card className="border-border shadow-strong sticky top-24 p-4 rounded-2xl bg-white dark:bg-card">
@@ -112,7 +113,7 @@ const StayBookingPanel = ({
                 mode="single"
                 selected={checkIn}
                 onSelect={setCheckIn}
-                disabled={(date) => date < new Date()}
+                disabled={(date) => date < today}
                 initialFocus
                 className={cn("p-3 pointer-events-auto")}
               />
@@ -139,7 +140,7 @@ const StayBookingPanel = ({
                 mode="single"
                 selected={checkOut}
                 onSelect={setCheckOut}
-                disabled={(date) => date < (checkIn || new Date())}
+                disabled={(date) => date <= (checkIn || today)}
                 initialFocus
                 className={cn("p-3 pointer-events-auto")}
               />
@@ -172,49 +173,31 @@ const StayBookingPanel = ({
         </div>
       </div>
 
-      {/* Pricing Options */}
-      <div className="grid grid-cols-3 gap-1.5 mb-3">
-        <button
-          type="button"
-          onClick={() => setPricingOption("daily")}
-          className={`py-2 px-1 border rounded-lg text-center transition-all ${
-            pricingOption === "daily"
-              ? "border-accent bg-accent/10"
-              : "border-border hover:border-muted-foreground"
-          }`}
-        >
-          <p className="text-[10px] font-semibold text-muted-foreground mb-0.5">Daily</p>
-          <p className="text-xs font-bold text-foreground">{currencySymbol}{pricePerNight}</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setPricingOption("weekly")}
-          className={`py-2 px-1 border rounded-lg text-center transition-all relative ${
-            pricingOption === "weekly"
-              ? "border-accent bg-accent/10 scale-[1.03]"
-              : "border-border hover:border-muted-foreground"
-          }`}
-        >
-          {pricingOption === "weekly" && (
-            <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-accent text-accent-foreground text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-              POPULAR
-            </span>
-          )}
-          <p className="text-[10px] font-semibold text-muted-foreground mb-0.5">Weekly</p>
-          <p className="text-xs font-bold text-foreground">{currencySymbol}{Math.round(weeklyPrice)}</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setPricingOption("monthly")}
-          className={`py-2 px-1 border rounded-lg text-center transition-all ${
-            pricingOption === "monthly"
-              ? "border-accent bg-accent/10"
-              : "border-border hover:border-muted-foreground"
-          }`}
-        >
-          <p className="text-[10px] font-semibold text-muted-foreground mb-0.5">Monthly</p>
-          <p className="text-xs font-bold text-foreground">{currencySymbol}{Math.round(monthlyPrice)}</p>
-        </button>
+      {/* Pricing Summary */}
+      <div className="bg-secondary/20 rounded-xl p-3 mb-4 space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Original Price:</span>
+          <span className={pricing.discountPercent > 0 ? "line-through text-muted-foreground" : "font-semibold"}>
+            {currencySymbol}{pricing.originalTotal.toLocaleString()}
+          </span>
+        </div>
+
+        {pricing.discountPercent > 0 && (
+          <>
+            <div className="flex justify-between text-sm text-green-600 font-medium bg-green-50 p-1.5 rounded">
+              <span>{pricing.discountPercent}% Long Stay Discount Applied</span>
+              <span>-{currencySymbol}{pricing.discountAmount.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-sm font-semibold">
+              <span>Final Price:</span>
+              <span>{currencySymbol}{pricing.finalTotal.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-xs text-accent font-bold">
+              <span>You Save:</span>
+              <span>{currencySymbol}{pricing.discountAmount.toLocaleString()}</span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Book Now */}
@@ -237,7 +220,7 @@ const StayBookingPanel = ({
             endDate: checkOut.toISOString(),
             description: `${nights} night stay at ${title}`,
             subtotal,
-            discount,
+            discount: hostDiscountAmount,
             serviceFee: serviceFee + cleaningFee + securityDeposit,
             total,
             hostDiscountPercent,
@@ -259,19 +242,25 @@ const StayBookingPanel = ({
       {/* Price Breakdown */}
       <div className="space-y-1.5 pt-3 border-t border-border">
         <div className="flex justify-between text-xs">
-          <span className="text-muted-foreground">{currencySymbol}{pricePerNight} × {nights} nights</span>
-          <span className="text-foreground font-medium">{currencySymbol}{subtotal.toLocaleString()}</span>
+          <span className="text-muted-foreground">{currencySymbol}{pricePerNight.toLocaleString()} × {nights} night{nights > 1 ? "s" : ""}</span>
+          <span className="text-foreground font-medium">{currencySymbol}{pricing.originalTotal.toLocaleString()}</span>
         </div>
+        {pricing.discountPercent > 0 ? (
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Long stay discount ({pricing.discountPercent}%)</span>
+            <span className="text-accent font-medium">-{currencySymbol}{pricing.discountAmount.toLocaleString()}</span>
+          </div>
+        ) : null}
         {hostDiscountPercent > 0 ? (
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Host discount ({hostDiscountPercent}%)</span>
-            <span className="text-accent font-medium">-{currencySymbol}{discount}</span>
+            <span className="text-accent font-medium">-{currencySymbol}{hostDiscountAmount}</span>
           </div>
         ) : null}
-        {serviceFee > 0 && (
+        {(cleaningFee > 0 || securityDeposit > 0) && (
           <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Service fee</span>
-            <span className="text-foreground font-medium">{currencySymbol}{serviceFee}</span>
+            <span className="text-muted-foreground">Additional Fees</span>
+            <span className="text-foreground font-medium">{currencySymbol}{cleaningFee + securityDeposit}</span>
           </div>
         )}
         {cleaningFee > 0 && (

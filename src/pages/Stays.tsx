@@ -22,6 +22,9 @@ interface Stay {
   profiles?: {
     full_name: string;
   };
+  long_stay_discount_7?: number;
+  long_stay_discount_14?: number;
+  long_stay_discount_30?: number;
 }
 
 const Stays = () => {
@@ -133,9 +136,14 @@ const Stays = () => {
                 price={`${stay.currency === 'INR' ? '₹' : '$'}${stay.price_per_night.toLocaleString()}`}
                 rating={Number(stay.rating)}
                 type="stay"
-                id={stay.id}
-                delay={index * 0.05}
-                hostName={(stay as any).host_name}
+                id={stay.slug || stay.id}
+                delay={index * 0.1}
+                hostName={stay.profiles?.full_name}
+                longStayDiscounts={{
+                  discount7: stay.long_stay_discount_7 || 0,
+                  discount14: stay.long_stay_discount_14 || 0,
+                  discount30: stay.long_stay_discount_30 || 0,
+                }}
               />
             ))}
           </div>

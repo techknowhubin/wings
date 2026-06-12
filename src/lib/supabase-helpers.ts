@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { encryptField, hashPhone, hashEmail } from '@/lib/crypto';
 import type { 
   Bike, Car, Stay, Experience, Booking, Review, Profile, LinkInBioPage,
   ListingType, AppRole, BookingStatus
@@ -31,16 +32,54 @@ export async function getHostProfile(userId: string) {
   return data;
 }
 
-export async function updateProfile(userId: string, updates: Partial<Profile>) {
-  const { data, error } = await supabase
+export async function updateProfile(userId: string, updates: Partial<any>) {
+  // Prepare encryption for sensitive fields
+  const encryptedUpdates: any = { ...updates };
+
+  // Full Name
+  if (updates.full_name) {
+    encryptedUpdates.full_name_encrypted = await encryptField(updates.full_name);
+    delete encryptedUpdates.full_name;
+  }
+
+  // Phone
+  if (updates.phone) {
+    encryptedUpdates.phone_encrypted = await encryptField(updates.phone);
+    encryptedUpdates.phone_hash = await hashPhone(updates.phone);
+    delete encryptedUpdates.phone;
+  }
+
+  // Email
+  if (updates.email) {
+    encryptedUpdates.email_encrypted = await encryptField(updates.email);
+    encryptedUpdates.email_hash = await hashEmail(updates.email);
+    delete encryptedUpdates.email;
+  }
+
+  // Address
+  if (updates.address) {
+    encryptedUpdates.address_encrypted = await encryptField(updates.address);
+    delete encryptedUpdates.address;
+  }
+
+  // Emergency Contact (assuming fields emergency_contact_name and emergency_contact_phone)
+  if (updates.emergency_contact_name) {
+    encryptedUpdates.emergency_contact_name_encrypted = await encryptField(updates.emergency_contact_name);
+    delete encryptedUpdates.emergency_contact_name;
+  }
+  if (updates.emergency_contact_phone) {
+    encryptedUpdates.emergency_contact_phone_encrypted = await encryptField(updates.emergency_contact_phone);
+    encryptedUpdates.emergency_contact_phone_hash = await hashPhone(updates.emergency_contact_phone);
+    delete encryptedUpdates.emergency_contact_phone;
+  }
+
+  const { error } = await supabase
     .from('profiles')
-    .update(updates)
-    .eq('id', userId)
-    .select()
-    .single();
-  
+    .update(encryptedUpdates)
+    .eq('id', userId);
   if (error) throw error;
-  return data;
+  // Invalidate cache if needed – handled by react-query in hooks.
+  return true;
 }
 
 // ============ Listing Helpers ============
@@ -648,10 +687,10 @@ export async function updateMarketplaceRequest(
 
 // ============ Create Listing Helpers ============
 
-export async function createStay(stay: Omit<Stay, 'id' | 'created_at' | 'updated_at' | 'rating' | 'total_reviews' | 'views_count' | 'booking_count' | 'last_booked_at' | 'is_verified' | 'verified_by' | 'featured'>) {
+export async function createStay(stay: any) {
   const slug = generateSlug(stay.title);
   const { data, error } = await supabase
-    .from('stays')
+    .from('stays' as any)
     .insert({
       ...stay,
       slug,
@@ -659,17 +698,17 @@ export async function createStay(stay: Omit<Stay, 'id' | 'created_at' | 'updated
       marketplace_requested: true,
       approval_status: 'pending',
       submitted_for_review_at: new Date().toISOString(),
-    })
+    } as any)
     .select()
     .single();
   if (error) throw error;
   return data;
 }
 
-export async function createCar(car: Omit<Car, 'id' | 'created_at' | 'updated_at' | 'rating' | 'total_reviews' | 'views_count' | 'booking_count' | 'last_booked_at' | 'is_verified' | 'verified_by' | 'featured'>) {
+export async function createCar(car: any) {
   const slug = generateSlug(car.title);
   const { data, error } = await supabase
-    .from('cars')
+    .from('cars' as any)
     .insert({
       ...car,
       slug,
@@ -677,17 +716,17 @@ export async function createCar(car: Omit<Car, 'id' | 'created_at' | 'updated_at
       marketplace_requested: true,
       approval_status: 'pending',
       submitted_for_review_at: new Date().toISOString(),
-    })
+    } as any)
     .select()
     .single();
   if (error) throw error;
   return data;
 }
 
-export async function createBike(bike: Omit<Bike, 'id' | 'created_at' | 'updated_at' | 'rating' | 'total_reviews' | 'views_count' | 'booking_count' | 'last_booked_at' | 'is_verified' | 'verified_by' | 'featured'>) {
+export async function createBike(bike: any) {
   const slug = generateSlug(bike.title);
   const { data, error } = await supabase
-    .from('bikes')
+    .from('bikes' as any)
     .insert({
       ...bike,
       slug,
@@ -695,17 +734,17 @@ export async function createBike(bike: Omit<Bike, 'id' | 'created_at' | 'updated
       marketplace_requested: true,
       approval_status: 'pending',
       submitted_for_review_at: new Date().toISOString(),
-    })
+    } as any)
     .select()
     .single();
   if (error) throw error;
   return data;
 }
 
-export async function createExperience(experience: Omit<Experience, 'id' | 'created_at' | 'updated_at' | 'rating' | 'total_reviews' | 'views_count' | 'booking_count' | 'last_booked_at' | 'is_verified' | 'verified_by' | 'featured'>) {
+export async function createExperience(experience: any) {
   const slug = generateSlug(experience.title);
   const { data, error } = await supabase
-    .from('experiences')
+    .from('experiences' as any)
     .insert({
       ...experience,
       slug,
@@ -713,7 +752,7 @@ export async function createExperience(experience: Omit<Experience, 'id' | 'crea
       marketplace_requested: true,
       approval_status: 'pending',
       submitted_for_review_at: new Date().toISOString(),
-    })
+    } as any)
     .select()
     .single();
   if (error) throw error;

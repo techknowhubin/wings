@@ -44,17 +44,16 @@ const Header = () => {
 
 
 
-  // Derive display name — prefer profile display_name/full_name, fall back to phone, never show derived email
-  const isWhatsAppUser = user?.user_metadata?.phone_provider === "whatsapp";
+  // Detect WhatsApp users by their derived email domain — not from metadata
+  const isWhatsAppUser = user?.email?.endsWith("@wa.xplorwing.com") ?? false;
   const displayName = profile?.display_name
     || profile?.full_name
-    || user?.user_metadata?.full_name
-    || (isWhatsAppUser ? user?.user_metadata?.phone : user?.email?.split("@")[0])
+    || (isWhatsAppUser ? profile?.phone : user?.email?.split("@")[0])
     || "My Account";
   const displaySubtitle = isWhatsAppUser
-    ? (user?.user_metadata?.phone || "")
+    ? (profile?.phone || "")
     : (user?.email || "");
-  const avatarLetter = (profile?.display_name || profile?.full_name || user?.user_metadata?.full_name || "").charAt(0).toUpperCase() || null;
+  const avatarLetter = (profile?.display_name || profile?.full_name || "").charAt(0).toUpperCase() || null;
 
   useEffect(() => {
     if (user) {

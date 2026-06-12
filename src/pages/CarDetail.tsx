@@ -285,6 +285,11 @@ const CarDetail = () => {
               listingCouponType="cars"
               hostDiscountPercent={discountConfig.hostDiscountPercent}
               availableCoupons={discountConfig.coupons}
+              longStayDiscounts={{
+                discount7: car.long_stay_discount_7 || 0,
+                discount14: car.long_stay_discount_14 || 0,
+                discount30: car.long_stay_discount_30 || 0,
+              }}
             />
           </div>
         </div>

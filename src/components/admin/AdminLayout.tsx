@@ -10,7 +10,7 @@ import { DynamicLogo } from '@/components/DynamicLogo';
 import {
   LayoutDashboard, ShieldCheck, CheckSquare, Store, Users,
   CalendarCheck, Building2, Wallet, BarChart3, Settings,
-  LogOut, FileText, Menu, X, Bell, Search, Mail,
+  LogOut, FileText, Menu, X, Bell, Search, Mail, Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,6 +80,12 @@ export default function AdminLayout() {
       ],
     },
     {
+      title: 'Security',
+      items: [
+        { label: 'Security Dashboard', to: '/admin/security', icon: Lock },
+      ],
+    },
+    {
       title: 'Platform',
       items: [
         { label: 'Blog Posts', to: '/admin/blog-posts', icon: FileText },
@@ -138,9 +144,9 @@ export default function AdminLayout() {
         <NavLink to="/" className="flex items-center gap-2.5">
           <DynamicLogo />
         </NavLink>
-        <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20">
-          <ShieldCheck className="h-3 w-3 text-primary" />
-          <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Admin Panel</span>
+        <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent/10 dark:bg-primary/10 border border-accent/20 dark:border-primary/20">
+          <ShieldCheck className="h-3 w-3 text-accent dark:text-primary" />
+          <span className="text-[10px] font-bold text-accent dark:text-primary uppercase tracking-widest">Admin Panel</span>
         </div>
       </div>
 

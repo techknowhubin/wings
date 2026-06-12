@@ -227,6 +227,9 @@ export default function HostEditListing() {
     exclusions: [""] as string[],
     amenities: [] as string[],
     amenityInput: "",
+    discount7: "",
+    discount14: "",
+    discount30: "",
     // Extended stay/hotel/resort fields
     ...emptyExtendedForm,
   });
@@ -248,7 +251,7 @@ export default function HostEditListing() {
       const extraFields = extraSelectMap[section as Section];
       const { data, error } = await supabase
          .from(table as any)
-         .select(`id,title,description,location,availability_status,images,discounts,approval_status,${priceField},${extraFields}`)
+         .select(`id,title,description,location,availability_status,images,discounts,approval_status,long_stay_discount_7,long_stay_discount_14,long_stay_discount_30,${priceField},${extraFields}`)
          .eq("id", listingId)
          .eq("host_id", user.id)
          .maybeSingle();
@@ -301,6 +304,9 @@ export default function HostEditListing() {
           Array.isArray((data as any).exclusions) && (data as any).exclusions.length
             ? ((data as any).exclusions as string[])
             : [""],
+        discount7: String((data as any).long_stay_discount_7 || ""),
+        discount14: String((data as any).long_stay_discount_14 || ""),
+        discount30: String((data as any).long_stay_discount_30 || ""),
         amenities: richAmenities.custom ?? [],
         // Extended fields from rich amenities
         shortDescription: richAmenities.shortDescription ?? "",
@@ -630,18 +636,28 @@ export default function HostEditListing() {
         }
       }
 
-      const payload: Record<string, unknown> = {
-        title: form.title,
-        description: form.description || null,
-        location: form.location,
-        [priceField]: Number(form.price),
-        availability_status: form.availability_status,
-        images: form.images.length > 0 ? form.images : null,
-        discounts:
-          discountConfig.hostDiscountPercent > 0 || discountConfig.coupons.length > 0
-            ? discountConfig
-            : null,
-      };
+        const d7 = form.discount7 ? Number(form.discount7) : 0;
+        // Ensure 14-day >= 7-day and 30-day >= 14-day to satisfy DB check constraint
+        const d14Raw = form.discount14 ? Number(form.discount14) : 0;
+        const d30Raw = form.discount30 ? Number(form.discount30) : 0;
+        const d14 = Math.max(d14Raw, d7);
+        const d30 = Math.max(d30Raw, d14);
+
+        const payload: Record<string, unknown> = {
+          title: form.title,
+          description: form.description || null,
+          location: form.location,
+          [priceField]: Number(form.price),
+          availability_status: form.availability_status,
+          images: form.images.length > 0 ? form.images : null,
+          long_stay_discount_7: d7,
+          long_stay_discount_14: d14,
+          long_stay_discount_30: d30,
+          discounts:
+            discountConfig.hostDiscountPercent > 0 || discountConfig.coupons.length > 0
+              ? discountConfig
+              : null,
+        };
 
       if (triggerPending) {
         payload.approval_status = 'pending';
@@ -1610,65 +1626,38 @@ export default function HostEditListing() {
 
           <Card>
             <CardHeader><CardTitle>Pricing (₹)</CardTitle></CardHeader>
+            <CardContent>
+              <div>
+                <Label>Price per {section === "stays" || section === "hotels" || section === "resorts" ? "Night" : section === "experiences" ? "Person" : "Day"} *</Label>
+                <Input type="number" value={form.price} onChange={(e) => set("price", e.target.value)} placeholder="e.g. 2500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Long Stay Pricing Rules</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label>Price *</Label>
-                <Input type="number" value={form.price} onChange={(e) => set("price", e.target.value)} />
+                <Label>7+ Days Discount (%)</Label>
+                <Input type="number" min={0} max={90} value={form.discount7} onChange={(e) => set("discount7", e.target.value)} placeholder="e.g. 20" />
               </div>
-              {(section === "stays" || section === "hotels" || section === "resorts") && (
-                <>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs">Original Price</Label>
-                      <Input type="number" min={0} value={form.originalPrice} onChange={e => set("originalPrice", e.target.value)} placeholder="3000" className="h-8 text-sm" />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Discounted Price</Label>
-                      <Input type="number" min={0} value={form.discountedPrice} onChange={e => set("discountedPrice", e.target.value)} placeholder="2500" className="h-8 text-sm" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs">Daily Price</Label>
-                      <Input type="number" min={0} value={form.dailyPrice} onChange={e => set("dailyPrice", e.target.value)} placeholder="2500" className="h-8 text-sm" />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Taxes & Fees</Label>
-                      <Input type="number" min={0} value={form.taxesAndFees} onChange={e => set("taxesAndFees", e.target.value)} placeholder="150" className="h-8 text-sm" />
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Weekly Price</Label>
-                    <Input type="number" min={1} value={form.weeklyPrice} onChange={e => set("weeklyPrice", e.target.value)} placeholder="Auto-calculated if blank" />
-                  </div>
-                  <div>
-                    <Label>Monthly Price</Label>
-                    <Input type="number" min={1} value={form.monthlyPrice} onChange={e => set("monthlyPrice", e.target.value)} placeholder="Auto-calculated if blank" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs">Cleaning Fee</Label>
-                      <Input type="number" min={0} value={form.cleaningFee} onChange={e => set("cleaningFee", e.target.value)} placeholder="0" className="h-8 text-sm" />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Security Deposit</Label>
-                      <Input type="number" min={0} value={form.securityDeposit} onChange={e => set("securityDeposit", e.target.value)} placeholder="0" className="h-8 text-sm" />
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-xs">Offer Percentage</Label>
-                    <Input type="number" min={0} max={100} value={form.offerPercentage} onChange={e => set("offerPercentage", e.target.value)} placeholder="15" className="h-8 text-sm" />
-                  </div>
-                  <div className="flex items-center gap-2 pt-2 border-t border-border">
-                    <Checkbox id="bookAtZero" checked={form.bookAtZero} onCheckedChange={v => set('bookAtZero', !!v)} />
-                    <Label htmlFor="bookAtZero" className="text-xs font-semibold cursor-pointer">Allow Book @ ₹0 Option</Label>
-                  </div>
-                </>
-              )}
               <div>
-                <Label>Host Discount (%)</Label>
-                <Input type="number" min={0} max={90} value={form.hostDiscountPercent} onChange={(e) => set("hostDiscountPercent", e.target.value)} />
+                <Label>14+ Days Discount (%)</Label>
+                <Input type="number" min={0} max={90} value={form.discount14} onChange={(e) => set("discount14", e.target.value)} placeholder="e.g. 25" />
+                {form.discount14 && form.discount7 && Number(form.discount14) < Number(form.discount7) && (
+                  <p className="text-xs text-destructive mt-1">⚠ Must be ≥ 7-day discount ({form.discount7}%). Will be auto-corrected on save.</p>
+                )}
               </div>
+              <div>
+                <Label>30+ Days Discount (%)</Label>
+                <Input type="number" min={0} max={90} value={form.discount30} onChange={(e) => set("discount30", e.target.value)} placeholder="e.g. 30" />
+                {form.discount30 && form.discount14 && Number(form.discount30) < Number(form.discount14) && (
+                  <p className="text-xs text-destructive mt-1">⚠ Must be ≥ 14-day discount ({form.discount14}%). Will be auto-corrected on save.</p>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Each tier discount must be ≥ the previous (30-day ≥ 14-day ≥ 7-day). Values are auto-corrected on save.
+              </p>
             </CardContent>
           </Card>
 

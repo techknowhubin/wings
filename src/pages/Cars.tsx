@@ -18,6 +18,9 @@ interface Car {
   rating: number;
   images: string[];
   host_name?: string;
+  long_stay_discount_7?: number;
+  long_stay_discount_14?: number;
+  long_stay_discount_30?: number;
 }
 
 const Cars = () => {
@@ -131,6 +134,11 @@ const Cars = () => {
                 type="car"
                 delay={index * 0.05}
                 hostName={(car as any).host_name}
+                longStayDiscounts={{
+                  discount7: car.long_stay_discount_7 || 0,
+                  discount14: car.long_stay_discount_14 || 0,
+                  discount30: car.long_stay_discount_30 || 0,
+                }}
               />
             ))}
           </div>

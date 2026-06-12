@@ -442,10 +442,10 @@ export default function UserOnboarding() {
     const prefill = async () => {
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
       // Normalize phone: strip +91 prefix for the 10-digit input field
-      const rawPhone = profile?.phone || user.user_metadata?.phone || user.phone || "";
+      const rawPhone = profile?.phone || user.phone || "";
       const normalizedPhone = rawPhone.replace(/^\+91/, "").replace(/\D/g, "").slice(0, 10);
       setBasicInfo({
-        full_name: profile?.full_name || user.user_metadata?.full_name || "",
+        full_name: profile?.full_name || "",
         phone: normalizedPhone,
         city: profile?.city || "",
       });
@@ -527,7 +527,7 @@ export default function UserOnboarding() {
   const goNext = () => setStep(s => Math.min(s + 1, TOTAL_STEPS - 1));
   const goBack = () => setStep(s => Math.max(s - 1, 0));
 
-  const firstName = basicInfo.full_name.split(" ")[0] || user?.user_metadata?.full_name?.split(" ")?.[0] || "Explorer";
+  const firstName = basicInfo.full_name.split(" ")[0] || "Explorer";
 
   if (authLoading) {
     return (

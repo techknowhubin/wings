@@ -67,6 +67,9 @@ interface Stay {
   cancellation_policy: string;
   amenities: any;
   images: string[];
+  long_stay_discount_7?: number;
+  long_stay_discount_14?: number;
+  long_stay_discount_30?: number;
 }
 
 interface StayDetailProps {
@@ -788,6 +791,11 @@ const StayDetail = ({ tableType = "stays" }: StayDetailProps) => {
               monthlyPrice={richAmenities.monthlyPrice}
               cleaningFee={richAmenities.cleaningFee}
               securityDeposit={richAmenities.securityDeposit}
+              longStayDiscounts={{
+                discount7: stay.long_stay_discount_7 || 0,
+                discount14: stay.long_stay_discount_14 || 0,
+                discount30: stay.long_stay_discount_30 || 0,
+              }}
             />
           </div>
         </div>

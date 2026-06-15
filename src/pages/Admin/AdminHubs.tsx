@@ -1,349 +1,248 @@
-import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-  useHubPartners, useCreateHubPartner, useUpdateHubPartner, useToggleHubStatus,
-  useReferralTransactions, useHubAnalytics, useDeleteHubPartner,
-} from '@/hooks/useAdmin';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { QRCodeCanvas, QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import {
-  Building2, Plus, Search, QrCode, Download, Copy, Pencil,
-  ToggleLeft, ToggleRight, TrendingUp, Users, DollarSign, BarChart3,
-  Eye, CheckCircle2, XCircle, Clock, ExternalLink, Trash2,
+  Building2, Plus, Search, Pencil, Trash2,
+  ToggleLeft, ToggleRight, Users, MapPin, Eye, EyeOff, Copy,
 } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { formatDistanceToNow, format } from 'date-fns';
-import { generateHubReferralId, buildReferralLink } from '@/lib/referral';
+import { formatDistanceToNow } from 'date-fns';
 
-const HUB_TYPE_COLORS: Record<string, string> = {
-  franchise:   'bg-purple-100 text-purple-700 border-purple-200',
-  hub:         'bg-blue-100 text-blue-700 border-blue-200',
-  collaborator:'bg-blue-100 text-blue-700 border-blue-200',
-  restaurant:  'bg-amber-100 text-amber-700 border-amber-200',
-  cab_driver:  'bg-green-100 text-green-700 border-green-200',
-};
+const INDIAN_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
+  'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+  'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
+  'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+  'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
+  'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
+];
 
-const HUB_TYPE_LABELS: Record<string, string> = {
-  franchise:   'Franchise',
-  hub:         'Hub',
-  collaborator:'Hub',
-  restaurant:  'Chai Point / Restaurant',
-  cab_driver:  'Cab Driver',
-};
+// ─── Hooks ─────────────────────────────────────────────────────────────────────
 
-// ─── QR Download helper ──────────────────────────────────────────────────────
-function downloadQR(canvasId: string, filename: string) {
-  const canvas = document.getElementById(canvasId) as HTMLCanvasElement | null;
-  if (!canvas) return;
-  const url = canvas.toDataURL('image/png');
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${filename}.png`;
-  a.click();
+function useHubPartnerProfiles(search?: string) {
+  return useQuery({
+    queryKey: ['admin', 'hub-partner-profiles', search],
+    queryFn: async () => {
+      // 1. Get all hub_partner user IDs from user_roles
+      const { data: roleRows, error: roleErr } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'hub_partner');
+      if (roleErr) throw roleErr;
+      const hubIds = (roleRows ?? []).map((r: any) => r.user_id);
+      if (hubIds.length === 0) return [];
+
+      // 2. Fetch their profiles
+      const { data: profiles, error: pErr } = await supabase
+        .from('profiles')
+        .select('id, full_name, phone, state, assigned_state, account_status, role, created_at')
+        .in('id', hubIds)
+        .order('created_at', { ascending: false });
+      if (pErr) throw pErr;
+
+      let results = profiles ?? [];
+      if (search) {
+        const s = search.toLowerCase();
+        results = results.filter((p: any) =>
+          p.full_name?.toLowerCase().includes(s) ||
+          p.phone?.includes(s) ||
+          p.assigned_state?.toLowerCase().includes(s)
+        );
+      }
+      return results;
+    },
+  });
 }
 
-// ─── Analytics Cards ──────────────────────────────────────────────────────────
-function AnalyticsCards() {
-  const { data: analytics, isLoading } = useHubAnalytics();
+function useCreateHubPartnerAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (form: {
+      full_name: string;
+      email: string;
+      phone: string;
+      password: string;
+      assigned_state: string;
+    }) => {
+      // 1. Sign up a new user account via Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: {
+          data: {
+            full_name: form.full_name,
+            phone: form.phone,
+            role: 'hub_partner',
+          },
+        },
+      });
+      if (authError) throw authError;
+      const userId = authData.user?.id;
+      if (!userId) throw new Error('Failed to create user account.');
 
-  const cards = [
-    { label: 'Total Hub Partners', value: analytics?.totalPartners ?? 0, sub: `${analytics?.activePartners ?? 0} active`, icon: Users, color: 'text-blue-600 bg-blue-50' },
-    { label: 'Referral Bookings', value: analytics?.totalReferralBookings ?? 0, sub: 'All time', icon: BarChart3, color: 'text-purple-600 bg-purple-50' },
-    { label: 'Referral Revenue', value: `₹${((analytics?.totalReferralRevenue ?? 0) / 100).toFixed(0)}`, sub: 'Completed payments', icon: TrendingUp, color: 'text-green-600 bg-green-50' },
-    { label: 'Commission Paid', value: `₹${((analytics?.totalCommissionPaid ?? 0) / 100).toFixed(0)}`, sub: 'To partners', icon: DollarSign, color: 'text-orange-600 bg-orange-50' },
-  ];
+      // 2. Upsert profile with assigned_state & role
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .upsert({
+          id: userId,
+          full_name: form.full_name,
+          phone: form.phone,
+          role: 'hub_partner',
+          assigned_state: form.assigned_state,
+          account_status: 'active',
+        }, { onConflict: 'id' });
+      if (profileErr) throw profileErr;
 
-  if (isLoading) {
-    return <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{cards.map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}</div>;
-  }
+      // 3. Upsert into user_roles
+      const { error: roleErr } = await supabase
+        .from('user_roles')
+        .upsert({ user_id: userId, role: 'hub_partner' }, { onConflict: 'user_id' } as any);
+      if (roleErr) throw roleErr;
 
-  return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {cards.map((c) => (
-        <Card key={c.label} className="rounded-2xl border-0 shadow-sm">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${c.color}`}>
-              <c.icon className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">{c.label}</p>
-              <p className="text-xl font-bold text-foreground">{c.value}</p>
-              <p className="text-[10px] text-muted-foreground">{c.sub}</p>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
+      return { userId, email: form.email };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'hub-partner-profiles'] });
+    },
+  });
 }
 
-// ─── QR Viewer Sheet ──────────────────────────────────────────────────────────
-function QRSheet({ hub, open, onClose }: { hub: any; open: boolean; onClose: () => void }) {
-  const canvasId = `qr-canvas-${hub?.id}`;
-  // Prefer referral_id; fall back to qr_tracking_id for partners created before this system
-  const refId = hub?.referral_id || hub?.qr_tracking_id || '';
-  const referralLink = (hub?.referral_link && hub.referral_link.includes('=') && hub.referral_link.split('=')[1])
-    ? hub.referral_link
-    : buildReferralLink(refId);
-
-  return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>QR Code — {hub?.business_name}</SheetTitle>
-        </SheetHeader>
-        {hub && (
-          <div className="mt-6 space-y-6">
-            {/* QR Code Display */}
-            <div className="flex flex-col items-center gap-4 p-6 bg-white rounded-2xl border">
-              {refId ? (
-                <QRCodeCanvas
-                  id={canvasId}
-                  value={referralLink}
-                  size={220}
-                  bgColor="#ffffff"
-                  fgColor="#013220"
-                  level="H"
-                  includeMargin
-                />
-              ) : (
-                <div className="w-[220px] h-[220px] flex items-center justify-center bg-muted rounded-xl text-xs text-muted-foreground text-center p-4">
-                  No referral ID found. Re-create this partner to generate one.
-                </div>
-              )}
-              <div className="text-center">
-                <p className="text-sm font-bold text-foreground">{hub.business_name}</p>
-                <p className="text-xs text-muted-foreground font-mono mt-1">{refId || '—'}</p>
-              </div>
-            </div>
-
-            {/* Referral Link */}
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Referral Link</Label>
-              <div className="flex items-center gap-2">
-                <Input value={referralLink} readOnly className="text-xs font-mono" />
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => { navigator.clipboard.writeText(referralLink); toast.success('Referral link copied!'); }}
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                { label: 'Scans', value: hub.qr_scans ?? 0 },
-                { label: 'Referrals', value: hub.total_referrals ?? 0 },
-                { label: 'Revenue', value: `₹${Number(hub.total_revenue ?? 0).toFixed(0)}` },
-                { label: 'Commission', value: `₹${Number(hub.total_commission ?? 0).toFixed(0)}` },
-              ].map((s) => (
-                <div key={s.label} className="p-2 rounded-xl bg-muted/40 text-center">
-                  <p className="text-base font-bold">{s.value}</p>
-                  <p className="text-[9px] text-muted-foreground">{s.label}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-3">
-              <Button
-                className="flex-1 bg-[#013220] text-white hover:bg-[#013220]/90"
-                onClick={() => { downloadQR(canvasId, `QR-${hub.referral_id}`); toast.success('QR downloaded!'); }}
-              >
-                <Download className="h-4 w-4 mr-2" /> Download QR
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => { navigator.clipboard.writeText(referralLink); toast.success('Link copied!'); }}
-              >
-                <Copy className="h-4 w-4 mr-2" /> Copy Link
-              </Button>
-            </div>
-
-            <button
-              onClick={() => {
-                const dashboardUrl = `${window.location.origin}/partner/${hub.id}`;
-                navigator.clipboard.writeText(dashboardUrl);
-                toast.success('Partner dashboard link copied! Share this with the partner.');
-              }}
-              className="w-full py-2 border border-dashed border-muted-foreground/30 rounded-xl text-xs text-muted-foreground hover:border-[#013220] hover:text-[#013220] transition flex items-center justify-center gap-1.5"
-            >
-              <Copy className="h-3.5 w-3.5" /> Copy partner dashboard link
-            </button>
-
-            <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
-              Print and display this QR at your location. Customers who scan it will have your referral code automatically applied at checkout.
-            </p>
-          </div>
-        )}
-      </SheetContent>
-    </Sheet>
-  );
+function useUpdateHubPartnerProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...fields }: { id: string; full_name?: string; phone?: string; assigned_state?: string }) => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ ...fields, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'hub-partner-profiles'] });
+    },
+  });
 }
 
-// ─── Referral History Sheet ───────────────────────────────────────────────────
-function ReferralHistorySheet({ hub, open, onClose }: { hub: any; open: boolean; onClose: () => void }) {
-  const { data: transactions, isLoading } = useReferralTransactions(hub?.id);
-
-  const STATUS_STYLE: Record<string, string> = {
-    completed: 'bg-green-100 text-green-700',
-    pending:   'bg-amber-100 text-amber-700',
-    refunded:  'bg-red-100 text-red-700',
-  };
-
-  return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Referral History — {hub?.business_name}</SheetTitle>
-        </SheetHeader>
-        <div className="mt-6 space-y-4">
-          {isLoading ? (
-            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)
-          ) : (transactions ?? []).length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground text-sm">No referral transactions yet.</div>
-          ) : (
-            (transactions ?? []).map((tx: any) => (
-              <div key={tx.id} className="flex items-center justify-between p-4 rounded-xl border bg-card">
-                <div>
-                  <p className="text-sm font-semibold capitalize">{tx.bookings?.listing_type ?? 'Booking'}</p>
-                  <p className="text-xs text-muted-foreground">{format(new Date(tx.created_at), 'dd MMM yyyy')}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold">₹{Number(tx.booking_amount).toFixed(0)}</p>
-                  <p className="text-xs text-green-600 font-medium">+₹{Number(tx.commission_amount).toFixed(0)} comm.</p>
-                </div>
-                <Badge variant="outline" className={`text-[10px] ml-3 ${STATUS_STYLE[tx.payment_status] ?? ''}`}>
-                  {tx.payment_status}
-                </Badge>
-              </div>
-            ))
-          )}
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
+function useToggleHubPartnerStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, newStatus }: { id: string; newStatus: string }) => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ account_status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'hub-partner-profiles'] });
+    },
+  });
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+function useDeleteHubPartnerAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // Remove the role (profile remains but is delinked)
+      const { error } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', id);
+      if (error) throw error;
+      // Reset role on profile
+      await supabase
+        .from('profiles')
+        .update({ role: null, assigned_state: null, account_status: 'suspended', updated_at: new Date().toISOString() })
+        .eq('id', id);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'hub-partner-profiles'] });
+    },
+  });
+}
+
+// ─── Main Page ──────────────────────────────────────────────────────────────────
+
 export default function AdminHubs() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [tab, setTab] = useState<'all' | 'franchise' | 'restaurant' | 'cab_driver' | 'hub'>('all');
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
-  const [qrHub, setQrHub] = useState<any>(null);
-  const [historyHub, setHistoryHub] = useState<any>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({
-    business_name: '', partner_name: '', partner_phone: '', partner_email: '',
-    address: '', city: '', state: '', pincode: '',
-    hub_type: 'hub', commission_rate: '5',
+    full_name: '', email: '', phone: '', password: '', assigned_state: '',
   });
 
   const [editHub, setEditHub] = useState<any>(null);
   const [editForm, setEditForm] = useState<Record<string, any>>({});
-
-  const { data: hubs, isLoading } = useHubPartners(search);
-  const createMut = useCreateHubPartner();
-  const updateMut = useUpdateHubPartner();
-  const toggleMut = useToggleHubStatus();
-  const deleteMut = useDeleteHubPartner();
-
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  const handleDelete = async () => {
-    if (!deleteConfirmId) return;
-    try {
-      await deleteMut.mutateAsync(deleteConfirmId);
-      toast.success('Hub partner deleted successfully.');
-      setDeleteConfirmId(null);
-    } catch (err: any) {
-      toast.error(err.message ?? 'Failed to delete.');
-    }
-  };
+  const { data: hubs, isLoading } = useHubPartnerProfiles(search);
+  const createMut = useCreateHubPartnerAccount();
+  const updateMut = useUpdateHubPartnerProfile();
+  const toggleMut = useToggleHubPartnerStatus();
+  const deleteMut = useDeleteHubPartnerAccount();
 
   const openEdit = (h: any) => {
     setEditHub(h);
     setEditForm({
-      business_name: h.business_name ?? '',
-      partner_name:  h.partner_name  ?? '',
-      partner_phone: h.partner_phone ?? '',
-      partner_email: h.partner_email ?? '',
-      address:       h.address       ?? '',
-      city:          h.city          ?? '',
-      state:         h.state         ?? '',
-      pincode:       h.pincode       ?? '',
-      hub_type:      h.hub_type      ?? 'collaborator',
-      commission_rate: String(h.commission_rate ?? '5'),
+      full_name: h.full_name ?? '',
+      phone: h.phone ?? '',
+      assigned_state: h.assigned_state ?? '',
     });
+  };
+
+  const handleCreate = async () => {
+    if (!form.full_name || !form.email || !form.password || !form.assigned_state) {
+      toast.error('Please fill in all required fields.');
+      return;
+    }
+    if (form.password.length < 6) {
+      toast.error('Password must be at least 6 characters.');
+      return;
+    }
+    try {
+      const result = await createMut.mutateAsync(form);
+      toast.success(`Hub Partner created! Email: ${result.email}`);
+      setAddOpen(false);
+      setForm({ full_name: '', email: '', phone: '', password: '', assigned_state: '' });
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to create hub partner.');
+    }
   };
 
   const handleUpdate = async () => {
     if (!editHub) return;
-    if (!editForm.business_name || !editForm.partner_name || !editForm.partner_phone || !editForm.city) {
-      toast.error('Please fill in all required fields.');
+    if (!editForm.full_name || !editForm.assigned_state) {
+      toast.error('Name and Assigned State are required.');
       return;
     }
     try {
-      await updateMut.mutateAsync({
-        id: editHub.id,
-        ...editForm,
-        commission_rate: parseFloat(editForm.commission_rate),
-      });
-      toast.success('Hub partner updated!');
+      await updateMut.mutateAsync({ id: editHub.id, ...editForm });
+      toast.success('Hub Partner updated!');
       setEditHub(null);
     } catch (err: any) {
       toast.error(err.message ?? 'Failed to update.');
     }
   };
 
-  const filtered = tab === 'all'
-    ? (hubs ?? [])
-    : (hubs ?? []).filter((h: any) => {
-        if (tab === 'hub') return h.hub_type === 'hub' || h.hub_type === 'collaborator';
-        return h.hub_type === tab;
-      });
-
-  const handleCreate = async () => {
-    if (!form.business_name || !form.partner_name || !form.partner_phone || !form.city) {
-      toast.error('Please fill in all required fields.');
-      return;
-    }
-    const referral_id   = generateHubReferralId();
-    const referral_link = buildReferralLink(referral_id);
+  const handleDelete = async () => {
+    if (!deleteConfirmId) return;
     try {
-      await createMut.mutateAsync({
-        ...form,
-        commission_rate: parseFloat(form.commission_rate),
-        created_by: user?.id,
-        referral_id,
-        referral_link,
-        qr_tracking_id: referral_id,
-        total_referrals: 0,
-        total_revenue: 0,
-        total_commission: 0,
-        is_active: true,
-      });
-      toast.success(`Hub partner added! Referral ID: ${referral_id}`);
-      setAddOpen(false);
-      setForm({ business_name: '', partner_name: '', partner_phone: '', partner_email: '', address: '', city: '', state: '', pincode: '', hub_type: 'hub', commission_rate: '5' });
+      await deleteMut.mutateAsync(deleteConfirmId);
+      toast.success('Hub Partner account removed.');
+      setDeleteConfirmId(null);
     } catch (err: any) {
-      toast.error(err.message ?? 'Failed to add hub partner.');
+      toast.error(err.message ?? 'Failed to delete.');
     }
   };
 
@@ -353,256 +252,266 @@ export default function AdminHubs() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight">Hub Partners</h1>
-          <p className="text-muted-foreground text-sm mt-1">Physical partner locations that promote Xplorwing via referral QR codes.</p>
+          <p className="text-muted-foreground text-sm mt-1">
+            Create and manage state-level Hub Partner accounts. Each partner gets credentials to access their dedicated dashboard.
+          </p>
         </div>
         <Button onClick={() => setAddOpen(true)} className="bg-[#013220] text-white hover:bg-[#013220]/90">
-          <Plus className="h-4 w-4 mr-2" /> Add Hub Partner
+          <Plus className="h-4 w-4 mr-2" /> Create Hub Partner
         </Button>
       </div>
 
-      {/* Analytics */}
-      <AnalyticsCards />
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card className="rounded-2xl border-0 shadow-sm">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 text-blue-600 bg-blue-50">
+              <Users className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground font-medium">Total Hub Partners</p>
+              <p className="text-xl font-bold text-foreground">{hubs?.length ?? 0}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-0 shadow-sm">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 text-green-600 bg-green-50">
+              <ToggleRight className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground font-medium">Active Partners</p>
+              <p className="text-xl font-bold text-foreground">{hubs?.filter((h: any) => h.account_status === 'active').length ?? 0}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-0 shadow-sm">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 text-purple-600 bg-purple-50">
+              <MapPin className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground font-medium">States Covered</p>
+              <p className="text-xl font-bold text-foreground">
+                {new Set(hubs?.map((h: any) => h.assigned_state).filter(Boolean)).size}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Search */}
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search by name, city, or referral ID…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Input placeholder="Search by name, phone, or state…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
-      {/* Tabs + Table */}
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="all">All Hubs</TabsTrigger>
-          <TabsTrigger value="franchise">Franchises</TabsTrigger>
-          <TabsTrigger value="hub">Hubs</TabsTrigger>
-          <TabsTrigger value="restaurant">Chai Points & Restaurants</TabsTrigger>
-          <TabsTrigger value="cab_driver">Cab Drivers</TabsTrigger>
-        </TabsList>
+      {/* Table */}
+      <Card>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-6 space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Partner</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Assigned State</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(hubs ?? []).length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                      No hub partners yet. Click "Create Hub Partner" to get started.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {(hubs ?? []).map((h: any) => (
+                  <TableRow key={h.id}>
+                    {/* Partner */}
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-[#013220]/10 text-[#013220] flex items-center justify-center shrink-0">
+                          <Building2 className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">{h.full_name || '—'}</p>
+                          <p className="text-xs text-muted-foreground font-mono">{h.id.substring(0, 8)}…</p>
+                        </div>
+                      </div>
+                    </TableCell>
 
-        <TabsContent value={tab} className="mt-4">
-          <Card>
-            <CardContent className="p-0">
-              {isLoading ? (
-                <div className="p-6 space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Business</TableHead>
-                      <TableHead>QR Code</TableHead>
-                      <TableHead>Partner</TableHead>
-                      <TableHead>City</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Commission</TableHead>
-                      <TableHead>Scans</TableHead>
-                      <TableHead>Referrals</TableHead>
-                      <TableHead>Revenue</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filtered.length === 0 && (
-                      <TableRow><TableCell colSpan={10} className="text-center py-12 text-muted-foreground">No hub partners yet. Add one to get started.</TableCell></TableRow>
-                    )}
-                    {filtered.map((h: any) => {
-                      const refId = h.referral_id || h.qr_tracking_id || '';
-                    const referralLink = (h.referral_link && h.referral_link.split('=')[1])
-                      ? h.referral_link
-                      : buildReferralLink(refId);
-                      const qrId = `qr-thumb-${h.id}`;
-                      return (
-                        <TableRow key={h.id}>
-                          {/* Business */}
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="h-8 w-8 rounded-lg bg-[#013220]/10 text-[#013220] flex items-center justify-center shrink-0">
-                                <Building2 className="h-4 w-4" />
-                              </div>
-                              <div>
-                                <p className="text-sm font-semibold">{h.business_name}</p>
-                                <p className="text-xs text-muted-foreground font-mono">{refId || '—'}</p>
-                              </div>
-                            </div>
-                          </TableCell>
+                    {/* Contact */}
+                    <TableCell className="text-sm">{h.phone || '—'}</TableCell>
 
-                          {/* QR Thumbnail */}
-                          <TableCell>
-                            <button
-                              onClick={() => setQrHub(h)}
-                              className="p-1 rounded-lg border hover:border-[#013220] transition-colors group"
-                              title="View QR Code"
-                            >
-                              <QRCodeSVG
-                                value={referralLink}
-                                size={40}
-                                bgColor="#ffffff"
-                                fgColor="#013220"
-                                level="M"
-                              />
-                            </button>
-                          </TableCell>
+                    {/* Assigned State */}
+                    <TableCell>
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                        <MapPin className="h-3 w-3 mr-1" />
+                        {h.assigned_state || 'Unassigned'}
+                      </Badge>
+                    </TableCell>
 
-                          {/* Partner */}
-                          <TableCell>
-                            <p className="text-sm">{h.partner_name}</p>
-                            <p className="text-xs text-muted-foreground">{h.partner_phone}</p>
-                          </TableCell>
+                    {/* Status */}
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={
+                          h.account_status === 'active'
+                            ? 'bg-green-50 text-green-700 border-green-200 text-[10px]'
+                            : 'bg-gray-100 text-gray-500 text-[10px]'
+                        }
+                      >
+                        {h.account_status === 'active' ? 'Active' : h.account_status || 'Inactive'}
+                      </Badge>
+                    </TableCell>
 
-                          <TableCell className="text-sm">{h.city}{h.state ? `, ${h.state}` : ''}</TableCell>
+                    {/* Created */}
+                    <TableCell className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(h.created_at), { addSuffix: true })}
+                    </TableCell>
 
-                          <TableCell>
-                            <Badge variant="outline" className={`text-[10px] ${HUB_TYPE_COLORS[h.hub_type] ?? ''}`}>{HUB_TYPE_LABELS[h.hub_type] ?? h.hub_type}</Badge>
-                          </TableCell>
+                    {/* Actions */}
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit" onClick={() => openEdit(h)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon" variant="ghost"
+                          className={`h-7 w-7 ${h.account_status === 'active' ? 'text-red-500 hover:text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}
+                          title={h.account_status === 'active' ? 'Suspend' : 'Activate'}
+                          onClick={() => toggleMut.mutate({ id: h.id, newStatus: h.account_status === 'active' ? 'suspended' : 'active' })}
+                        >
+                          {h.account_status === 'active' ? <ToggleRight className="h-3.5 w-3.5" /> : <ToggleLeft className="h-3.5 w-3.5" />}
+                        </Button>
+                        <Button
+                          size="icon" variant="ghost"
+                          className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          title="Copy Dashboard URL"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/hubpartner`);
+                            toast.success('Hub Partner dashboard link copied!');
+                          }}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon" variant="ghost"
+                          className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50"
+                          title="Remove Hub Partner"
+                          onClick={() => setDeleteConfirmId(h.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
-                          <TableCell className="text-sm font-semibold">{h.commission_rate}%</TableCell>
-                          <TableCell className="text-sm font-medium">{h.qr_scans ?? 0}</TableCell>
-                          <TableCell className="text-sm font-medium">{h.total_referrals ?? 0}</TableCell>
-                          <TableCell className="text-sm">₹{Number(h.total_revenue ?? 0).toFixed(0)}</TableCell>
-
-                          {/* Status */}
-                          <TableCell>
-                            <Badge variant="outline" className={h.is_active ? 'bg-green-50 text-green-700 border-green-200 text-[10px]' : 'bg-gray-100 text-gray-500 text-[10px]'}>
-                              {h.is_active ? 'Active' : 'Inactive'}
-                            </Badge>
-                          </TableCell>
-
-                          {/* Actions */}
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit" onClick={() => openEdit(h)}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button size="icon" variant="ghost" className="h-7 w-7" title="View QR" onClick={() => setQrHub(h)}>
-                                <QrCode className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="icon" variant="ghost" className="h-7 w-7" title="Download QR"
-                                onClick={() => {
-                                  setQrHub(h);
-                                  setTimeout(() => downloadQR(`qr-canvas-${h.id}`, `QR-${h.referral_id ?? h.id}`), 300);
-                                }}
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="icon" variant="ghost" className="h-7 w-7" title="Copy Link"
-                                onClick={() => { navigator.clipboard.writeText(referralLink); toast.success('Referral link copied!'); }}
-                              >
-                                <Copy className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button size="icon" variant="ghost" className="h-7 w-7" title="Referral History" onClick={() => setHistoryHub(h)}>
-                                <Eye className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="icon" variant="ghost" className="h-7 w-7 text-blue-600 hover:bg-blue-50"
-                                title="Open Partner Dashboard"
-                                onClick={() => navigate(`/partner/${h.id}`)}
-                              >
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="icon" variant="ghost"
-                                className={`h-7 w-7 ${h.is_active ? 'text-red-500 hover:text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}
-                                title={h.is_active ? 'Deactivate' : 'Activate'}
-                                onClick={() => toggleMut.mutate({ id: h.id, isActive: !h.is_active })}
-                              >
-                                {h.is_active ? <ToggleRight className="h-3.5 w-3.5" /> : <ToggleLeft className="h-3.5 w-3.5" />}
-                              </Button>
-                              <Button
-                                size="icon" variant="ghost"
-                                className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50"
-                                title="Delete"
-                                onClick={() => setDeleteConfirmId(h.id)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* QR Viewer */}
-      <QRSheet hub={qrHub} open={!!qrHub} onClose={() => setQrHub(null)} />
-
-      {/* Referral History */}
-      <ReferralHistorySheet hub={historyHub} open={!!historyHub} onClose={() => setHistoryHub(null)} />
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={!!deleteConfirmId} onOpenChange={(o) => !o && setDeleteConfirmId(null)}>
-        <DialogContent>
+      {/* ── Create Hub Partner Dialog ──────────────────────────────────────────── */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Delete Hub Partner?</DialogTitle>
+            <DialogTitle>Create Hub Partner Account</DialogTitle>
+            <DialogDescription>
+              This will create a new user account with the <strong>hub_partner</strong> role. Share the credentials with the partner so they can log in at <code>/hubpartner</code>.
+            </DialogDescription>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete this hub partner? This action cannot be undone.
-          </p>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 space-y-1">
+                <Label>Full Name *</Label>
+                <Input placeholder="e.g. Rajesh Kumar" value={form.full_name} onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>Email *</Label>
+                <Input type="email" placeholder="partner@example.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>Phone</Label>
+                <Input placeholder="+91 98765 43210" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+              </div>
+              <div className="col-span-2 space-y-1">
+                <Label>Password *</Label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Min 6 characters"
+                    value={form.password}
+                    onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="col-span-2 space-y-1">
+                <Label>Assigned State *</Label>
+                <Select value={form.assigned_state} onValueChange={(v) => setForm((f) => ({ ...f, assigned_state: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select a state" /></SelectTrigger>
+                  <SelectContent>
+                    {INDIAN_STATES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="p-3 rounded-xl bg-muted/40 text-xs text-muted-foreground space-y-1">
+              <p className="font-semibold text-foreground">What happens next:</p>
+              <p>• A new user account is created with the <strong>hub_partner</strong> role.</p>
+              <p>• The partner's dashboard is auto-filtered to show only data from their assigned state.</p>
+              <p>• Share the email + password with the partner. They log in at <code>/hubpartner</code>.</p>
+            </div>
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleteMut.isPending}>
-              {deleteMut.isPending ? 'Deleting…' : 'Delete'}
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreate} disabled={createMut.isPending} className="bg-[#013220] text-white hover:bg-[#013220]/90">
+              {createMut.isPending ? 'Creating…' : 'Create Hub Partner'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Hub Partner Dialog */}
+      {/* ── Edit Hub Partner Dialog ────────────────────────────────────────────── */}
       <Dialog open={!!editHub} onOpenChange={(o) => !o && setEditHub(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Edit Hub Partner</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-1">
-                <Label>Business Name *</Label>
-                <Input value={editForm.business_name ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, business_name: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>Partner Name *</Label>
-                <Input value={editForm.partner_name ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, partner_name: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>Partner Phone *</Label>
-                <Input value={editForm.partner_phone ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, partner_phone: e.target.value }))} />
+                <Label>Full Name *</Label>
+                <Input value={editForm.full_name ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, full_name: e.target.value }))} />
               </div>
               <div className="col-span-2 space-y-1">
-                <Label>Partner Email</Label>
-                <Input value={editForm.partner_email ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, partner_email: e.target.value }))} />
+                <Label>Phone</Label>
+                <Input value={editForm.phone ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} />
               </div>
               <div className="col-span-2 space-y-1">
-                <Label>Address</Label>
-                <Input value={editForm.address ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, address: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>City *</Label>
-                <Input value={editForm.city ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, city: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>State</Label>
-                <Input value={editForm.state ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, state: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>Partner Type</Label>
-                <Select value={editForm.hub_type ?? 'hub'} onValueChange={(v) => setEditForm((f) => ({ ...f, hub_type: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Label>Assigned State *</Label>
+                <Select value={editForm.assigned_state ?? ''} onValueChange={(v) => setEditForm((f) => ({ ...f, assigned_state: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select a state" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="hub">Hub</SelectItem>
-                    <SelectItem value="franchise">Franchise</SelectItem>
-                    <SelectItem value="restaurant">Chai Point / Restaurant</SelectItem>
-                    <SelectItem value="cab_driver">Cab Driver</SelectItem>
+                    {INDIAN_STATES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>Commission Rate (%)</Label>
-                <Input type="number" min="0" max="100" value={editForm.commission_rate ?? '5'} onChange={(e) => setEditForm((f) => ({ ...f, commission_rate: e.target.value }))} />
               </div>
             </div>
           </div>
@@ -615,68 +524,19 @@ export default function AdminHubs() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Hub Partner Dialog */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Add Hub Partner</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2 space-y-1">
-                <Label>Business Name *</Label>
-                <Input placeholder="e.g. The Green Café" value={form.business_name} onChange={(e) => setForm((f) => ({ ...f, business_name: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>Partner Name *</Label>
-                <Input placeholder="Owner / Contact" value={form.partner_name} onChange={(e) => setForm((f) => ({ ...f, partner_name: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>Partner Phone *</Label>
-                <Input placeholder="+91 98765 43210" value={form.partner_phone} onChange={(e) => setForm((f) => ({ ...f, partner_phone: e.target.value }))} />
-              </div>
-              <div className="col-span-2 space-y-1">
-                <Label>Partner Email</Label>
-                <Input placeholder="partner@example.com" value={form.partner_email} onChange={(e) => setForm((f) => ({ ...f, partner_email: e.target.value }))} />
-              </div>
-              <div className="col-span-2 space-y-1">
-                <Label>Address</Label>
-                <Input placeholder="Street address" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>City *</Label>
-                <Input placeholder="City" value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>State</Label>
-                <Input placeholder="State" value={form.state} onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>Partner Type</Label>
-                <Select value={form.hub_type} onValueChange={(v) => setForm((f) => ({ ...f, hub_type: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hub">Hub</SelectItem>
-                    <SelectItem value="franchise">Franchise</SelectItem>
-                    <SelectItem value="restaurant">Chai Point / Restaurant</SelectItem>
-                    <SelectItem value="cab_driver">Cab Driver</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>Commission Rate (%)</Label>
-                <Input type="number" min="0" max="100" value={form.commission_rate} onChange={(e) => setForm((f) => ({ ...f, commission_rate: e.target.value }))} />
-              </div>
-            </div>
-            <div className="p-3 rounded-xl bg-muted/40 text-xs text-muted-foreground space-y-1">
-              <p className="font-semibold text-foreground">Auto-generated on save:</p>
-              <p>• Unique Referral ID (e.g. HUB-6DBFF5E1)</p>
-              <p>• Referral Link (https://xplorwing.com?ref=HUB-…)</p>
-              <p>• QR Code (downloadable PNG)</p>
-            </div>
-          </div>
+      {/* ── Delete Confirmation Dialog ─────────────────────────────────────────── */}
+      <Dialog open={!!deleteConfirmId} onOpenChange={(o) => !o && setDeleteConfirmId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Hub Partner?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This will remove the hub_partner role from this user and suspend their account. They will no longer be able to access the Hub Partner dashboard.
+          </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={createMut.isPending} className="bg-[#013220] text-white hover:bg-[#013220]/90">
-              {createMut.isPending ? 'Adding…' : 'Add Hub Partner'}
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteMut.isPending}>
+              {deleteMut.isPending ? 'Removing…' : 'Remove Partner'}
             </Button>
           </DialogFooter>
         </DialogContent>

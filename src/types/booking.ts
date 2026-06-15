@@ -21,4 +21,12 @@ export interface BookingDetails {
   total: number;
   hostDiscountPercent?: number;
   availableCoupons?: CouponOffer[];
+  cabDetails?: {
+    pickup_location: string;
+    drop_location: string;
+    travel_date: string;
+    cab_type: string;
+    fare_amount: number;
+    state: string;
+  };
 }

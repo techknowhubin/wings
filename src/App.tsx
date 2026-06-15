@@ -67,11 +67,25 @@ import AdminProviders from "./pages/Admin/AdminProviders";
 import AdminUsers from "./pages/Admin/AdminUsers";
 import AdminBookings from "./pages/Admin/AdminBookings";
 import AdminHubs from "./pages/Admin/AdminHubs";
+import AdminReferrals from "./pages/Admin/AdminReferrals";
 import AdminPayouts from "./pages/Admin/AdminPayouts";
 import AdminAnalytics from "./pages/Admin/AdminAnalytics";
 import AdminSettings from "./pages/Admin/AdminSettings";
 import AdminBlogPosts from "./pages/Admin/AdminBlogPosts";
 import AdminSecurityDashboard from "./pages/Admin/AdminSecurityDashboard";
+
+// Hub Partner Dashboard
+import { ProtectedHubRoute } from "./components/ProtectedHubRoute";
+import HubLayout from "./pages/HubPartner/HubLayout";
+import HubOverview from "./pages/HubPartner/HubOverview";
+import HubHosts from "./pages/HubPartner/HubHosts";
+import HubListings from "./pages/HubPartner/HubListings";
+import HubBookings from "./pages/HubPartner/HubBookings";
+import HubTravellers from "./pages/HubPartner/HubTravellers";
+import HubDrivers from "./pages/HubPartner/HubDrivers";
+import HubMap from "./pages/HubPartner/HubMap";
+import HubSupport from "./pages/HubPartner/HubSupport";
+import HubReports from "./pages/HubPartner/HubReports";
 
 const queryClient = new QueryClient();
 
@@ -198,11 +212,32 @@ const App = () =>
               <Route path="users" element={<AdminUsers />} />
               <Route path="bookings" element={<AdminBookings />} />
               <Route path="hubs" element={<AdminHubs />} />
+              <Route path="referrals" element={<AdminReferrals />} />
               <Route path="payouts" element={<AdminPayouts />} />
               <Route path="analytics" element={<AdminAnalytics />} />
               <Route path="blog-posts" element={<AdminBlogPosts />} />
               <Route path="security" element={<AdminSecurityDashboard />} />
               <Route path="settings" element={<AdminSettings />} />
+            </Route>
+
+            {/* Hub Partner Dashboard */}
+            <Route
+              path="/hubpartner"
+              element={
+                <ProtectedHubRoute>
+                  <HubLayout />
+                </ProtectedHubRoute>
+              }
+            >
+              <Route index element={<HubOverview />} />
+              <Route path="hosts" element={<HubHosts />} />
+              <Route path="listings" element={<HubListings />} />
+              <Route path="bookings" element={<HubBookings />} />
+              <Route path="travellers" element={<HubTravellers />} />
+              <Route path="drivers" element={<HubDrivers />} />
+              <Route path="map" element={<HubMap />} />
+              <Route path="support" element={<HubSupport />} />
+              <Route path="reports" element={<HubReports />} />
             </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

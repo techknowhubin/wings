@@ -1,5 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { format, addDays } from "date-fns";
 import carIcon from "@/assets/car-icon-5436.png";
 import "./CabFareCard.css";
 
@@ -116,104 +123,29 @@ const CabFareCard = ({
   delay = 0,
   variant = "previous",
 }: CabFareCardProps) => {
-  // ────────────────────────────────────────────────────────────────
-  // PREVIOUS (ORIGINAL) STYLE RENDERER
-  // ────────────────────────────────────────────────────────────────
-  if (variant === "previous") {
-    const effectiveSedanPrice =
-      sedanDiscountedPrice && sedanDiscountedPrice > 0 && sedanDiscountedPrice < sedanPrice
-        ? sedanDiscountedPrice
-        : sedanPrice;
-    const effectiveSuvPrice =
-      suvDiscountedPrice && suvDiscountedPrice > 0 && suvDiscountedPrice < suvPrice
-        ? suvDiscountedPrice
-        : suvPrice;
-
-    const buildWhatsAppUrl = (vehicleType: string, fare: number) => {
-      const message = `Hi, I'd like to book a cab.\n\n*From:* ${fromCity} (${fromCode})\n*To:* ${toCity} (${toCode})\n*Distance:* ${distance}\n*Trip Type:* \n*Vehicle Type:* ${vehicleType}\n*Fare:* ₹${fare.toLocaleString()}\n*Booking Person:* `;
-      return `https://wa.me/919492986412?text=${encodeURIComponent(message)}`;
-    };
-
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay }}
-        className="bg-card border border-border rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full max-w-full"
-      >
-        <div className="flex items-center w-full relative min-h-[100px] md:min-h-[120px]">
-          <div className="flex-1 p-1 md:p-5 flex flex-col items-center justify-center text-center min-w-[60px] md:min-w-[110px]">
-            <p className="text-sm md:text-2xl font-bold text-foreground leading-tight">{fromCode}</p>
-            <p className="text-[9px] md:text-sm text-muted-foreground leading-tight mt-0.5">{fromCity}</p>
-          </div>
-
-          <div className="flex flex-col items-center px-0.5 md:px-2 py-4 shrink-0">
-            <p className="text-[7px] md:text-[10px] font-bold text-muted-foreground tracking-tighter md:tracking-widest uppercase mb-1">Round Trip</p>
-            <div className="flex items-center gap-0.5 md:gap-1">
-              <div className="w-2 md:w-8 h-[1px] border-t border-dashed border-primary/30" />
-              <img src={carIcon} alt="Car" className="h-5 w-8 md:h-10 md:w-16 object-contain shrink-0" />
-              <div className="w-2 md:w-8 h-[1px] border-t border-dashed border-primary/30" />
-            </div>
-            <p className="text-[8px] md:text-xs text-muted-foreground mt-1 font-medium whitespace-nowrap">{distance}</p>
-          </div>
-
-          <div className="flex-1 p-1 md:p-5 flex flex-col items-center justify-center text-center min-w-[60px] md:min-w-[110px]">
-            <p className="text-sm md:text-2xl font-bold text-foreground leading-tight">{toCode}</p>
-            <p className="text-[9px] md:text-sm text-muted-foreground leading-tight mt-0.5">{toCity}</p>
-          </div>
-
-          <div className="p-2 md:p-5 min-w-[100px] md:min-w-[160px] self-stretch flex flex-col justify-center text-center bg-[#064e3b] border-l border-emerald-900 shadow-inner shrink-0">
-            <div className="mb-0.5 md:mb-1">
-              <p className="text-[8px] md:text-xs text-emerald-100/70 uppercase tracking-wider font-medium">Sedan</p>
-              <p
-                className={`text-[9px] md:text-sm text-emerald-100/70 line-through h-[14px] md:h-[18px] ${
-                  effectiveSedanPrice !== sedanPrice ? "opacity-100" : "opacity-0"
-                }`}
-              >
-                ₹{sedanPrice.toLocaleString()}
-              </p>
-              <p className="text-xs md:text-xl font-bold text-[#FFFFF0]">₹{effectiveSedanPrice.toLocaleString()}</p>
-              <a
-                href={buildWhatsAppUrl("Sedan", effectiveSedanPrice)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block mt-0.5 md:mt-1 px-2 md:px-3 py-0.5 md:py-1 bg-[#E5F76E] text-gray-900 text-[7px] md:text-[10px] font-semibold rounded-full hover:bg-[#d4e85e] transition-colors"
-              >
-                Book Now
-              </a>
-            </div>
-            <div className="h-[1px] bg-[#FFFFF0] w-full mb-0.5 md:mb-1 opacity-20" />
-            <div>
-              <p className="text-[8px] md:text-xs text-emerald-100/70 uppercase tracking-wider font-medium">SUV</p>
-              <p
-                className={`text-[9px] md:text-sm text-emerald-100/70 line-through h-[14px] md:h-[18px] ${
-                  effectiveSuvPrice !== suvPrice ? "opacity-100" : "opacity-0"
-                }`}
-              >
-                ₹{suvPrice.toLocaleString()}
-              </p>
-              <p className="text-xs md:text-xl font-bold text-[#FFFFF0]">₹{effectiveSuvPrice.toLocaleString()}</p>
-              <a
-                href={buildWhatsAppUrl("SUV", effectiveSuvPrice)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block mt-0.5 md:mt-1 px-2 md:px-3 py-0.5 md:py-1 bg-[#E5F76E] text-gray-900 text-[7px] md:text-[10px] font-semibold rounded-full hover:bg-[#d4e85e] transition-colors"
-              >
-                Book Now
-              </a>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-    );
-  }
-
-  // ────────────────────────────────────────────────────────────────
-  // TICKET STYLE RENDERER (variant === "ticket")
-  // ────────────────────────────────────────────────────────────────
+  const navigate = useNavigate();
+  const [isBookModalOpen, setIsBookModalOpen] = useState(false);
+  const [selectedCabType, setSelectedCabType] = useState<"Sedan" | "SUV">("Sedan");
+  const [selectedTripType, setSelectedTripType] = useState<"One Way" | "Round Trip">("Round Trip");
+  const [travelDate, setTravelDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
+  const [adminHostId, setAdminHostId] = useState<string>("");
   const [isOpen, setIsOpen] = useState(false);
 
-  // Round-trip effective pricing
+  useEffect(() => {
+    // Fetch an admin user ID to act as the host for outstation cabs
+    const fetchAdminId = async () => {
+      const { data } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "admin")
+        .limit(1)
+        .maybeSingle();
+      if (data) setAdminHostId(data.user_id);
+    };
+    fetchAdminId();
+  }, []);
+
+  // ── Shared pricing variables (needed by both variants and the Dialog) ──
   const effectiveSedanRound =
     sedanDiscountedPrice && sedanDiscountedPrice > 0 && sedanDiscountedPrice < sedanPrice
       ? sedanDiscountedPrice
@@ -232,7 +164,6 @@ const CabFareCard = ({
       ? suvPrice
       : Math.round(effectiveSuvRound * 1.15 / 10) * 10;
 
-  // One-way: use sheet values when available, otherwise fall back to 70% of round-trip
   const effectiveSedanOneWay =
     oneWaySedanDiscountedPrice && oneWaySedanDiscountedPrice > 0
       ? oneWaySedanDiscountedPrice
@@ -271,7 +202,209 @@ const CabFareCard = ({
     return `https://wa.me/919492986412?text=${encodeURIComponent(message)}`;
   };
 
+  const handleBookNowClick = (cabType: "Sedan" | "SUV", tripType: "One Way" | "Round Trip" = "Round Trip") => {
+    setSelectedCabType(cabType);
+    setSelectedTripType(tripType);
+    setIsBookModalOpen(true);
+  };
+
+  const handleOnlinePayment = () => {
+    if (!travelDate) return;
+    
+    // Determine fare based on selection
+    let fare = 0;
+    if (selectedCabType === "Sedan") {
+      if (selectedTripType === "One Way") fare = effectiveSedanOneWay;
+      else fare = effectiveSedanRound;
+    } else {
+      if (selectedTripType === "One Way") fare = effectiveSuvOneWay;
+      else fare = effectiveSuvRound;
+    }
+
+    const stateStr = variant === "ticket" ? "Telangana" : "Andhra Pradesh";
+
+    const bookingDetails = {
+      listingType: "vehicle" as const,
+      listingCouponType: "cabs" as const,
+      hostId: adminHostId || "00000000-0000-0000-0000-000000000000",
+      listingTitle: `Outstation Cab - ${selectedCabType} (${selectedTripType})`,
+      listingImage: resolveImageUrl(imageUrl || "") || getDestinationImage(toCode),
+      currencySymbol: "₹",
+      unitLabel: "Trip",
+      unitPrice: fare,
+      quantity: 1,
+      startDate: new Date(travelDate).toISOString(),
+      endDate: new Date(travelDate).toISOString(),
+      description: `${fromCity} to ${toCity} - Distance: ${distance}`,
+      subtotal: fare,
+      discount: 0,
+      serviceFee: 0,
+      total: fare,
+      cabDetails: {
+        pickup_location: fromCity,
+        drop_location: toCity,
+        travel_date: travelDate,
+        cab_type: selectedCabType,
+        fare_amount: fare,
+        state: stateStr,
+      }
+    };
+
+    navigate("/confirm-and-pay", { state: { booking: bookingDetails } });
+  };
+
+  // ── Shared Dialog (rendered by both variants) ──
+  const bookingDialog = (
+    <Dialog open={isBookModalOpen} onOpenChange={setIsBookModalOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Book Your Ride</DialogTitle>
+          <DialogDescription>
+            Complete your booking for {fromCity} to {toCity} ({selectedCabType} - {selectedTripType}).
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="travelDate">Travel Date</Label>
+            <Input 
+              id="travelDate" 
+              type="date" 
+              value={travelDate} 
+              onChange={(e) => setTravelDate(e.target.value)} 
+              min={format(new Date(), "yyyy-MM-dd")}
+              required
+            />
+          </div>
+          
+          <div className="rounded-xl border p-4 bg-muted/20 space-y-2 text-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">Route</span><span className="font-medium text-right">{fromCity} → {toCity}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Vehicle</span><span className="font-medium">{selectedCabType}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Trip Type</span><span className="font-medium">{selectedTripType}</span></div>
+            <div className="flex justify-between border-t pt-2 mt-2"><span className="font-semibold">Estimated Fare</span><span className="font-bold text-lg">
+              ₹{(selectedCabType === "Sedan" 
+                ? (selectedTripType === "One Way" ? effectiveSedanOneWay : effectiveSedanRound) 
+                : (selectedTripType === "One Way" ? effectiveSuvOneWay : effectiveSuvRound)
+              ).toLocaleString()}*
+            </span></div>
+            <p className="text-[10px] text-muted-foreground text-right">*Excl. tolls & driver night charges</p>
+          </div>
+        </div>
+        
+        <DialogFooter className="flex-col sm:flex-row gap-2 w-full">
+          <Button 
+            type="button" 
+            variant="outline" 
+            className="flex-1 border-[#25D366] text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]"
+            onClick={() => {
+              window.open(buildWhatsAppUrl(selectedCabType), "_blank");
+              setIsBookModalOpen(false);
+            }}
+          >
+            Book via WhatsApp
+          </Button>
+          <Button 
+            type="button" 
+            className="flex-1 bg-primary text-primary-foreground"
+            onClick={() => {
+              setIsBookModalOpen(false);
+              handleOnlinePayment();
+            }}
+          >
+            Book Now (Pay Online)
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  // ────────────────────────────────────────────────────────────────
+  // PREVIOUS (ORIGINAL) STYLE RENDERER
+  // ────────────────────────────────────────────────────────────────
+  if (variant === "previous") {
+    const effectiveSedanPrice = effectiveSedanRound;
+    const effectiveSuvPrice = effectiveSuvRound;
+
+    return (
+      <>
+      {bookingDialog}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay }}
+        className="bg-card border border-border rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full max-w-full"
+      >
+        <div className="flex items-center w-full relative min-h-[100px] md:min-h-[120px]">
+          <div className="flex-1 p-1 md:p-5 flex flex-col items-center justify-center text-center min-w-[60px] md:min-w-[110px]">
+            <p className="text-sm md:text-2xl font-bold text-foreground leading-tight">{fromCode}</p>
+            <p className="text-[9px] md:text-sm text-muted-foreground leading-tight mt-0.5">{fromCity}</p>
+          </div>
+
+          <div className="flex flex-col items-center px-0.5 md:px-2 py-4 shrink-0">
+            <p className="text-[7px] md:text-[10px] font-bold text-muted-foreground tracking-tighter md:tracking-widest uppercase mb-1">Round Trip</p>
+            <div className="flex items-center gap-0.5 md:gap-1">
+              <div className="w-2 md:w-8 h-[1px] border-t border-dashed border-primary/30" />
+              <img src={carIcon} alt="Car" className="h-5 w-8 md:h-10 md:w-16 object-contain shrink-0" />
+              <div className="w-2 md:w-8 h-[1px] border-t border-dashed border-primary/30" />
+            </div>
+            <p className="text-[8px] md:text-xs text-muted-foreground mt-1 font-medium whitespace-nowrap">{distance}</p>
+          </div>
+
+          <div className="flex-1 p-1 md:p-5 flex flex-col items-center justify-center text-center min-w-[60px] md:min-w-[110px]">
+            <p className="text-sm md:text-2xl font-bold text-foreground leading-tight">{toCode}</p>
+            <p className="text-[9px] md:text-sm text-muted-foreground leading-tight mt-0.5">{toCity}</p>
+          </div>
+
+          <div className="p-2 md:p-5 min-w-[100px] md:min-w-[160px] self-stretch flex flex-col justify-center text-center bg-[#064e3b] border-l border-emerald-900 shadow-inner shrink-0">
+            <div className="mb-0.5 md:mb-1">
+              <p className="text-[8px] md:text-xs text-emerald-100/70 uppercase tracking-wider font-medium">Sedan</p>
+              <p
+                className={`text-[9px] md:text-sm text-emerald-100/70 line-through h-[14px] md:h-[18px] ${
+                  effectiveSedanPrice !== sedanPrice ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                ₹{sedanPrice.toLocaleString()}
+              </p>
+              <p className="text-xs md:text-xl font-bold text-[#FFFFF0]">₹{effectiveSedanPrice.toLocaleString()}</p>
+              <button
+                onClick={() => handleBookNowClick("Sedan", "Round Trip")}
+                className="inline-block mt-0.5 md:mt-1 px-2 md:px-3 py-0.5 md:py-1 bg-[#E5F76E] text-gray-900 text-[7px] md:text-[10px] font-semibold rounded-full hover:bg-[#d4e85e] transition-colors"
+              >
+                Book Now
+              </button>
+            </div>
+            <div className="h-[1px] bg-[#FFFFF0] w-full mb-0.5 md:mb-1 opacity-20" />
+            <div>
+              <p className="text-[8px] md:text-xs text-emerald-100/70 uppercase tracking-wider font-medium">SUV</p>
+              <p
+                className={`text-[9px] md:text-sm text-emerald-100/70 line-through h-[14px] md:h-[18px] ${
+                  effectiveSuvPrice !== suvPrice ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                ₹{suvPrice.toLocaleString()}
+              </p>
+              <p className="text-xs md:text-xl font-bold text-[#FFFFF0]">₹{effectiveSuvPrice.toLocaleString()}</p>
+              <button
+                onClick={() => handleBookNowClick("SUV", "Round Trip")}
+                className="inline-block mt-0.5 md:mt-1 px-2 md:px-3 py-0.5 md:py-1 bg-[#E5F76E] text-gray-900 text-[7px] md:text-[10px] font-semibold rounded-full hover:bg-[#d4e85e] transition-colors"
+              >
+                Book Now
+              </button>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+      </>
+    );
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // TICKET STYLE RENDERER (variant === "ticket")
+  // ────────────────────────────────────────────────────────────────
+
   return (
+    <>
+    {bookingDialog}
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
@@ -360,9 +493,9 @@ const CabFareCard = ({
                   <div className="v-price">₹{effectiveSedanRound.toLocaleString()}<sup>*</sup></div>
                 </div>
               </div>
-              <a href={buildWhatsAppUrl("Sedan")} target="_blank" rel="noopener noreferrer" className="v-btn">
+              <button onClick={() => handleBookNowClick("Sedan", "Round Trip")} className="v-btn">
                 Book Now
-              </a>
+              </button>
             </div>
 
             {/* SUV */}
@@ -380,9 +513,9 @@ const CabFareCard = ({
                   <div className="v-price">₹{effectiveSuvRound.toLocaleString()}<sup>*</sup></div>
                 </div>
               </div>
-              <a href={buildWhatsAppUrl("SUV")} target="_blank" rel="noopener noreferrer" className="v-btn">
+              <button onClick={() => handleBookNowClick("SUV", "Round Trip")} className="v-btn">
                 Book Now
-              </a>
+              </button>
             </div>
           </div>
 
@@ -435,6 +568,7 @@ const CabFareCard = ({
         </div>
       </div>
     </motion.div>
+    </>
   );
 };
 

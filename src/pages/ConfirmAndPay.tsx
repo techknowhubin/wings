@@ -426,6 +426,27 @@ const ConfirmAndPay = () => {
       }
       pendingBookingId = newBooking.id;
 
+      if (booking.cabDetails) {
+        try {
+          const { error: cabError } = await supabase.from('cab_bookings').insert({
+            booking_id: newBooking.id,
+            traveller_id: user.id,
+            host_id: booking.hostId,
+            state: booking.cabDetails.state,
+            pickup_location: booking.cabDetails.pickup_location,
+            drop_location: booking.cabDetails.drop_location,
+            travel_date: new Date(booking.cabDetails.travel_date).toISOString(),
+            cab_type: booking.cabDetails.cab_type,
+            fare_amount: booking.cabDetails.fare_amount,
+            payment_status: 'pending',
+            booking_status: 'pending'
+          });
+          if (cabError) console.error("Cab booking insert error:", cabError);
+        } catch (err) {
+          console.error("Cab booking insert exception:", err);
+        }
+      }
+
       // Notify the host about the new booking request
       if (booking.hostId) {
         await createNotification({

@@ -10,7 +10,7 @@ import { DynamicLogo } from '@/components/DynamicLogo';
 import {
   LayoutDashboard, ShieldCheck, CheckSquare, Store, Users,
   CalendarCheck, Building2, Wallet, BarChart3, Settings,
-  LogOut, FileText, Menu, X, Bell, Search, Mail, Lock,
+  LogOut, FileText, Menu, X, Bell, Search, Mail, Lock, QrCode,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,6 +70,7 @@ export default function AdminLayout() {
         { label: 'Travelers', to: '/admin/users', icon: Users },
         { label: 'All Bookings', to: '/admin/bookings', icon: CalendarCheck },
         { label: 'Hub Partners', to: '/admin/hubs', icon: Building2 },
+        { label: 'Referrals', to: '/admin/referrals', icon: QrCode },
       ],
     },
     {

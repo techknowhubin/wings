@@ -137,7 +137,7 @@ const BlogDetail = () => {
         <div className="flex-grow flex flex-col items-center justify-center py-24">
           <BookOpen className="h-16 w-16 text-muted-foreground opacity-20 mb-4" />
           <h2 className="text-2xl font-bold mb-4">Post Not Found</h2>
-          <Link to="/blog" className="text-primary hover:underline flex items-center gap-2">
+          <Link to="/blog" className="text-primary-text hover:underline flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" /> Back to Blog
           </Link>
         </div>
@@ -172,7 +172,7 @@ const BlogDetail = () => {
       <article className="container mx-auto px-4 py-16">
         <div className="max-w-4xl mx-auto">
           {/* Back Button */}
-          <Link to="/blog" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-8">
+          <Link to="/blog" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary-text transition-colors mb-8">
             <ArrowLeft className="h-4 w-4" /> Back to Blog
           </Link>
 
@@ -183,7 +183,7 @@ const BlogDetail = () => {
             transition={{ duration: 0.5 }}
             className="mb-12"
           >
-            <span className="bg-primary/10 text-primary px-4 py-1.5 rounded-full text-sm font-semibold mb-6 inline-block">
+            <span className="bg-primary/10 text-primary-text px-4 py-1.5 rounded-full text-sm font-semibold mb-6 inline-block">
               {categoryTag}
             </span>
             <h1 className="text-4xl md:text-6xl font-bold text-foreground mb-8 leading-tight">
@@ -192,7 +192,7 @@ const BlogDetail = () => {
             <div className="flex flex-wrap items-center gap-6 text-muted-foreground border-b border-border pb-8">
               <div className="flex items-center gap-2">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <User className="h-5 w-5 text-primary" />
+                  <User className="h-5 w-5 text-primary-text" />
                 </div>
                 <span className="font-medium">Xplorwing Team</span>
               </div>
@@ -296,7 +296,7 @@ const BlogDetail = () => {
                         )}
                       </div>
                       <div className="p-4">
-                        <h4 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors line-clamp-2">
+                        <h4 className="text-sm font-bold text-foreground group-hover:text-primary-text transition-colors line-clamp-2">
                           {related.title}
                         </h4>
                         {related.published_at && (

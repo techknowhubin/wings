@@ -155,7 +155,7 @@ const Blog = () => {
 
                   {/* Content */}
                   <div className="p-6">
-                    <h2 className="text-xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors line-clamp-2">
+                    <h2 className="text-xl font-bold text-foreground mb-2 group-hover:text-primary-text transition-colors line-clamp-2">
                       {post.title}
                     </h2>
                     {post.excerpt && (

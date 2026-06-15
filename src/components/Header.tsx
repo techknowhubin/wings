@@ -221,7 +221,7 @@ const Header = () => {
                   <Link to="/auth" className="hidden md:flex">
                     <Button
                       variant="outline"
-                      className="rounded-full px-5 transition-all font-semibold border-border text-foreground hover:bg-muted/50"
+                      className="rounded-full px-5 transition-all font-semibold border-border text-foreground hover:bg-muted/50 hover:text-foreground"
                     >
                       Login/Signup
                     </Button>

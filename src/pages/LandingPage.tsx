@@ -542,7 +542,7 @@ const LandingPage = () => {
                     </div>
                   </div>
                   <div className="p-5">
-                    <h3 className="text-lg font-bold text-foreground mb-2 group-hover:text-primary transition-colors line-clamp-2">{post.title}</h3>
+                    <h3 className="text-lg font-bold text-foreground mb-2 group-hover:text-primary-text transition-colors line-clamp-2">{post.title}</h3>
                     <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{post.excerpt}</p>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{post.author}</span>

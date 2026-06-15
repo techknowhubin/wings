@@ -26,6 +26,7 @@ import { BookOpen } from "lucide-react";
 import heroOutstationCabs from "@/assets/hero-outstation-cabs.jpg";
 import heroOutstationCabs1 from "@/assets/hero-outstation-cabs-1.jpg";
 import heroOutstationCabs2 from "@/assets/hero-outstation-cabs-2.jpg";
+import heroAirportCabs from "@/assets/airport-cabs.jpeg";
 import homestaysIcon from "@/assets/categories/homestays-icon.png";
 import bikesIcon from "@/assets/categories/bikes-icon.png";
 import carsIcon from "@/assets/categories/cars-icon.png";
@@ -127,7 +128,7 @@ const OutstationCabs = () => {
   const navigate = useNavigate();
   const [categoryPage, setCategoryPage] = useState(0);
   const [heroSlide, setHeroSlide] = useState(0);
-  const heroImages = [heroXplorwing, heroOutstationCabs1, heroOutstationCabs2];
+  const heroImages = [heroXplorwing, heroOutstationCabs1, heroOutstationCabs2, heroAirportCabs];
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
 

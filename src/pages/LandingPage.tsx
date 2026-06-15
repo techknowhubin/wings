@@ -23,6 +23,7 @@ import { format } from "date-fns";
 import { BookOpen } from "lucide-react";
 
 import heroOutstationCabs from "@/assets/hero-outstation-cabs.jpg";
+import heroAirportCabs from "@/assets/airport-cabs.jpeg";
 import homestaysIcon from "@/assets/categories/homestays-icon.png";
 import bikesIcon from "@/assets/categories/bikes-icon.png";
 import carsIcon from "@/assets/categories/cars-icon.png";
@@ -134,7 +135,7 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const [categoryPage, setCategoryPage] = useState(0);
   const [heroSlide, setHeroSlide] = useState(0);
-  const heroImages = [heroImage, heroXplorwing, heroTajmahal, heroOutstationCabs];
+  const heroImages = [heroImage, heroXplorwing, heroTajmahal, heroOutstationCabs, heroAirportCabs];
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
 
@@ -294,8 +295,8 @@ const LandingPage = () => {
       <Header />
 
       {/* Hero Section with Slider */}
-      <section className="container mx-auto px-4 pt-4 hidden lg:block">
-        <div className="relative h-[85vh] rounded-3xl overflow-hidden">
+      <section className="container mx-auto px-4 pt-4">
+        <div className="relative h-[40vh] sm:h-[60vh] lg:h-[85vh] rounded-3xl overflow-hidden">
           {heroImages.map((img, i) => (
             <motion.div
               key={i}

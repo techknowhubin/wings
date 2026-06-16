@@ -11,14 +11,20 @@ const CabFareKPIs: React.FC = () => {
           <div className="dual-row">
             <div className="dual-item">
               <div className="d-label">Sedan</div>
-              <div className="d-val" style={{ fontSize: '2rem', lineHeight: 1 }}>
-                ₹14<span className="d-unit" style={{ fontSize: '0.8rem' }}>/km</span>
+              <div className="d-val">
+                ₹12<span className="d-unit">/km</span>
+              </div>
+            </div>
+            <div className="dual-item">
+              <div className="d-label">MUV</div>
+              <div className="d-val">
+                ₹16<span className="d-unit">/km</span>
               </div>
             </div>
             <div className="dual-item">
               <div className="d-label">SUV</div>
-              <div className="d-val" style={{ fontSize: '2rem', lineHeight: 1 }}>
-                ₹18<span className="d-unit" style={{ fontSize: '0.8rem' }}>/km</span>
+              <div className="d-val">
+                ₹22<span className="d-unit">/km</span>
               </div>
             </div>
           </div>
@@ -45,7 +51,7 @@ const CabFareKPIs: React.FC = () => {
         <div className="kpi-card">
           <div className="kpi-label">Beyond buffer?</div>
           <div className="kpi-value">Per KM rate applies</div>
-          <div className="kpi-sub">Sedan ₹14/km · SUV ₹18/km · billed transparently</div>
+          <div className="kpi-sub">Sedan ₹12/km · MUV ₹16/km · SUV ₹22/km · billed transparently</div>
           <span className="kpi-tag lime">No penalty charges</span>
         </div>
       </div>

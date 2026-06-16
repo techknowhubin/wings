@@ -15,6 +15,8 @@ interface FareData {
   sedanDiscountedPrice?: number;
   suvPrice: number;
   suvDiscountedPrice?: number;
+  muvPrice?: number;
+  muvDiscountedPrice?: number;
   oneWaySedanPrice?: number;
   oneWaySedanDiscountedPrice?: number;
   oneWaySuvPrice?: number;
@@ -205,12 +207,17 @@ const splitCodeAndCity = (value: string) => {
 // promote the discount value to the base price so the card renders correctly.
 const normalizeFare = (fare: FareData): FareData => {
   let { sedanPrice, sedanDiscountedPrice, suvPrice, suvDiscountedPrice,
+        muvPrice, muvDiscountedPrice,
         oneWaySedanPrice, oneWaySedanDiscountedPrice, oneWaySuvPrice, oneWaySuvDiscountedPrice } = fare;
   if (sedanPrice === 0 && (sedanDiscountedPrice ?? 0) > 0) {
     sedanPrice = sedanDiscountedPrice!; sedanDiscountedPrice = 0;
   }
   if (suvPrice === 0 && (suvDiscountedPrice ?? 0) > 0) {
     suvPrice = suvDiscountedPrice!; suvDiscountedPrice = 0;
+  }
+  // MUV: if only discounted column exists, promote it to the base price
+  if ((muvPrice ?? 0) === 0 && (muvDiscountedPrice ?? 0) > 0) {
+    muvPrice = muvDiscountedPrice!; muvDiscountedPrice = 0;
   }
   if ((oneWaySedanPrice ?? 0) === 0 && (oneWaySedanDiscountedPrice ?? 0) > 0) {
     oneWaySedanPrice = oneWaySedanDiscountedPrice!; oneWaySedanDiscountedPrice = 0;
@@ -219,6 +226,7 @@ const normalizeFare = (fare: FareData): FareData => {
     oneWaySuvPrice = oneWaySuvDiscountedPrice!; oneWaySuvDiscountedPrice = 0;
   }
   return { ...fare, sedanPrice, sedanDiscountedPrice, suvPrice, suvDiscountedPrice,
+           muvPrice, muvDiscountedPrice,
            oneWaySedanPrice, oneWaySedanDiscountedPrice, oneWaySuvPrice, oneWaySuvDiscountedPrice };
 };
 
@@ -243,6 +251,8 @@ const mapRowToFare = (row: Record<string, string>): FareData => {
   const suvDiscountedPrice = toPrice(
     pick(row, ["roundtripsuvdiscounted", "roundtripsuvdiscount", "suvdiscounted", "suvdiscountedprice", "suvdiscount", "suv_offer"]),
   );
+  const muvPrice = toPrice(pick(row, ["roundtripmuv", "rtmuv", "muvprice", "muv", "muvfare"]));
+  const muvDiscountedPrice = toPrice(pick(row, ["roundtripmuvdiscounted", "roundtripmuvdiscount", "muvdiscounted", "muvdiscount", "muv_offer"]));
   const oneWaySedanPrice = toPrice(pick(row, ["onewaysedan", "onewaysedanprice", "sedanoneway", "owsedan"]));
   const oneWaySedanDiscountedPrice = toPrice(pick(row, ["onewaysedandiscount", "onewaysedandiscounted", "owsedandiscount"]));
   const oneWaySuvPrice = toPrice(pick(row, ["onewaysuv", "onewaysuvprice", "suvoneway", "owsuv"]));
@@ -259,6 +269,8 @@ const mapRowToFare = (row: Record<string, string>): FareData => {
     sedanDiscountedPrice,
     suvPrice,
     suvDiscountedPrice,
+    muvPrice,
+    muvDiscountedPrice,
     oneWaySedanPrice,
     oneWaySedanDiscountedPrice,
     oneWaySuvPrice,

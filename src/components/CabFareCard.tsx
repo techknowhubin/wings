@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { format, addDays } from "date-fns";
 import carIcon from "@/assets/car-icon-5436.png";
+import sedanImg from "@/assets/sedan-dzire.jpeg";
+import muvImg from "@/assets/MUV-Ertiga.jpeg";
+import suvImg from "@/assets/SUV-Innova.jpeg";
 import "./CabFareCard.css";
 
 // Import local destination images for the ticket design
@@ -38,6 +41,8 @@ interface CabFareCardProps {
   sedanDiscountedPrice?: number;
   suvPrice: number;
   suvDiscountedPrice?: number;
+  muvPrice?: number;
+  muvDiscountedPrice?: number;
   oneWaySedanPrice?: number;
   oneWaySedanDiscountedPrice?: number;
   oneWaySuvPrice?: number;
@@ -115,6 +120,8 @@ const CabFareCard = ({
   sedanDiscountedPrice,
   suvPrice,
   suvDiscountedPrice,
+  muvPrice: muvPriceProp,
+  muvDiscountedPrice: muvDiscountedPriceProp,
   oneWaySedanPrice,
   oneWaySedanDiscountedPrice,
   oneWaySuvPrice,
@@ -125,7 +132,10 @@ const CabFareCard = ({
 }: CabFareCardProps) => {
   const navigate = useNavigate();
   const [isBookModalOpen, setIsBookModalOpen] = useState(false);
-  const [selectedCabType, setSelectedCabType] = useState<"Sedan" | "SUV">("Sedan");
+  const [isVehicleSelectOpen, setIsVehicleSelectOpen] = useState(false);
+  const [selectedCabType, setSelectedCabType] = useState<"Sedan" | "MUV" | "SUV">("Sedan");
+  const [pickedVehicle, setPickedVehicle] = useState<"Sedan" | "MUV" | "SUV" | null>(null);
+  const [travelTime, setTravelTime] = useState("06:00");
   const [selectedTripType, setSelectedTripType] = useState<"One Way" | "Round Trip">("Round Trip");
   const [travelDate, setTravelDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
   const [adminHostId, setAdminHostId] = useState<string>("");
@@ -186,6 +196,18 @@ const CabFareCard = ({
       ? oneWaySuvPrice
       : Math.round((displaySuvRoundOriginal * 0.7) / 10) * 10;
 
+  // MUV pricing — use sheet value when available, else fall back to Sedan × (16/12) ratio
+  const muvRatio = 16 / 12;
+  const sheetMuvRound = muvPriceProp && muvPriceProp > 0 ? muvPriceProp
+    : muvDiscountedPriceProp && muvDiscountedPriceProp > 0 ? muvDiscountedPriceProp
+    : 0;
+  const effectiveMuvRound    = sheetMuvRound > 0
+    ? sheetMuvRound
+    : Math.round(effectiveSedanRound  * muvRatio / 10) * 10;
+  const effectiveMuvOneWay   = Math.round(effectiveMuvRound * 0.7 / 10) * 10;
+  const displayMuvRoundOrig  = Math.round(effectiveMuvRound * 1.15 / 10) * 10;
+  const displayMuvOneWayOrig = Math.round(effectiveMuvOneWay * 1.15 / 10) * 10;
+
   // Distance values
   const numericDistance = parseInt(distance) || 300;
   const bufferDistance = 50;
@@ -195,31 +217,34 @@ const CabFareCard = ({
   const minToll = Math.max(150, Math.round((numericDistance * 0.5) / 50) * 50);
   const maxToll = minToll + 150;
 
+  const getFareForType = (type: string, trip: "One Way" | "Round Trip") => {
+    if (type === "Sedan") return trip === "One Way" ? effectiveSedanOneWay : effectiveSedanRound;
+    if (type === "MUV")   return trip === "One Way" ? effectiveMuvOneWay   : effectiveMuvRound;
+    return                       trip === "One Way" ? effectiveSuvOneWay   : effectiveSuvRound;
+  };
+
   const buildWhatsAppUrl = (vehicleType: string) => {
-    const owFare = vehicleType === "Sedan" ? effectiveSedanOneWay : effectiveSuvOneWay;
-    const rtFare = vehicleType === "Sedan" ? effectiveSedanRound : effectiveSuvRound;
+    const owFare = getFareForType(vehicleType, "One Way");
+    const rtFare = getFareForType(vehicleType, "Round Trip");
     const message = `Hi Xplorwing! I would like to book a Cab.\n\n🚗 *Booking Details:*\n• *Route:* ${fromCity} (${fromCode}) → ${toCity} (${toCode})\n• *Vehicle:* ${vehicleType}\n• *One Way:* ₹${owFare.toLocaleString()}* | *Round Trip:* ₹${rtFare.toLocaleString()}*\n\nPlease confirm trip type and availability. Thank you!`;
     return `https://wa.me/919492986412?text=${encodeURIComponent(message)}`;
   };
 
-  const handleBookNowClick = (cabType: "Sedan" | "SUV", tripType: "One Way" | "Round Trip" = "Round Trip") => {
+  const handleBookNowClick = (cabType: "Sedan" | "MUV" | "SUV", tripType: "One Way" | "Round Trip" = "Round Trip") => {
     setSelectedCabType(cabType);
     setSelectedTripType(tripType);
     setIsBookModalOpen(true);
   };
 
+  const openVehicleSelect = (tripType: "One Way" | "Round Trip" = "Round Trip") => {
+    setSelectedTripType(tripType);
+    setPickedVehicle(null);
+    setIsVehicleSelectOpen(true);
+  };
+
   const handleOnlinePayment = () => {
     if (!travelDate) return;
-    
-    // Determine fare based on selection
-    let fare = 0;
-    if (selectedCabType === "Sedan") {
-      if (selectedTripType === "One Way") fare = effectiveSedanOneWay;
-      else fare = effectiveSedanRound;
-    } else {
-      if (selectedTripType === "One Way") fare = effectiveSuvOneWay;
-      else fare = effectiveSuvRound;
-    }
+    const fare = getFareForType(selectedCabType, selectedTripType);
 
     const stateStr = variant === "ticket" ? "Telangana" : "Andhra Pradesh";
 
@@ -228,7 +253,7 @@ const CabFareCard = ({
       listingCouponType: "cabs" as const,
       hostId: adminHostId || "00000000-0000-0000-0000-000000000000",
       listingTitle: `Outstation Cab - ${selectedCabType} (${selectedTripType})`,
-      listingImage: resolveImageUrl(imageUrl || "") || getDestinationImage(toCode),
+      listingImage: selectedCabType === "Sedan" ? sedanImg : selectedCabType === "MUV" ? muvImg : suvImg,
       currencySymbol: "₹",
       unitLabel: "Trip",
       unitPrice: fare,
@@ -244,6 +269,7 @@ const CabFareCard = ({
         pickup_location: fromCity,
         drop_location: toCity,
         travel_date: travelDate,
+        pickup_time: travelTime,
         cab_type: selectedCabType,
         fare_amount: fare,
         state: stateStr,
@@ -252,6 +278,145 @@ const CabFareCard = ({
 
     navigate("/confirm-and-pay", { state: { booking: bookingDetails } });
   };
+
+  // ── Vehicle selection popup ──
+  const VEHICLES = [
+    { type: "Sedan" as const, img: sedanImg, desc: "4 seats · Comfortable", owFare: effectiveSedanOneWay, rtFare: effectiveSedanRound },
+    { type: "MUV"   as const, img: muvImg,   desc: "6 seats · Spacious",    owFare: effectiveMuvOneWay,   rtFare: effectiveMuvRound },
+    { type: "SUV"   as const, img: suvImg,   desc: "7 seats · Premium",     owFare: effectiveSuvOneWay,   rtFare: effectiveSuvRound },
+  ];
+
+  const vehicleSelectDialog = (
+    <Dialog open={isVehicleSelectOpen} onOpenChange={(open) => { setIsVehicleSelectOpen(open); if (!open) setPickedVehicle(null); }}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Choose Your Vehicle</DialogTitle>
+          <DialogDescription>{fromCity} → {toCity} · Tap a vehicle type to proceed</DialogDescription>
+        </DialogHeader>
+
+        {/* Vehicle cards */}
+        <div className="grid grid-cols-3 gap-3 pt-2">
+          {VEHICLES.map(({ type, img, desc, owFare, rtFare }) => {
+            const isSelected = pickedVehicle === type;
+            return (
+              <button
+                key={type}
+                onClick={() => { setPickedVehicle(type); setSelectedCabType(type); }}
+                className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border-2 transition-all text-center ${
+                  isSelected
+                    ? "border-[#064e3b] bg-[#f0fdf4] shadow-md"
+                    : "border-border hover:border-[#064e3b]/40 hover:bg-muted/40"
+                }`}
+              >
+                <img
+                  src={img}
+                  alt={type}
+                  className="h-16 w-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                />
+                <p className={`font-bold text-sm ${isSelected ? "text-[#064e3b]" : "text-foreground"}`}>{type}</p>
+                <p className="text-[10px] text-muted-foreground">{desc}</p>
+                <div className="mt-1 w-full border-t pt-1.5">
+                  <div className="flex justify-between text-[10px]">
+                    <span className="text-muted-foreground">Round Trip</span>
+                    <span className="font-semibold">₹{rtFare.toLocaleString()}</span>
+                  </div>
+                </div>
+                {isSelected && <span className="text-[9px] font-bold text-[#064e3b]">✓ Selected</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Booking form — only appears after vehicle is selected */}
+        <AnimatePresence>
+        {pickedVehicle && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.3 }}
+          className="mt-4 space-y-3 overflow-hidden"
+        >
+          <div className="rounded-xl border bg-muted/20 p-4 space-y-3">
+            {/* Travel date */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-foreground">Travel Date</label>
+                <input
+                  type="date"
+                  value={travelDate}
+                  onChange={(e) => setTravelDate(e.target.value)}
+                  min={format(new Date(), "yyyy-MM-dd")}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-foreground">Pickup Time</label>
+                <select
+                  value={travelTime}
+                  onChange={(e) => setTravelTime(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {Array.from({ length: 48 }, (_, i) => {
+                    const h = Math.floor(i / 2);
+                    const m = i % 2 === 0 ? "00" : "30";
+                    const hh = String(h).padStart(2, "0");
+                    const ampm = h < 12 ? "AM" : "PM";
+                    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+                    return (
+                      <option key={`${hh}:${m}`} value={`${hh}:${m}`}>
+                        {String(h12).padStart(2, "0")}:{m} {ampm}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+
+            {/* Fare summary */}
+            <div className="rounded-lg bg-background border p-3 space-y-1.5 text-sm">
+              <div className="flex justify-between text-muted-foreground text-xs">
+                <span>Route</span><span className="font-medium text-foreground">{fromCity} → {toCity}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground text-xs">
+                <span>Vehicle</span><span className="font-medium text-foreground">{selectedCabType}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground text-xs">
+                <span>Trip</span><span className="font-medium text-foreground">Round Trip</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground text-xs">
+                <span>Pickup Time</span><span className="font-medium text-foreground">{travelTime}</span>
+              </div>
+              <div className="flex justify-between border-t pt-1.5 mt-1">
+                <span className="font-semibold text-sm">Estimated Fare</span>
+                <span className="font-bold text-base text-[#064e3b]">₹{getFareForType(selectedCabType, selectedTripType).toLocaleString()}*</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground text-right">*Excl. tolls & driver night charges</p>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex gap-2 pb-1">
+            <button
+              onClick={() => { window.open(buildWhatsAppUrl(selectedCabType), "_blank"); setIsVehicleSelectOpen(false); }}
+              className="flex-1 py-2.5 rounded-xl border border-[#25D366] text-[#25D366] text-xs font-semibold hover:bg-[#25D366]/10 transition-colors"
+            >
+              Book via WhatsApp
+            </button>
+            <button
+              disabled={!travelDate}
+              onClick={() => { setIsVehicleSelectOpen(false); handleOnlinePayment(); }}
+              className="flex-1 py-2.5 rounded-xl bg-[#064e3b] text-white text-xs font-semibold hover:bg-[#043d2e] transition-colors disabled:opacity-50"
+            >
+              Book Now (Pay Online)
+            </button>
+          </div>
+        </motion.div>
+        )}
+        </AnimatePresence>
+      </DialogContent>
+    </Dialog>
+  );
 
   // ── Shared Dialog (rendered by both variants) ──
   const bookingDialog = (
@@ -282,10 +447,7 @@ const CabFareCard = ({
             <div className="flex justify-between"><span className="text-muted-foreground">Vehicle</span><span className="font-medium">{selectedCabType}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Trip Type</span><span className="font-medium">{selectedTripType}</span></div>
             <div className="flex justify-between border-t pt-2 mt-2"><span className="font-semibold">Estimated Fare</span><span className="font-bold text-lg">
-              ₹{(selectedCabType === "Sedan" 
-                ? (selectedTripType === "One Way" ? effectiveSedanOneWay : effectiveSedanRound) 
-                : (selectedTripType === "One Way" ? effectiveSuvOneWay : effectiveSuvRound)
-              ).toLocaleString()}*
+              ₹{getFareForType(selectedCabType, selectedTripType).toLocaleString()}*
             </span></div>
             <p className="text-[10px] text-muted-foreground text-right">*Excl. tolls & driver night charges</p>
           </div>
@@ -322,11 +484,9 @@ const CabFareCard = ({
   // PREVIOUS (ORIGINAL) STYLE RENDERER
   // ────────────────────────────────────────────────────────────────
   if (variant === "previous") {
-    const effectiveSedanPrice = effectiveSedanRound;
-    const effectiveSuvPrice = effectiveSuvRound;
-
     return (
       <>
+      {vehicleSelectDialog}
       {bookingDialog}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -335,11 +495,13 @@ const CabFareCard = ({
         className="bg-card border border-border rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full max-w-full"
       >
         <div className="flex items-center w-full relative min-h-[100px] md:min-h-[120px]">
+          {/* From */}
           <div className="flex-1 p-1 md:p-5 flex flex-col items-center justify-center text-center min-w-[60px] md:min-w-[110px]">
             <p className="text-sm md:text-2xl font-bold text-foreground leading-tight">{fromCode}</p>
             <p className="text-[9px] md:text-sm text-muted-foreground leading-tight mt-0.5">{fromCity}</p>
           </div>
 
+          {/* Car icon + distance */}
           <div className="flex flex-col items-center px-0.5 md:px-2 py-4 shrink-0">
             <p className="text-[7px] md:text-[10px] font-bold text-muted-foreground tracking-tighter md:tracking-widest uppercase mb-1">Round Trip</p>
             <div className="flex items-center gap-0.5 md:gap-1">
@@ -350,47 +512,20 @@ const CabFareCard = ({
             <p className="text-[8px] md:text-xs text-muted-foreground mt-1 font-medium whitespace-nowrap">{distance}</p>
           </div>
 
+          {/* To */}
           <div className="flex-1 p-1 md:p-5 flex flex-col items-center justify-center text-center min-w-[60px] md:min-w-[110px]">
             <p className="text-sm md:text-2xl font-bold text-foreground leading-tight">{toCode}</p>
             <p className="text-[9px] md:text-sm text-muted-foreground leading-tight mt-0.5">{toCity}</p>
           </div>
 
-          <div className="p-2 md:p-5 min-w-[100px] md:min-w-[160px] self-stretch flex flex-col justify-center text-center bg-[#064e3b] border-l border-emerald-900 shadow-inner shrink-0">
-            <div className="mb-0.5 md:mb-1">
-              <p className="text-[8px] md:text-xs text-emerald-100/70 uppercase tracking-wider font-medium">Sedan</p>
-              <p
-                className={`text-[9px] md:text-sm text-emerald-100/70 line-through h-[14px] md:h-[18px] ${
-                  effectiveSedanPrice !== sedanPrice ? "opacity-100" : "opacity-0"
-                }`}
-              >
-                ₹{sedanPrice.toLocaleString()}
-              </p>
-              <p className="text-xs md:text-xl font-bold text-[#FFFFF0]">₹{effectiveSedanPrice.toLocaleString()}</p>
-              <button
-                onClick={() => handleBookNowClick("Sedan", "Round Trip")}
-                className="inline-block mt-0.5 md:mt-1 px-2 md:px-3 py-0.5 md:py-1 bg-[#E5F76E] text-gray-900 text-[7px] md:text-[10px] font-semibold rounded-full hover:bg-[#d4e85e] transition-colors"
-              >
-                Book Now
-              </button>
-            </div>
-            <div className="h-[1px] bg-[#FFFFF0] w-full mb-0.5 md:mb-1 opacity-20" />
-            <div>
-              <p className="text-[8px] md:text-xs text-emerald-100/70 uppercase tracking-wider font-medium">SUV</p>
-              <p
-                className={`text-[9px] md:text-sm text-emerald-100/70 line-through h-[14px] md:h-[18px] ${
-                  effectiveSuvPrice !== suvPrice ? "opacity-100" : "opacity-0"
-                }`}
-              >
-                ₹{suvPrice.toLocaleString()}
-              </p>
-              <p className="text-xs md:text-xl font-bold text-[#FFFFF0]">₹{effectiveSuvPrice.toLocaleString()}</p>
-              <button
-                onClick={() => handleBookNowClick("SUV", "Round Trip")}
-                className="inline-block mt-0.5 md:mt-1 px-2 md:px-3 py-0.5 md:py-1 bg-[#E5F76E] text-gray-900 text-[7px] md:text-[10px] font-semibold rounded-full hover:bg-[#d4e85e] transition-colors"
-              >
-                Book Now
-              </button>
-            </div>
+          {/* Book Now only */}
+          <div className="p-2 md:p-4 self-stretch flex items-center justify-center bg-[#064e3b] border-l border-emerald-900 shadow-inner shrink-0">
+            <button
+              onClick={() => openVehicleSelect("Round Trip")}
+              className="px-3 md:px-5 py-1.5 md:py-2 bg-[#E5F76E] text-gray-900 text-[9px] md:text-xs font-bold rounded-full hover:bg-[#d4e85e] transition-colors whitespace-nowrap"
+            >
+              Book Now
+            </button>
           </div>
         </div>
       </motion.div>
@@ -404,6 +539,7 @@ const CabFareCard = ({
 
   return (
     <>
+    {vehicleSelectDialog}
     {bookingDialog}
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -476,9 +612,8 @@ const CabFareCard = ({
             </div>
           </div>
 
-          {/* VEHICLE CARDS */}
+          {/* VEHICLE CARDS — Sedan / MUV / SUV */}
           <div className="vehicle-row">
-            {/* SEDAN */}
             <div className="v-card">
               <div className="v-type">Sedan</div>
               <div className="v-prices-inner">
@@ -493,12 +628,24 @@ const CabFareCard = ({
                   <div className="v-price">₹{effectiveSedanRound.toLocaleString()}<sup>*</sup></div>
                 </div>
               </div>
-              <button onClick={() => handleBookNowClick("Sedan", "Round Trip")} className="v-btn">
-                Book Now
-              </button>
             </div>
 
-            {/* SUV */}
+            <div className="v-card">
+              <div className="v-type">MUV</div>
+              <div className="v-prices-inner">
+                <div className="v-price-col">
+                  <div className="v-trip-label">One Way</div>
+                  <div className="v-price-struck">₹{displayMuvOneWayOrig.toLocaleString()}</div>
+                  <div className="v-price">₹{effectiveMuvOneWay.toLocaleString()}<sup>*</sup></div>
+                </div>
+                <div className="v-price-col">
+                  <div className="v-trip-label">Round Trip</div>
+                  <div className="v-price-struck">₹{displayMuvRoundOrig.toLocaleString()}</div>
+                  <div className="v-price">₹{effectiveMuvRound.toLocaleString()}<sup>*</sup></div>
+                </div>
+              </div>
+            </div>
+
             <div className="v-card">
               <div className="v-type">SUV</div>
               <div className="v-prices-inner">
@@ -513,10 +660,14 @@ const CabFareCard = ({
                   <div className="v-price">₹{effectiveSuvRound.toLocaleString()}<sup>*</sup></div>
                 </div>
               </div>
-              <button onClick={() => handleBookNowClick("SUV", "Round Trip")} className="v-btn">
-                Book Now
-              </button>
             </div>
+          </div>
+
+          {/* SINGLE BOOK NOW BUTTON */}
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0 2px' }}>
+            <button onClick={() => openVehicleSelect("Round Trip")} className="v-btn" style={{ minWidth: 120 }}>
+              Book Now
+            </button>
           </div>
 
           {/* FOOTER */}
@@ -547,8 +698,9 @@ const CabFareCard = ({
             <div className="acc-row"><span className="acc-key">Buffer</span><span className="acc-val">+{bufferDistance} km</span></div>
             <div className="acc-row"><span className="acc-key">Total</span><span className="acc-val">{totalCovered} km</span></div>
             <div className="acc-trip-header">Extra KM</div>
-            <div className="acc-row"><span className="acc-key">Sedan</span><span className="acc-val">₹14 / km</span></div>
-            <div className="acc-row"><span className="acc-key">SUV</span><span className="acc-val">₹18 / km</span></div>
+            <div className="acc-row"><span className="acc-key">Sedan</span><span className="acc-val">₹12 / km</span></div>
+            <div className="acc-row"><span className="acc-key">MUV</span><span className="acc-val">₹16 / km</span></div>
+            <div className="acc-row"><span className="acc-key">SUV</span><span className="acc-val">₹22 / km</span></div>
           </div>
           <div>
             <div className="acc-section-title">What's Included</div>

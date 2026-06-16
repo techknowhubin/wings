@@ -48,13 +48,18 @@ const ConfirmAndPay = () => {
   const { state } = useLocation();
 
   const [booking, setBooking] = useState<BookingDetails | null>(() => {
-    if (state?.booking) return state.booking;
+    if (state?.booking) {
+      // Fresh booking from navigation — clear any stale localStorage cache
+      localStorage.removeItem("pending_booking");
+      return state.booking;
+    }
     const saved = localStorage.getItem("pending_booking");
     return saved ? JSON.parse(saved) : null;
   });
 
   useEffect(() => {
     if (state?.booking) {
+      localStorage.removeItem("pending_booking");
       setBooking(state.booking);
     }
   }, [state]);
@@ -73,6 +78,9 @@ const ConfirmAndPay = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [pickupAddress, setPickupAddress] = useState("");
+  const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapLoading, setMapLoading] = useState(false);
 
   // Additional guests
   const [extraGuests, setExtraGuests] = useState<ExtraGuest[]>([]);
@@ -554,29 +562,51 @@ const ConfirmAndPay = () => {
 
             {/* Listing Summary */}
             <div className="rounded-2xl border border-border bg-background p-4 mb-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="h-24 w-28 rounded-xl overflow-hidden border border-border bg-secondary/40 shrink-0">
-                    {booking.listingImage ? (
-                      <img src={booking.listingImage} alt={booking.listingTitle} className="h-full w-full object-cover" />
-                    ) : null}
-                  </div>
-                  <div>
-                    <p className="text-lg font-semibold text-foreground">{booking.listingTitle}</p>
-                    <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
-                      <CalendarDays className="h-4 w-4 text-accent" />
+              <div className="flex items-start gap-3">
+                {/* Car image */}
+                <div className="h-20 w-28 sm:h-28 sm:w-36 rounded-xl overflow-hidden border border-border bg-white shrink-0 flex items-center justify-center">
+                  {booking.listingImage ? (
+                    <img
+                      src={booking.listingImage}
+                      alt={booking.listingTitle}
+                      className="h-full w-full object-contain mix-blend-multiply"
+                    />
+                  ) : null}
+                </div>
+
+                {/* Details */}
+                <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm sm:text-lg font-semibold text-foreground leading-snug">{booking.listingTitle}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                      <CalendarDays className="h-3.5 w-3.5 text-accent shrink-0" />
                       {stayDates}
                     </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {booking.quantity} {booking.unitLabel} • {booking.currencySymbol}{booking.unitPrice} each
+                    {booking.cabDetails && (
+                      <>
+                        <p className="text-xs sm:text-sm font-medium text-foreground mt-1">
+                          📍 {booking.cabDetails.pickup_location} → {booking.cabDetails.drop_location}
+                        </p>
+                        {booking.cabDetails.pickup_time && (
+                          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 flex items-center gap-1">
+                            🕐 Pickup at {booking.cabDetails.pickup_time}
+                          </p>
+                        )}
+                      </>
+                    )}
+                    {/* Total — shown below on mobile only */}
+                    <p className="sm:hidden text-sm font-bold text-foreground mt-2">
+                      Total — {booking.currencySymbol}{formatAmount(booking.total)}
                     </p>
                   </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Total</p>
-                  <p className="text-3xl font-bold text-foreground">
-                    {booking.currencySymbol}{formatAmount(booking.total)}
-                  </p>
+
+                  {/* Total — shown on the right on desktop only */}
+                  <div className="hidden sm:block text-right shrink-0">
+                    <p className="text-xs text-muted-foreground">Total</p>
+                    <p className="text-2xl font-bold text-foreground whitespace-nowrap">
+                      {booking.currencySymbol}{formatAmount(booking.total)}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -648,6 +678,160 @@ const ConfirmAndPay = () => {
                     required
                   />
                 </div>
+                {booking.cabDetails && (
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pickup-address">Pickup Address *</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="pickup-address"
+                          className="h-11 rounded-xl bg-white dark:bg-background flex-1"
+                          value={pickupAddress}
+                          onChange={(e) => { setPickupAddress(e.target.value); setPickupCoords(null); }}
+                          placeholder="Enter your exact pickup address"
+                          required
+                        />
+                        <button
+                          type="button"
+                          disabled={!pickupAddress.trim() || mapLoading}
+                          onClick={async () => {
+                            if (!pickupAddress.trim()) return;
+                            setMapLoading(true);
+                            try {
+                              const res = await fetch(
+                                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(pickupAddress)}&format=json&addressdetails=1&limit=1`,
+                                { headers: { "Accept-Language": "en" } }
+                              );
+                              const data = await res.json();
+                              if (data && data[0]) {
+                                setPickupCoords({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) });
+                                toast.success("Address found on map.");
+                              } else {
+                                // Fallback: open Google Maps search directly
+                                window.open(`https://www.google.com/maps/search/${encodeURIComponent(pickupAddress)}`, "_blank");
+                              }
+                            } catch {
+                              window.open(`https://www.google.com/maps/search/${encodeURIComponent(pickupAddress)}`, "_blank");
+                            } finally {
+                              setMapLoading(false);
+                            }
+                          }}
+                          className="h-11 px-3 rounded-xl border border-border bg-white hover:bg-muted/50 transition-colors text-xs font-semibold text-[#064e3b] whitespace-nowrap shrink-0 disabled:opacity-40"
+                        >
+                          {mapLoading ? (
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                            </svg>
+                          ) : "🗺️ Show on Map"}
+                        </button>
+                      </div>
+                    </div>
+                    {/* Select on Maps */}
+                    <div className="space-y-1.5">
+                      <Label>Or select on map</Label>
+                      <button
+                        type="button"
+                        disabled={mapLoading}
+                        onClick={async () => {
+                          if (!navigator.geolocation) {
+                            toast.error("Geolocation is not supported by your browser.");
+                            return;
+                          }
+                          setMapLoading(true);
+                          navigator.geolocation.getCurrentPosition(
+                            async (pos) => {
+                              const { latitude, longitude } = pos.coords;
+                              try {
+                                const res = await fetch(
+                                  `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1&zoom=18`,
+                                  { headers: { "Accept-Language": "en" } }
+                                );
+                                const data = await res.json();
+                                const a = data.address || {};
+                                // Build precise address: building → house no → road → suburb → city → state → pincode
+                                const parts = [
+                                  a.building || a.amenity || a.shop || a.office || a.tourism,
+                                  a.house_number ? `No. ${a.house_number}` : null,
+                                  a.road || a.pedestrian || a.footway,
+                                  a.neighbourhood || a.suburb || a.quarter,
+                                  a.city || a.town || a.village || a.county,
+                                  a.state,
+                                  a.postcode,
+                                ].filter(Boolean).join(", ");
+                                setPickupAddress(parts || data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+                                setPickupCoords({ lat: latitude, lng: longitude });
+                                toast.success("Location detected successfully.");
+                              } catch {
+                                setPickupAddress(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+                              } finally {
+                                setMapLoading(false);
+                              }
+                            },
+                            (err) => {
+                              setMapLoading(false);
+                              toast.error("Could not get your location. Please allow location access.");
+                            },
+                            { enableHighAccuracy: true, timeout: 10000 }
+                          );
+                        }}
+                        className="flex items-center gap-2 w-full h-11 px-4 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary/60 transition-all text-sm font-medium text-[#064e3b] disabled:opacity-60"
+                      >
+                        {mapLoading ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                            </svg>
+                            Detecting your location…
+                          </>
+                        ) : (
+                          <>
+                            <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="12" r="3"/>
+                              <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+                              <path d="M12 8a4 4 0 100 8 4 4 0 000-8z" fill="currentColor" opacity=".15"/>
+                            </svg>
+                            📍 Use My Current Location (via GPS)
+                          </>
+                        )}
+                      </button>
+                      <p className="text-[10px] text-muted-foreground">
+                        Allows browser to detect your precise location and auto-fill the address above.
+                      </p>
+
+                      {/* Coordinates display — shown after detection */}
+                      {pickupCoords && (
+                        <div className="mt-2 rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-foreground">📌 GPS Coordinates</span>
+                            <a
+                              href={`https://www.google.com/maps?q=${pickupCoords.lat},${pickupCoords.lng}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] font-semibold text-[#064e3b] underline underline-offset-2 hover:opacity-80"
+                            >
+                              Open in Google Maps ↗
+                            </a>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-lg border bg-white px-3 py-2">
+                              <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Latitude</p>
+                              <p className="text-sm font-mono font-semibold text-foreground">{pickupCoords.lat.toFixed(6)}</p>
+                            </div>
+                            <div className="rounded-lg border bg-white px-3 py-2">
+                              <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Longitude</p>
+                              <p className="text-sm font-mono font-semibold text-foreground">{pickupCoords.lng.toFixed(6)}</p>
+                            </div>
+                          </div>
+                          <p className="text-[9px] text-muted-foreground">
+                            Share these coordinates with your cab driver to navigate directly to your location.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </form>
             </div>
 
@@ -807,7 +991,7 @@ const ConfirmAndPay = () => {
               </div>
               {referralPartner && (
                 <p className="text-xs text-green-600 font-medium mt-1.5 flex items-center gap-1">
-                  <span>✓</span> Referred by {referralPartner.business_name} ({referralPartner.commission_rate}% commission to partner)
+                  <span>✓</span> Referred by {referralPartner.business_name}
                 </p>
               )}
             </div>

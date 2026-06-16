@@ -709,10 +709,25 @@ const Auth = () => {
         toast({ variant: "destructive", title: "Validation Error", description: zodError.message });
       } else {
         const msg: string = err.message || "Something went wrong";
-        const isConflict = msg.toLowerCase().includes("already registered") ||
-          msg.toLowerCase().includes("already exists") ||
-          msg.toLowerCase().includes("user already");
-        if (isConflict) {
+        const msgL = msg.toLowerCase();
+        const isEmailSendFail =
+          msgL.includes('error sending confirmation email') ||
+          msgL.includes('email sending') ||
+          msgL.includes('failed to send') ||
+          msgL.includes('smtp');
+        const isConflict = msgL.includes("already registered") ||
+          msgL.includes("already exists") ||
+          msgL.includes("user already");
+        if (isEmailSendFail) {
+          // Account was created but confirmation email couldn't be sent (SMTP issue).
+          // Show a helpful message so the user knows to contact support.
+          setVerificationPending(true);
+          toast({
+            variant: "destructive",
+            title: "Email delivery issue",
+            description: "Your account was created but the confirmation email couldn't be sent. Please contact support or try resending from the login page.",
+          });
+        } else if (isConflict) {
           toast({
             variant: "destructive",
             title: "User already exists",

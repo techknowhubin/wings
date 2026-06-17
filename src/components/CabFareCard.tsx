@@ -696,22 +696,21 @@ const CabFareCard = ({
               <p className="text-[9px] md:text-sm text-muted-foreground leading-tight mt-0.5">{toCity}</p>
             </div>
 
-            {/* Price and Book Now */}
-            <div className="p-2 md:p-4 self-stretch flex flex-col items-center justify-center bg-[#064e3b] border-l border-emerald-900 shadow-inner shrink-0 gap-1.5 md:gap-2 min-w-[90px] md:min-w-[130px]">
-              <div className="flex flex-col items-center text-center text-white">
-                <span className="opacity-80 text-[8px] md:text-[10px] font-semibold">Starting from</span>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <span className="text-[9px] md:text-[11px] text-white/60 line-through">
-                    ₹{displaySedanOneWayOriginal.toLocaleString()}
-                  </span>
-                  <span className="text-sm md:text-lg font-bold text-[#E5F76E]">
-                    ₹{effectiveSedanOneWay.toLocaleString()}
-                  </span>
-                </div>
+            {/* Price and Book Now — fixed width so all cards are identical height */}
+            <div className="p-2 md:p-4 self-stretch flex flex-col items-center justify-center bg-[#064e3b] border-l border-emerald-900 shadow-inner shrink-0 gap-1.5 md:gap-2 w-[100px] md:w-[140px]">
+              <div className="flex flex-col items-center text-center text-white w-full">
+                <span className="opacity-80 text-[8px] md:text-[10px] font-semibold whitespace-nowrap">Starting from</span>
+                <span className="text-[8px] md:text-[10px] text-white/60 line-through mt-0.5 whitespace-nowrap">
+                  ₹{displaySedanRoundOriginal.toLocaleString()}
+                </span>
+                <span className="font-bold text-[#E5F76E] whitespace-nowrap leading-tight"
+                  style={{ fontSize: effectiveSedanRound >= 10000 ? 'clamp(0.75rem, 2.5vw, 1rem)' : 'clamp(0.85rem, 3vw, 1.125rem)' }}>
+                  ₹{effectiveSedanRound.toLocaleString()}
+                </span>
               </div>
               <button
                 onClick={(e) => { e.stopPropagation(); openVehicleSelect("Round Trip"); }}
-                className="w-full px-3 md:px-5 py-1 md:py-1.5 bg-[#E5F76E] text-gray-900 text-[9px] md:text-xs font-bold rounded-full hover:bg-[#d4e85e] transition-colors whitespace-nowrap"
+                className="w-full px-2 md:px-4 py-1 md:py-1.5 bg-[#E5F76E] text-gray-900 text-[9px] md:text-xs font-bold rounded-full hover:bg-[#d4e85e] transition-colors whitespace-nowrap"
               >
                 Book Now
               </button>

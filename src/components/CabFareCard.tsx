@@ -11,6 +11,8 @@ import carIcon from "@/assets/car-icon-5436.png";
 import sedanImg from "@/assets/sedan-dzire.jpeg";
 import muvImg from "@/assets/MUV-Ertiga.jpeg";
 import suvImg from "@/assets/SUV-Innova.jpeg";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 import "./CabFareCard.css";
 
 // Import local destination images for the ticket design
@@ -131,6 +133,7 @@ const CabFareCard = ({
   variant = "previous",
 }: CabFareCardProps) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [isBookModalOpen, setIsBookModalOpen] = useState(false);
   const [isVehicleSelectOpen, setIsVehicleSelectOpen] = useState(false);
   const [selectedCabType, setSelectedCabType] = useState<"Sedan" | "MUV" | "SUV">("Sedan");
@@ -138,8 +141,23 @@ const CabFareCard = ({
   const [travelTime, setTravelTime] = useState("06:00");
   const [selectedTripType, setSelectedTripType] = useState<"One Way" | "Round Trip">("Round Trip");
   const [travelDate, setTravelDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
+  const [returnDate, setReturnDate] = useState(format(addDays(new Date(), 2), "yyyy-MM-dd"));
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [adminHostId, setAdminHostId] = useState<string>("");
   const [isOpen, setIsOpen] = useState(false);
+
+  const [timeSettings, setTimeSettings] = useState<{
+    same_day_restrictions_enabled: boolean;
+    min_advance_hours: number;
+    available_time_slots: string[];
+    blocked_time_slots: string[];
+  }>({
+    same_day_restrictions_enabled: true,
+    min_advance_hours: 1,
+    available_time_slots: [],
+    blocked_time_slots: []
+  });
 
   useEffect(() => {
     // Fetch an admin user ID to act as the host for outstation cabs
@@ -154,6 +172,110 @@ const CabFareCard = ({
     };
     fetchAdminId();
   }, []);
+
+  useEffect(() => {
+    const prefillProfile = async () => {
+      if (!user) return;
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, phone")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (profile) {
+          setCustomerName(profile.full_name || "");
+          setCustomerPhone(profile.phone || user.phone || "");
+        }
+      } catch (err) {
+        console.error("Prefill error:", err);
+      }
+    };
+    prefillProfile();
+  }, [user]);
+
+  useEffect(() => {
+    const fetchTimeSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('platform_settings' as any)
+          .select('same_day_restrictions_enabled, min_advance_hours, available_time_slots, blocked_time_slots')
+          .limit(1)
+          .maybeSingle();
+        if (data && !error) {
+          setTimeSettings({
+            same_day_restrictions_enabled: data.same_day_restrictions_enabled !== false,
+            min_advance_hours: Number(data.min_advance_hours ?? 1),
+            available_time_slots: Array.isArray(data.available_time_slots) ? data.available_time_slots : [],
+            blocked_time_slots: Array.isArray(data.blocked_time_slots) ? data.blocked_time_slots : [],
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch platform settings for cab timing:", err);
+      }
+    };
+    fetchTimeSettings();
+  }, []);
+
+  useEffect(() => {
+    if (travelDate && returnDate && returnDate < travelDate) {
+      setReturnDate(travelDate);
+    }
+  }, [travelDate, returnDate]);
+
+  const getFilteredTimeSlots = () => {
+    const allSlots = Array.from({ length: 48 }, (_, i) => {
+      const h = Math.floor(i / 2);
+      const m = i % 2 === 0 ? "00" : "30";
+      const hh = String(h).padStart(2, "0");
+      const timeStr = `${hh}:${m}`;
+      const ampm = h < 12 ? "AM" : "PM";
+      const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      const displayStr = `${String(h12).padStart(2, "0")}:${m} ${ampm}`;
+      return { value: timeStr, label: displayStr };
+    });
+
+    return allSlots.filter((slot) => {
+      const [sh, sm] = slot.value.split(":").map(Number);
+
+      // 1. Block 12 hours from current time and date
+      if (travelDate) {
+        const now = new Date();
+        const [ty, tm, td] = travelDate.split("-").map(Number);
+        const slotDate = new Date(ty, tm - 1, td, sh, sm, 0, 0);
+
+        const diffMs = slotDate.getTime() - now.getTime();
+        const diffHours = diffMs / (1000 * 60 * 60);
+
+        if (diffHours < 12) {
+          return false;
+        }
+      }
+
+      // 2. Filter by available time slots configured by admin
+      if (timeSettings.available_time_slots.length > 0) {
+        if (!timeSettings.available_time_slots.includes(slot.value)) {
+          return false;
+        }
+      }
+
+      // 3. Filter by manually blocked time slots configured by admin
+      if (timeSettings.blocked_time_slots.includes(slot.value)) {
+        return false;
+      }
+
+      return true;
+    });
+  };
+
+  useEffect(() => {
+    const slots = getFilteredTimeSlots();
+    if (slots.length > 0) {
+      const currentStillValid = slots.some((s) => s.value === travelTime);
+      if (!currentStillValid) {
+        setTravelTime(slots[0].value);
+      }
+    }
+  }, [travelDate, timeSettings]);
 
   // ── Shared pricing variables (needed by both variants and the Dialog) ──
   const effectiveSedanRound =
@@ -224,9 +346,24 @@ const CabFareCard = ({
   };
 
   const buildWhatsAppUrl = (vehicleType: string) => {
-    const owFare = getFareForType(vehicleType, "One Way");
-    const rtFare = getFareForType(vehicleType, "Round Trip");
-    const message = `Hi Xplorwing! I would like to book a Cab.\n\n🚗 *Booking Details:*\n• *Route:* ${fromCity} (${fromCode}) → ${toCity} (${toCode})\n• *Vehicle:* ${vehicleType}\n• *One Way:* ₹${owFare.toLocaleString()}* | *Round Trip:* ₹${rtFare.toLocaleString()}*\n\nPlease confirm trip type and availability. Thank you!`;
+    const fare = getFareForType(vehicleType, "Round Trip");
+    const formattedPickupDate = travelDate ? format(new Date(travelDate), "dd MMM yyyy") : "—";
+
+    let message = `Hi Xplorwing! I would like to book a Cab.\n\n` +
+      `🚗 *Booking Details:*\n` +
+      (customerName ? `• *Customer Name:* ${customerName.trim()}\n` : "") +
+      (customerPhone ? `• *Mobile Number:* ${customerPhone.trim()}\n` : "") +
+      `• *Pickup Location:* ${fromCity} (${fromCode})\n` +
+      `• *Drop Location:* ${toCity} (${toCode})\n` +
+      `• *Route:* ${fromCity} → ${toCity}\n` +
+      `• *Distance:* ${distance}\n` +
+      `• *Trip Type:* Round Trip\n` +
+      `• *Pickup Date:* ${formattedPickupDate}\n` +
+      `• *Pickup Time:* ${travelTime}\n` +
+      `• *Vehicle Type:* ${vehicleType}\n` +
+      `• *Total Fare:* ₹${fare.toLocaleString()}*\n\n` +
+      `Please confirm availability. Thank you!`;
+
     return `https://wa.me/919492986412?text=${encodeURIComponent(message)}`;
   };
 
@@ -259,7 +396,7 @@ const CabFareCard = ({
       unitPrice: fare,
       quantity: 1,
       startDate: new Date(travelDate).toISOString(),
-      endDate: new Date(travelDate).toISOString(),
+      endDate: new Date(selectedTripType === "Round Trip" ? returnDate : travelDate).toISOString(),
       description: `${fromCity} to ${toCity} - Distance: ${distance}`,
       subtotal: fare,
       discount: 0,
@@ -270,9 +407,11 @@ const CabFareCard = ({
         drop_location: toCity,
         travel_date: travelDate,
         pickup_time: travelTime,
+        return_date: selectedTripType === "Round Trip" ? returnDate : undefined,
         cab_type: selectedCabType,
         fare_amount: fare,
         state: stateStr,
+        distance_km: numericDistance,
       }
     };
 
@@ -335,81 +474,86 @@ const CabFareCard = ({
           animate={{ opacity: 1, height: "auto" }}
           exit={{ opacity: 0, height: 0 }}
           transition={{ duration: 0.3 }}
-          className="mt-4 space-y-3 overflow-hidden"
+          className="mt-4 space-y-4 overflow-hidden"
         >
-          <div className="rounded-xl border bg-muted/20 p-4 space-y-3">
-            {/* Travel date */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-foreground">Travel Date</label>
-                <input
-                  type="date"
-                  value={travelDate}
-                  onChange={(e) => setTravelDate(e.target.value)}
-                  min={format(new Date(), "yyyy-MM-dd")}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-foreground">Pickup Time</label>
-                <select
-                  value={travelTime}
-                  onChange={(e) => setTravelTime(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  {Array.from({ length: 48 }, (_, i) => {
-                    const h = Math.floor(i / 2);
-                    const m = i % 2 === 0 ? "00" : "30";
-                    const hh = String(h).padStart(2, "0");
-                    const ampm = h < 12 ? "AM" : "PM";
-                    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-                    return (
-                      <option key={`${hh}:${m}`} value={`${hh}:${m}`}>
-                        {String(h12).padStart(2, "0")}:{m} {ampm}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="travelDate" className="text-sm font-semibold text-[#013220]">Travel Date</Label>
+              <Input
+                id="travelDate"
+                type="date"
+                value={travelDate}
+                onChange={(e) => {
+                  setTravelDate(e.target.value);
+                  setTravelTime("");
+                }}
+                min={format(new Date(), "yyyy-MM-dd")}
+                required
+                className="h-10 text-sm rounded-xl border-[#e2e8f0]"
+              />
             </div>
-
-            {/* Fare summary */}
-            <div className="rounded-lg bg-background border p-3 space-y-1.5 text-sm">
-              <div className="flex justify-between text-muted-foreground text-xs">
-                <span>Route</span><span className="font-medium text-foreground">{fromCity} → {toCity}</span>
-              </div>
-              <div className="flex justify-between text-muted-foreground text-xs">
-                <span>Vehicle</span><span className="font-medium text-foreground">{selectedCabType}</span>
-              </div>
-              <div className="flex justify-between text-muted-foreground text-xs">
-                <span>Trip</span><span className="font-medium text-foreground">Round Trip</span>
-              </div>
-              <div className="flex justify-between text-muted-foreground text-xs">
-                <span>Pickup Time</span><span className="font-medium text-foreground">{travelTime}</span>
-              </div>
-              <div className="flex justify-between border-t pt-1.5 mt-1">
-                <span className="font-semibold text-sm">Estimated Fare</span>
-                <span className="font-bold text-base text-[#064e3b]">₹{getFareForType(selectedCabType, selectedTripType).toLocaleString()}*</span>
-              </div>
-              <p className="text-[10px] text-muted-foreground text-right">*Excl. tolls & driver night charges</p>
+            <div className="space-y-1.5">
+              <Label htmlFor="travelTime" className="text-sm font-semibold text-[#013220]">Pickup Time</Label>
+              <select
+                id="travelTime"
+                value={travelTime}
+                onChange={(e) => setTravelTime(e.target.value)}
+                required
+                className="flex h-10 w-full items-center justify-between rounded-xl border border-[#e2e8f0] bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-[#013220]"
+              >
+                <option value="" disabled>Select time</option>
+                {getFilteredTimeSlots().map((slot) => (
+                  <option key={slot.value} value={slot.value}>{slot.label}</option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div className="flex gap-2 pb-1">
-            <button
-              onClick={() => { window.open(buildWhatsAppUrl(selectedCabType), "_blank"); setIsVehicleSelectOpen(false); }}
-              className="flex-1 py-2.5 rounded-xl border border-[#25D366] text-[#25D366] text-xs font-semibold hover:bg-[#25D366]/10 transition-colors"
+          <div className="rounded-2xl border border-[#e2e8f0] p-4 bg-white space-y-3 text-sm shadow-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">Route</span><span className="font-semibold text-right text-[#013220]">{fromCity} → {toCity}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Distance</span><span className="font-semibold text-[#013220]">{distance}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Vehicle</span><span className="font-semibold text-[#013220]">{pickedVehicle}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Trip</span><span className="font-semibold text-[#013220]">Round Trip</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Pickup Time</span><span className="font-semibold text-[#013220]">{travelTime || "—"}</span></div>
+            <div className="flex justify-between border-t border-[#e2e8f0] pt-3 mt-1">
+              <span className="font-bold text-base text-[#013220]">Estimated Fare</span>
+              <span className="font-bold text-xl text-[#013220]">₹{getFareForType(pickedVehicle, "Round Trip").toLocaleString()}*</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground text-right mt-0">*Excl. tolls & driver night charges</p>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1 h-12 text-sm font-bold border-[#25D366] text-[#25D366] rounded-xl hover:bg-[#25D366]/10 hover:text-[#25D366]"
+              onClick={() => {
+                if (!travelDate || !travelTime) {
+                  alert("Please fill travel date and time");
+                  return;
+                }
+                window.open(buildWhatsAppUrl(pickedVehicle), "_blank");
+                setIsVehicleSelectOpen(false);
+              }}
             >
               Book via WhatsApp
-            </button>
-            <button
-              disabled={!travelDate}
-              onClick={() => { setIsVehicleSelectOpen(false); handleOnlinePayment(); }}
-              className="flex-1 py-2.5 rounded-xl bg-[#064e3b] text-white text-xs font-semibold hover:bg-[#043d2e] transition-colors disabled:opacity-50"
+            </Button>
+            <Button
+              type="button"
+              className="flex-1 h-12 text-sm font-bold bg-[#013220] text-white rounded-xl hover:bg-[#013220]/90"
+              onClick={() => {
+                if (!travelDate || !travelTime) {
+                  alert("Please fill travel date and time");
+                  return;
+                }
+                setIsVehicleSelectOpen(false);
+                setSelectedCabType(pickedVehicle);
+                setSelectedTripType("Round Trip");
+                handleOnlinePayment();
+              }}
             >
               Book Now (Pay Online)
-            </button>
+            </Button>
           </div>
         </motion.div>
         )}

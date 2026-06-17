@@ -39,6 +39,9 @@ const DEFAULTS = {
   whatsapp_notifications_enabled: true,
   blog_auto_publish: false,
   blog_moderation_enabled: true,
+  same_day_restrictions_enabled: false,
+  min_advance_hours: 4,
+  districts: [] as string[],
 };
 
 type Settings = typeof DEFAULTS;
@@ -146,6 +149,9 @@ export default function AdminSettings() {
         whatsapp_notifications_enabled:Boolean(data.whatsapp_notifications_enabled ?? DEFAULTS.whatsapp_notifications_enabled),
         blog_auto_publish:             Boolean(data.blog_auto_publish           ?? DEFAULTS.blog_auto_publish),
         blog_moderation_enabled:       Boolean(data.blog_moderation_enabled     ?? DEFAULTS.blog_moderation_enabled),
+        same_day_restrictions_enabled: Boolean(data.same_day_restrictions_enabled ?? DEFAULTS.same_day_restrictions_enabled),
+        min_advance_hours:             Number(data.min_advance_hours            ?? DEFAULTS.min_advance_hours),
+        districts:                     Array.isArray(data.districts) ? data.districts : DEFAULTS.districts,
       });
     }
     // data is null → table exists but no row yet; defaults are fine
@@ -260,6 +266,8 @@ CREATE TABLE IF NOT EXISTS public.platform_settings (
   whatsapp_notifications_enabled BOOLEAN NOT NULL DEFAULT true,
   blog_auto_publish BOOLEAN NOT NULL DEFAULT false,
   blog_moderation_enabled BOOLEAN NOT NULL DEFAULT true,
+  same_day_restrictions_enabled BOOLEAN NOT NULL DEFAULT false,
+  min_advance_hours INTEGER NOT NULL DEFAULT 4,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
 );
@@ -467,6 +475,35 @@ ON CONFLICT (id) DO NOTHING;`}
         </Button>
       </SettingSection>
 
+      {/* ── 4.5. Cab Booking Settings ────────────────────────────────────── */}
+      <SettingSection icon={Settings2} title="Cab Bookings"
+        description="Configure rules for outstation cab bookings." loading={loading}>
+        <div className="flex items-center justify-between p-3 rounded-xl border border-border">
+          <div>
+            <p className="text-sm font-medium">Same-Day Booking Restrictions</p>
+            <p className="text-xs text-muted-foreground">Enforce minimum advance notice for same-day bookings</p>
+          </div>
+          <Switch checked={settings.same_day_restrictions_enabled}
+            onCheckedChange={(v) => set('same_day_restrictions_enabled', v)} />
+        </div>
+        
+        {settings.same_day_restrictions_enabled && (
+          <Field label="Minimum Advance Hours" hint="Minimum hours required before pickup time">
+            <Input type="number" min={1} max={24} value={settings.min_advance_hours}
+              onChange={(e) => set('min_advance_hours', Number(e.target.value))} />
+          </Field>
+        )}
+        
+        <Button disabled={saving.cab_bookings} className="bg-[#013220] text-white hover:bg-[#013220]/90"
+          onClick={() => save('cab_bookings', {
+            same_day_restrictions_enabled: settings.same_day_restrictions_enabled,
+            min_advance_hours: settings.min_advance_hours,
+          }, 'Cab booking settings saved')}>
+          {saving.cab_bookings ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+          Save Cab Booking Settings
+        </Button>
+      </SettingSection>
+
       {/* ── 5. Referral Settings ─────────────────────────────────────────── */}
       <SettingSection icon={QrCode} title="Referral & Hub Partners"
         description="Configure referral commission rates and link expiry." loading={loading}>
@@ -617,6 +654,62 @@ ON CONFLICT (id) DO NOTHING;`}
             </TableBody>
           </Table>
         )}
+      </SettingSection>
+
+      {/* District Management */}
+      <SettingSection icon={Tag} title="Hub Partner Districts" description="Manage district options for Hub Partner assignments.">
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Add new district (e.g., Hyderabad)"
+              id="new-district-input"
+              className="max-w-xs"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const val = e.currentTarget.value.trim();
+                  if (val && !settings.districts.includes(val)) {
+                    set('districts', [...settings.districts, val]);
+                    e.currentTarget.value = '';
+                  }
+                }
+              }}
+            />
+            <Button
+              variant="secondary"
+              onClick={() => {
+                const input = document.getElementById('new-district-input') as HTMLInputElement;
+                const val = input?.value.trim();
+                if (val && !settings.districts.includes(val)) {
+                  set('districts', [...settings.districts, val]);
+                  if (input) input.value = '';
+                }
+              }}
+            >
+              Add
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {settings.districts.map((d) => (
+              <Badge key={d} variant="outline" className="px-3 py-1 bg-white flex items-center gap-2">
+                {d}
+                <button
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => set('districts', settings.districts.filter(x => x !== d))}
+                >
+                  &times;
+                </button>
+              </Badge>
+            ))}
+            {settings.districts.length === 0 && <span className="text-sm text-muted-foreground">No districts configured</span>}
+          </div>
+          <Button
+            disabled={saving.districts}
+            onClick={() => save('districts', { districts: settings.districts }, 'Districts updated.')}
+          >
+            {saving.districts ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+            Save Districts
+          </Button>
+        </div>
       </SettingSection>
     </div>
   );

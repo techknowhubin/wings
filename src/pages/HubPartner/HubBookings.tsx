@@ -28,7 +28,22 @@ export default function HubBookings() {
         .order('created_at', { ascending: false });
         
       if (error) throw error;
-      return data;
+      
+      const bookings = data ?? [];
+      const bookingIds = bookings.map((b: any) => b.id);
+      let cabBookingsMap = new Map();
+      if (bookingIds.length > 0) {
+        const { data: cabData } = await supabase
+          .from('cab_bookings')
+          .select('*')
+          .in('booking_id', bookingIds);
+        (cabData ?? []).forEach((cb: any) => cabBookingsMap.set(cb.booking_id, cb));
+      }
+      
+      return bookings.map(b => ({
+        ...b,
+        cabDetails: cabBookingsMap.get(b.id) ?? null
+      }));
     }
   });
 
@@ -96,7 +111,14 @@ export default function HubBookings() {
                     <div className="font-medium">{booking.user?.full_name || 'Unknown'}</div>
                     <div className="text-xs text-muted-foreground">{booking.user?.phone}</div>
                   </TableCell>
-                  <TableCell className="capitalize">{booking.listing_type}</TableCell>
+                  <TableCell>
+                    <div className="capitalize">{booking.listing_type}</div>
+                    {booking.cabDetails?.distance_km && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Distance: {booking.cabDetails.distance_km} KM
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell className="font-medium">
                     {booking.currency === 'USD' ? '$' : '₹'}{booking.total_price}
                   </TableCell>

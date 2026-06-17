@@ -26,6 +26,7 @@ export interface BookingDetails {
     drop_location: string;
     travel_date: string;
     pickup_time?: string;
+    return_date?: string;
     cab_type: string;
     fare_amount: number;
     state: string;

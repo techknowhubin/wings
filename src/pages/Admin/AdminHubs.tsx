@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,17 +16,10 @@ import {
   ToggleLeft, ToggleRight, Users, MapPin, Eye, EyeOff, Copy,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import indiaLocationsData from '@/constants/indiaLocations.json';
 
-const INDIAN_STATES = [
-  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
-  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
-  'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
-  'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
-  'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
-  'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
-  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
-  'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
-];
+const indianStatesData = indiaLocationsData as { states: { state: string, districts: string[] }[] };
+const INDIAN_STATES = indianStatesData.states.map(s => s.state);
 
 // ─── Hooks ─────────────────────────────────────────────────────────────────────
 
@@ -46,7 +39,7 @@ function useHubPartnerProfiles(search?: string) {
       // 2. Fetch their profiles
       const { data: profiles, error: pErr } = await supabase
         .from('profiles')
-        .select('id, full_name, phone, state, assigned_state, account_status, role, created_at')
+        .select('id, full_name, phone, state, assigned_state, assigned_district, assigned_area, account_status, role, created_at')
         .in('id', hubIds)
         .order('created_at', { ascending: false });
       if (pErr) throw pErr;
@@ -74,6 +67,8 @@ function useCreateHubPartnerAccount() {
       phone: string;
       password: string;
       assigned_state: string;
+      assigned_district?: string;
+      assigned_area?: string;
     }) => {
       // 1. Sign up a new user account via Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -100,6 +95,8 @@ function useCreateHubPartnerAccount() {
           phone: form.phone,
           role: 'hub_partner',
           assigned_state: form.assigned_state,
+          assigned_district: form.assigned_district,
+          assigned_area: form.assigned_area,
           account_status: 'active',
         }, { onConflict: 'id' });
       if (profileErr) throw profileErr;
@@ -121,7 +118,7 @@ function useCreateHubPartnerAccount() {
 function useUpdateHubPartnerProfile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...fields }: { id: string; full_name?: string; phone?: string; assigned_state?: string }) => {
+    mutationFn: async ({ id, ...fields }: { id: string; full_name?: string; phone?: string; assigned_state?: string; assigned_district?: string; assigned_area?: string }) => {
       const { error } = await supabase
         .from('profiles')
         .update({ ...fields, updated_at: new Date().toISOString() })
@@ -178,8 +175,13 @@ export default function AdminHubs() {
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
+  // Custom input states for 'Other' selections
+  const [isOtherAddDistrict, setIsOtherAddDistrict] = useState(false);
+  const [isOtherEditDistrict, setIsOtherEditDistrict] = useState(false);
+
   const [form, setForm] = useState({
-    full_name: '', email: '', phone: '', password: '', assigned_state: '',
+    full_name: '', email: '', phone: '', password: '', assigned_state: '', assigned_district: '', assigned_area: '',
   });
 
   const [editHub, setEditHub] = useState<any>(null);
@@ -198,12 +200,25 @@ export default function AdminHubs() {
       full_name: h.full_name ?? '',
       phone: h.phone ?? '',
       assigned_state: h.assigned_state ?? '',
+      assigned_district: h.assigned_district ?? '',
+      assigned_area: h.assigned_area ?? '',
     });
+    
+    // Check if the current district/area is in our standard lists, if not, activate 'Other' mode
+    const stateData = indianStatesData.states.find(s => s.state === h.assigned_state);
+    const standardDistricts = stateData ? stateData.districts : [];
+    if (h.assigned_district && !standardDistricts.includes(h.assigned_district)) {
+      setIsOtherEditDistrict(true);
+    } else {
+      setIsOtherEditDistrict(false);
+    }
+
+    const matchingHubs = hubs?.filter((hub: any) => hub.assigned_district === h.assigned_district && hub.assigned_area) || [];
   };
 
   const handleCreate = async () => {
-    if (!form.full_name || !form.email || !form.password || !form.assigned_state) {
-      toast.error('Please fill in all required fields.');
+    if (!form.full_name || !form.email || !form.password || !form.phone || !form.assigned_state || !form.assigned_district || !form.assigned_area) {
+      toast.error('Please fill in all required fields including Mobile, District, and Area.');
       return;
     }
     if (form.password.length < 6) {
@@ -214,7 +229,8 @@ export default function AdminHubs() {
       const result = await createMut.mutateAsync(form);
       toast.success(`Hub Partner created! Email: ${result.email}`);
       setAddOpen(false);
-      setForm({ full_name: '', email: '', phone: '', password: '', assigned_state: '' });
+      setForm({ full_name: '', email: '', phone: '', password: '', assigned_state: '', assigned_district: '', assigned_area: '' });
+      setIsOtherAddDistrict(false);
     } catch (err: any) {
       toast.error(err.message ?? 'Failed to create hub partner.');
     }
@@ -222,8 +238,8 @@ export default function AdminHubs() {
 
   const handleUpdate = async () => {
     if (!editHub) return;
-    if (!editForm.full_name || !editForm.assigned_state) {
-      toast.error('Name and Assigned State are required.');
+    if (!editForm.full_name || !editForm.phone || !editForm.assigned_state || !editForm.assigned_district || !editForm.assigned_area) {
+      toast.error('Name, Mobile, State, District, and Area are required.');
       return;
     }
     try {
@@ -245,6 +261,10 @@ export default function AdminHubs() {
       toast.error(err.message ?? 'Failed to delete.');
     }
   };
+
+  // Helper selectors
+  const addAvailableDistricts = indianStatesData.states.find(s => s.state === form.assigned_state)?.districts || [];
+  const editAvailableDistricts = indianStatesData.states.find(s => s.state === editForm.assigned_state)?.districts || [];
 
   return (
     <div className="space-y-6">
@@ -317,7 +337,7 @@ export default function AdminHubs() {
                 <TableRow>
                   <TableHead>Partner</TableHead>
                   <TableHead>Contact</TableHead>
-                  <TableHead>Assigned State</TableHead>
+                  <TableHead>Location Details</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Actions</TableHead>
@@ -349,12 +369,24 @@ export default function AdminHubs() {
                     {/* Contact */}
                     <TableCell className="text-sm">{h.phone || '—'}</TableCell>
 
-                    {/* Assigned State */}
+                    {/* Assigned Location */}
                     <TableCell>
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
-                        <MapPin className="h-3 w-3 mr-1" />
-                        {h.assigned_state || 'Unassigned'}
-                      </Badge>
+                      <div className="space-y-1">
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          {h.assigned_state || 'Unassigned State'}
+                        </Badge>
+                        {h.assigned_district && (
+                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-[10px] ml-1">
+                            {h.assigned_district}
+                          </Badge>
+                        )}
+                        {h.assigned_area && (
+                          <div className="text-[10px] text-muted-foreground mt-1 px-1">
+                            Area: {h.assigned_area}
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
 
                     {/* Status */}
@@ -439,8 +471,8 @@ export default function AdminHubs() {
                 <Input type="email" placeholder="partner@example.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
               </div>
               <div className="space-y-1">
-                <Label>Phone</Label>
-                <Input placeholder="+91 98765 43210" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+                <Label>Mobile *</Label>
+                <Input type="tel" placeholder="+91 9876543210" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
               </div>
               <div className="col-span-2 space-y-1">
                 <Label>Password *</Label>
@@ -462,7 +494,10 @@ export default function AdminHubs() {
               </div>
               <div className="col-span-2 space-y-1">
                 <Label>Assigned State *</Label>
-                <Select value={form.assigned_state} onValueChange={(v) => setForm((f) => ({ ...f, assigned_state: v }))}>
+                <Select value={form.assigned_state} onValueChange={(v) => {
+                  setForm((f) => ({ ...f, assigned_state: v, assigned_district: '', assigned_area: '' }));
+                  setIsOtherAddDistrict(false);
+                }}>
                   <SelectTrigger><SelectValue placeholder="Select a state" /></SelectTrigger>
                   <SelectContent>
                     {INDIAN_STATES.map((s) => (
@@ -470,6 +505,32 @@ export default function AdminHubs() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>District *</Label>
+                {!isOtherAddDistrict ? (
+                  <Select value={form.assigned_district} onValueChange={(v) => {
+                    if (v === 'other') setIsOtherAddDistrict(true);
+                    else setForm((f) => ({ ...f, assigned_district: v, assigned_area: '' }));
+                  }} disabled={!form.assigned_state}>
+                    <SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger>
+                    <SelectContent>
+                      {addAvailableDistricts.map((d) => (
+                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                      ))}
+                      <SelectItem value="other">Other (Type manually)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Input autoFocus placeholder="Type district" value={form.assigned_district} onChange={e => setForm(f => ({ ...f, assigned_district: e.target.value }))} />
+                    <Button variant="ghost" size="sm" onClick={() => { setIsOtherAddDistrict(false); setForm(f => ({ ...f, assigned_district: '' })); }}>Cancel</Button>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1">
+                <Label>Area *</Label>
+                <Input placeholder="Type area" value={form.assigned_area} onChange={e => setForm(f => ({ ...f, assigned_area: e.target.value }))} />
               </div>
             </div>
             <div className="p-3 rounded-xl bg-muted/40 text-xs text-muted-foreground space-y-1">
@@ -498,13 +559,16 @@ export default function AdminHubs() {
                 <Label>Full Name *</Label>
                 <Input value={editForm.full_name ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, full_name: e.target.value }))} />
               </div>
-              <div className="col-span-2 space-y-1">
-                <Label>Phone</Label>
-                <Input value={editForm.phone ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} />
+              <div className="space-y-1">
+                <Label>Mobile *</Label>
+                <Input type="tel" value={editForm.phone ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} />
               </div>
               <div className="col-span-2 space-y-1">
                 <Label>Assigned State *</Label>
-                <Select value={editForm.assigned_state ?? ''} onValueChange={(v) => setEditForm((f) => ({ ...f, assigned_state: v }))}>
+                <Select value={editForm.assigned_state ?? ''} onValueChange={(v) => {
+                  setEditForm((f) => ({ ...f, assigned_state: v, assigned_district: '', assigned_area: '' }));
+                  setIsOtherEditDistrict(false);
+                }}>
                   <SelectTrigger><SelectValue placeholder="Select a state" /></SelectTrigger>
                   <SelectContent>
                     {INDIAN_STATES.map((s) => (
@@ -512,6 +576,35 @@ export default function AdminHubs() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>District *</Label>
+                {!isOtherEditDistrict ? (
+                  <Select value={editForm.assigned_district ?? ''} onValueChange={(v) => {
+                    if (v === 'other') setIsOtherEditDistrict(true);
+                    else setEditForm((f) => ({ ...f, assigned_district: v, assigned_area: '' }));
+                  }} disabled={!editForm.assigned_state}>
+                    <SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger>
+                    <SelectContent>
+                      {editAvailableDistricts.map((d) => (
+                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                      ))}
+                      {editForm.assigned_district && !editAvailableDistricts.includes(editForm.assigned_district) && (
+                        <SelectItem value={editForm.assigned_district}>{editForm.assigned_district}</SelectItem>
+                      )}
+                      <SelectItem value="other">Other (Type manually)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Input autoFocus value={editForm.assigned_district ?? ''} onChange={e => setEditForm(f => ({ ...f, assigned_district: e.target.value }))} />
+                    <Button variant="ghost" size="sm" onClick={() => { setIsOtherEditDistrict(false); setEditForm(f => ({ ...f, assigned_district: '' })); }}>Cancel</Button>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1">
+                <Label>Area *</Label>
+                <Input value={editForm.assigned_area ?? ''} onChange={e => setEditForm(f => ({ ...f, assigned_area: e.target.value }))} />
               </div>
             </div>
           </div>

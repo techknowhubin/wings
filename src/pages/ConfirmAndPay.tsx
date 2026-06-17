@@ -436,20 +436,76 @@ const ConfirmAndPay = () => {
 
       if (booking.cabDetails) {
         try {
+          let finalTravelDate = new Date(booking.cabDetails.travel_date);
+          if (booking.cabDetails.pickup_time) {
+            const timeMatch = booking.cabDetails.pickup_time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+            if (timeMatch) {
+              let hours = parseInt(timeMatch[1], 10);
+              const mins = parseInt(timeMatch[2], 10);
+              const ampm = timeMatch[3].toUpperCase();
+              if (ampm === "PM" && hours < 12) hours += 12;
+              if (ampm === "AM" && hours === 12) hours = 0;
+              finalTravelDate.setHours(hours, mins, 0, 0);
+            }
+          }
+
+          // Auto-routing logic for Hub Partner
+          let matchedHubPartnerId: string | null = null;
+          let assignmentStatus = "Awaiting Hub Partner Assignment";
+
+          try {
+            const { data: partners } = await supabase
+              .from("profiles")
+              .select("id, assigned_district, assigned_area, assigned_state")
+              .eq("role", "hub_partner");
+            
+            if (partners && partners.length > 0) {
+              const pickupLower = booking.cabDetails.pickup_location.toLowerCase();
+              const matched = partners.find((p: any) => 
+                (p.assigned_district && p.assigned_district.toLowerCase() === pickupLower) ||
+                (p.assigned_area && p.assigned_area.toLowerCase() === pickupLower) ||
+                (p.assigned_state && p.assigned_state.toLowerCase() === pickupLower)
+              );
+              if (matched) {
+                matchedHubPartnerId = matched.id;
+                assignmentStatus = "Assigned";
+              }
+            }
+          } catch (e) {
+            console.error("Failed to route to hub partner:", e);
+          }
+
           const { error: cabError } = await supabase.from('cab_bookings').insert({
             booking_id: newBooking.id,
             traveller_id: user.id,
             host_id: booking.hostId,
+            hub_partner_id: matchedHubPartnerId,
+            assignment_status: assignmentStatus,
+            distance_km: booking.cabDetails.distance_km,
             state: booking.cabDetails.state,
             pickup_location: booking.cabDetails.pickup_location,
             drop_location: booking.cabDetails.drop_location,
-            travel_date: new Date(booking.cabDetails.travel_date).toISOString(),
+            travel_date: finalTravelDate.toISOString(),
+            return_date: booking.cabDetails.return_date ? new Date(booking.cabDetails.return_date).toISOString() : null,
             cab_type: booking.cabDetails.cab_type,
             fare_amount: booking.cabDetails.fare_amount,
             payment_status: 'pending',
             booking_status: 'pending'
           });
           if (cabError) console.error("Cab booking insert error:", cabError);
+
+          // Notify the matched Hub Partner
+          if (matchedHubPartnerId) {
+            await createNotification({
+              user_id: matchedHubPartnerId,
+              title: "New Assigned Cab Booking!",
+              message: `${name} has booked a cab from ${booking.cabDetails.pickup_location} to ${booking.cabDetails.drop_location}. Distance: ${booking.cabDetails.distance_km || "Unknown"} KM.`,
+              type: "bookings",
+              link: "/hub/bookings",
+              reference_id: newBooking.id,
+              reference_type: "booking",
+            });
+          }
         } catch (err) {
           console.error("Cab booking insert exception:", err);
         }

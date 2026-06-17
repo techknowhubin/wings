@@ -708,13 +708,13 @@ const CabFareCard = ({
             {/* Price and Book Now — fixed width so all cards are identical height */}
             <div className="p-2 md:p-4 self-stretch flex flex-col items-center justify-center bg-[#064e3b] border-l border-emerald-900 shadow-inner shrink-0 gap-1.5 md:gap-2 w-[100px] md:w-[140px]">
               <div className="flex flex-col items-center text-center text-white w-full">
-                <span className="opacity-80 text-[8px] md:text-[10px] font-semibold whitespace-nowrap">Starting from</span>
+                <span className="opacity-80 text-[8px] md:text-[10px] font-semibold whitespace-nowrap">Base Fare</span>
                 <span className="text-[8px] md:text-[10px] text-white/60 line-through mt-0.5 whitespace-nowrap">
-                  ₹{displaySedanRoundOriginal.toLocaleString()}
+                  ₹{displaySedanOneWayOriginal.toLocaleString()}
                 </span>
                 <span className="font-bold text-[#E5F76E] whitespace-nowrap leading-tight"
-                  style={{ fontSize: effectiveSedanRound >= 10000 ? 'clamp(0.75rem, 2.5vw, 1rem)' : 'clamp(0.85rem, 3vw, 1.125rem)' }}>
-                  ₹{effectiveSedanRound.toLocaleString()}
+                  style={{ fontSize: effectiveSedanOneWay >= 10000 ? 'clamp(0.75rem, 2.5vw, 1rem)' : 'clamp(0.85rem, 3vw, 1.125rem)' }}>
+                  ₹{effectiveSedanOneWay.toLocaleString()}
                 </span>
               </div>
               <button

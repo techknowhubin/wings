@@ -127,7 +127,7 @@ const OutstationCabs = () => {
   const navigate = useNavigate();
   const [categoryPage, setCategoryPage] = useState(0);
   const [heroSlide, setHeroSlide] = useState(0);
-  const heroImages = [heroXplorwing, heroOutstationCabs1, heroOutstationCabs2, heroAirportCabs];
+  const heroImages = [heroXplorwing, heroOutstationCabs1, heroOutstationCabs2];
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
 
@@ -259,20 +259,20 @@ const OutstationCabs = () => {
       ...hotels.map(h => ({ ...h, price: h.price_per_night })),
       ...resorts.map(r => ({ ...r, price: r.price_per_night }))
     ];
-    
+
     return destinations.map(dest => {
-      const destListings = allListings.filter(l => 
+      const destListings = allListings.filter(l =>
         l.location?.toLowerCase().includes(dest.title.toLowerCase())
       );
-      
+
       if (destListings.length === 0) return null;
 
       const prices = destListings
         .map(l => Number(l.price))
         .filter(p => !isNaN(p) && p > 0);
-      
+
       const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
-      
+
       return {
         ...dest,
         subtitle: `Over ${destListings.length} stays and vehicles`,
@@ -329,9 +329,8 @@ const OutstationCabs = () => {
                 key={i}
                 onClick={() => setHeroSlide(i)}
                 aria-label={`Go to slide ${i + 1}`}
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  i === heroSlide ? "w-6 bg-white" : "w-2 bg-white/50"
-                }`}
+                className={`h-2 rounded-full transition-all duration-300 ${i === heroSlide ? "w-6 bg-white" : "w-2 bg-white/50"
+                  }`}
               />
             ))}
           </div>

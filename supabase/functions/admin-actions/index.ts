@@ -136,6 +136,73 @@ Deno.serve(async (req) => {
         return jsonResponse({ encrypted });
       }
 
+      case "create_hub_partner": {
+        if (!ctx.isAdmin) {
+          throw new ForbiddenError("Unauthorized: admin only");
+        }
+        const { email, password, full_name, phone, assigned_state, assigned_district, assigned_area } = body;
+        
+        if (!email || !password || !full_name) {
+          return jsonResponse({ error: "Missing required fields" }, 400);
+        }
+
+        // 1. Create auth user securely
+        const { data: user, error: createErr } = await admin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true, // auto-confirm since admin created
+          user_metadata: { full_name, phone, role: 'hub_partner' }
+        });
+        
+        if (createErr) {
+          return jsonResponse({ error: createErr.message }, 400);
+        }
+
+        const newUserId = user.user.id;
+
+        // 2. Insert into profiles
+        const { error: profileErr } = await admin.from('profiles').upsert({
+          id: newUserId,
+          full_name,
+          phone,
+          role: 'hub_partner',
+          assigned_state,
+          assigned_district,
+          assigned_area,
+          account_status: 'active'
+        });
+
+        if (profileErr) {
+          // If profile fails, rollback user creation to prevent orphaned records
+          await admin.auth.admin.deleteUser(newUserId);
+          return jsonResponse({ error: profileErr.message }, 400);
+        }
+
+        // 3. Insert into user_roles
+        const { error: roleErr } = await admin.from('user_roles').upsert({ 
+          user_id: newUserId, 
+          role: 'hub_partner' 
+        });
+
+        if (roleErr) {
+           // Best effort rollback
+           await admin.auth.admin.deleteUser(newUserId);
+           return jsonResponse({ error: roleErr.message }, 400);
+        }
+
+        await admin.from("audit_logs").insert({
+          user_id:    newUserId,
+          actor_id:   ctx.userId,
+          action:     "admin_created_hub_partner",
+          entity_type:"user",
+          entity_id:  newUserId,
+          ip_address: clientIp,
+          metadata:   { assigned_state, assigned_district, assigned_area }
+        });
+
+        return jsonResponse({ success: true, userId: newUserId, email });
+      }
+
       case "decrypt": {
         const { ciphertext, table, column, recordId } = body;
         if (ciphertext === undefined) return jsonResponse({ error: "ciphertext is required" }, 400);

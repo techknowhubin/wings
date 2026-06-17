@@ -107,6 +107,12 @@ export default function UserProfile() {
   const { data: profile, isLoading: profileLoading } = useProfile(user?.id);
   const updateProfile = useUpdateProfile();
 
+  useEffect(() => {
+    if (profile?.role === 'hub_partner') {
+      navigate('/hubpartner');
+    }
+  }, [profile?.role, navigate]);
+
   // Determine section from URL
   const pathSection = location.pathname.split("/profile/")[1] || "profile";
   const [activeSection, setActiveSection] = useState<Section>(

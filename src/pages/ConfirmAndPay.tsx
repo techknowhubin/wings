@@ -233,7 +233,7 @@ const ConfirmAndPay = () => {
     if (referralCode && !referralPartner) {
       void handleValidateReferral();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const stayDates = useMemo(() => {
@@ -349,7 +349,7 @@ const ConfirmAndPay = () => {
       toast.error("Please accept the privacy and cancellation policy to continue.");
       return;
     }
-    if (!booking.hostId) {
+    if (!booking.hostId && !booking.cabDetails) {
       toast.error("Booking host details are missing. Please go back and book again.");
       return;
     }
@@ -392,11 +392,9 @@ const ConfirmAndPay = () => {
 
     let pendingBookingId = "";
     try {
-      const bookingData = {
+      const bookingData: any = {
         user_id: user.id,
-        listing_id: booking.listingId || "00000000-0000-0000-0000-000000000001",
         listing_type: dbListingType,
-        host_id: booking.hostId,
         start_date: new Date(booking.startDate).toISOString(),
         end_date: new Date(booking.endDate).toISOString(),
         total_price: Number(totalPayable.toFixed(2)),
@@ -409,6 +407,14 @@ const ConfirmAndPay = () => {
         commission_amount: Number(normalBookingFee.toFixed(2)),
         notes: JSON.stringify(notesPayload),
       };
+
+      const finalListingId = booking.listingId || "00000000-0000-0000-0000-000000000001";
+      if (finalListingId && finalListingId !== "00000000-0000-0000-0000-000000000001") {
+        bookingData.listing_id = finalListingId;
+      }
+      if (booking.hostId && booking.hostId !== "00000000-0000-0000-0000-000000000000") {
+        bookingData.host_id = booking.hostId;
+      }
 
       const { data: newBooking, error: bookingError } = await supabase
         .from("bookings")
@@ -458,10 +464,10 @@ const ConfirmAndPay = () => {
               .from("profiles")
               .select("id, assigned_district, assigned_area, assigned_state")
               .eq("role", "hub_partner");
-            
+
             if (partners && partners.length > 0) {
               const pickupLower = booking.cabDetails.pickup_location.toLowerCase();
-              const matched = partners.find((p: any) => 
+              const matched = partners.find((p: any) =>
                 (p.assigned_district && p.assigned_district.toLowerCase() === pickupLower) ||
                 (p.assigned_area && p.assigned_area.toLowerCase() === pickupLower) ||
                 (p.assigned_state && p.assigned_state.toLowerCase() === pickupLower)
@@ -776,8 +782,8 @@ const ConfirmAndPay = () => {
                         >
                           {mapLoading ? (
                             <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                             </svg>
                           ) : "🗺️ Show on Map"}
                         </button>
@@ -836,17 +842,17 @@ const ConfirmAndPay = () => {
                         {mapLoading ? (
                           <>
                             <svg className="animate-spin h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                             </svg>
                             Detecting your location…
                           </>
                         ) : (
                           <>
                             <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <circle cx="12" cy="12" r="3"/>
-                              <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
-                              <path d="M12 8a4 4 0 100 8 4 4 0 000-8z" fill="currentColor" opacity=".15"/>
+                              <circle cx="12" cy="12" r="3" />
+                              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+                              <path d="M12 8a4 4 0 100 8 4 4 0 000-8z" fill="currentColor" opacity=".15" />
                             </svg>
                             📍 Use My Current Location (via GPS)
                           </>

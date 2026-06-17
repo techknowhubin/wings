@@ -21,9 +21,9 @@ import indiaLocationsData from '@/constants/indiaLocations.json';
 const indianStatesData = indiaLocationsData as { states: { state: string, districts: string[] }[] };
 const INDIAN_STATES = indianStatesData.states.map(s => s.state);
 
-// ─── Hooks ─────────────────────────────────────────────────────────────────────
+// --- Hooks ---
 
-function useHubPartnerProfiles(search?: string) {
+function useHubPartnerProfiles(search: string) {
   return useQuery({
     queryKey: ['admin', 'hub-partner-profiles', search],
     queryFn: async () => {
@@ -44,7 +44,24 @@ function useHubPartnerProfiles(search?: string) {
         .order('created_at', { ascending: false });
       if (pErr) throw pErr;
 
-      let results = profiles ?? [];
+      // 3. Fetch their booking counts
+      const { data: cabBookings, error: cabErr } = await supabase
+        .from('cab_bookings')
+        .select('hub_partner_id')
+        .in('hub_partner_id', hubIds)
+        .not('hub_partner_id', 'is', null);
+
+      const bookingCounts = (cabBookings || []).reduce((acc: Record<string, number>, curr: any) => {
+        const id = curr.hub_partner_id;
+        acc[id] = (acc[id] || 0) + 1;
+        return acc;
+      }, {});
+
+      let results = (profiles ?? []).map(p => ({
+        ...p,
+        total_assigned_bookings: bookingCounts[p.id] || 0
+      }));
+
       if (search) {
         const s = search.toLowerCase();
         results = results.filter((p: any) =>
@@ -70,44 +87,17 @@ function useCreateHubPartnerAccount() {
       assigned_district?: string;
       assigned_area?: string;
     }) => {
-      // 1. Sign up a new user account via Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: form.email,
-        password: form.password,
-        options: {
-          data: {
-            full_name: form.full_name,
-            phone: form.phone,
-            role: 'hub_partner',
-          },
-        },
+      const { data, error } = await supabase.functions.invoke('admin-actions', {
+        body: {
+          action: 'create_hub_partner',
+          ...form
+        }
       });
-      if (authError) throw authError;
-      const userId = authData.user?.id;
-      if (!userId) throw new Error('Failed to create user account.');
+      
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      // 2. Upsert profile with assigned_state & role
-      const { error: profileErr } = await supabase
-        .from('profiles')
-        .upsert({
-          id: userId,
-          full_name: form.full_name,
-          phone: form.phone,
-          role: 'hub_partner',
-          assigned_state: form.assigned_state,
-          assigned_district: form.assigned_district,
-          assigned_area: form.assigned_area,
-          account_status: 'active',
-        }, { onConflict: 'id' });
-      if (profileErr) throw profileErr;
-
-      // 3. Upsert into user_roles
-      const { error: roleErr } = await supabase
-        .from('user_roles')
-        .upsert({ user_id: userId, role: 'hub_partner' }, { onConflict: 'user_id' } as any);
-      if (roleErr) throw roleErr;
-
-      return { userId, email: form.email };
+      return { userId: data.userId, email: form.email };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'hub-partner-profiles'] });
@@ -335,18 +325,21 @@ export default function AdminHubs() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Partner</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Location Details</TableHead>
+                  <TableHead>Hub Partner Name</TableHead>
+                  <TableHead>Mobile Number</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>District</TableHead>
+                  <TableHead>Area</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
+                  <TableHead>Created Date</TableHead>
+                  <TableHead>Total Assigned Bookings</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {(hubs ?? []).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
                       No hub partners yet. Click "Create Hub Partner" to get started.
                     </TableCell>
                   </TableRow>
@@ -366,28 +359,17 @@ export default function AdminHubs() {
                       </div>
                     </TableCell>
 
-                    {/* Contact */}
+                    {/* Mobile Number */}
                     <TableCell className="text-sm">{h.phone || '—'}</TableCell>
 
-                    {/* Assigned Location */}
-                    <TableCell>
-                      <div className="space-y-1">
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
-                          <MapPin className="h-3 w-3 mr-1" />
-                          {h.assigned_state || 'Unassigned State'}
-                        </Badge>
-                        {h.assigned_district && (
-                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-[10px] ml-1">
-                            {h.assigned_district}
-                          </Badge>
-                        )}
-                        {h.assigned_area && (
-                          <div className="text-[10px] text-muted-foreground mt-1 px-1">
-                            Area: {h.assigned_area}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
+                    {/* Email */}
+                    <TableCell className="text-sm">{h.email || '—'}</TableCell>
+
+                    {/* District */}
+                    <TableCell className="text-sm">{h.assigned_district || '—'}</TableCell>
+
+                    {/* Area */}
+                    <TableCell className="text-sm">{h.assigned_area || '—'}</TableCell>
 
                     {/* Status */}
                     <TableCell>
@@ -403,9 +385,14 @@ export default function AdminHubs() {
                       </Badge>
                     </TableCell>
 
-                    {/* Created */}
+                    {/* Created Date */}
                     <TableCell className="text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(h.created_at), { addSuffix: true })}
+                    </TableCell>
+
+                    {/* Total Assigned Bookings */}
+                    <TableCell className="text-sm text-center font-medium">
+                      {h.total_assigned_bookings || 0}
                     </TableCell>
 
                     {/* Actions */}

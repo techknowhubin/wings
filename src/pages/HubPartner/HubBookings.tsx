@@ -1,141 +1,241 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, Eye } from "lucide-react";
+import { Loader2, Search, Check, X, Car, Calendar, MapPin, Eye, MoreHorizontal, User, Phone } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function HubBookings() {
-  const { profile } = useAuth();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
 
   const { data: bookings, isLoading } = useQuery({
-    queryKey: ['hub-bookings', profile?.assigned_state],
-    enabled: !!profile?.assigned_state,
+    queryKey: ['hub-partner-bookings', user?.id],
+    enabled: !!user?.id,
     queryFn: async () => {
-      // Due to RLS, this will only return bookings in the assigned state
       const { data, error } = await supabase
-        .from('bookings')
+        .from('cab_bookings')
         .select(`
           *,
-          user:profiles!bookings_user_id_fkey(full_name, phone),
-          host:profiles!bookings_host_id_fkey(full_name)
+          traveller:profiles!cab_bookings_traveller_id_fkey(full_name, phone)
         `)
+        .eq('hub_partner_id', user?.id)
         .order('created_at', { ascending: false });
         
       if (error) throw error;
-      
-      const bookings = data ?? [];
-      const bookingIds = bookings.map((b: any) => b.id);
-      let cabBookingsMap = new Map();
-      if (bookingIds.length > 0) {
-        const { data: cabData } = await supabase
-          .from('cab_bookings')
-          .select('*')
-          .in('booking_id', bookingIds);
-        (cabData ?? []).forEach((cb: any) => cabBookingsMap.set(cb.booking_id, cb));
-      }
-      
-      return bookings.map(b => ({
-        ...b,
-        cabDetails: cabBookingsMap.get(b.id) ?? null
-      }));
+      return data || [];
     }
   });
 
-  const filteredBookings = bookings?.filter(booking => 
-    (booking.id?.toLowerCase().includes(searchTerm.toLowerCase()) || '') ||
-    (booking.user?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || '')
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status, isAssignmentStatus = false }: { id: string, status: string, isAssignmentStatus?: boolean }) => {
+      if (isAssignmentStatus) {
+        const { error } = await supabase
+          .from('cab_bookings')
+          .update({ assignment_status: status })
+          .eq('booking_id', id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('bookings')
+          .update({ booking_status: status })
+          .eq('id', id);
+        if (error) throw error;
+        // The trigger will update cab_bookings
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hub-partner-bookings', user?.id] });
+      toast({
+        title: "Status updated",
+        description: "Booking status has been updated successfully."
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Update failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+      </div>
+    );
+  }
+
+  const filteredBookings = bookings?.filter((b: any) => 
+    b.pickup_location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    b.drop_location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    b.booking_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    b.traveller?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Booking Management</h2>
-        <p className="text-muted-foreground">View bookings and transactions within {profile?.assigned_state}. Modification is restricted.</p>
-      </div>
-
-      <div className="flex bg-white dark:bg-gray-800 p-4 rounded-xl border dark:border-gray-700">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-          <Input 
-            placeholder="Search by Booking ID or Traveller Name..." 
-            className="pl-9 w-full bg-gray-50 dark:bg-gray-900 border-none"
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h2 className="text-2xl font-bold tracking-tight">Hub Bookings</h2>
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search location, name, ID..."
+            className="pl-8"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl overflow-hidden">
+      <div className="border rounded-md bg-card">
         <Table>
-          <TableHeader className="bg-gray-50 dark:bg-gray-900/50">
+          <TableHeader>
             <TableRow>
-              <TableHead>ID / Date</TableHead>
-              <TableHead>Traveller</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Amount</TableHead>
+              <TableHead>Route & Date</TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead>Vehicle & Fare</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
+            {filteredBookings?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-emerald-500" />
-                </TableCell>
-              </TableRow>
-            ) : filteredBookings?.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                  No bookings found.
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  No bookings found
                 </TableCell>
               </TableRow>
             ) : (
-              filteredBookings?.map((booking) => (
-                <TableRow key={booking.id}>
+              filteredBookings?.map((booking: any) => (
+                <TableRow key={booking.booking_id}>
                   <TableCell>
-                    <div className="font-mono text-xs text-muted-foreground mb-1">
-                      {booking.id.substring(0, 8)}...
-                    </div>
-                    <div className="text-sm">
-                      {format(new Date(booking.created_at), 'MMM dd, yyyy')}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium">{booking.user?.full_name || 'Unknown'}</div>
-                    <div className="text-xs text-muted-foreground">{booking.user?.phone}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="capitalize">{booking.listing_type}</div>
-                    {booking.cabDetails?.distance_km && (
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Distance: {booking.cabDetails.distance_km} KM
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {booking.currency === 'USD' ? '$' : '₹'}{booking.total_price}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1 items-start">
-                      <Badge variant={booking.booking_status === 'confirmed' ? 'default' : booking.booking_status === 'cancelled' ? 'destructive' : 'secondary'}>
-                        {booking.booking_status}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        Pay: {booking.payment_status}
+                    <div className="font-medium flex flex-col gap-1">
+                      <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {booking.pickup_location} → {booking.drop_location}</span>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Calendar className="h-3 w-3" /> 
+                        {booking.travel_date ? format(new Date(booking.travel_date), 'PP p') : 'TBD'}
                       </span>
+                      {booking.distance_km && (
+                        <span className="text-xs text-muted-foreground">{booking.distance_km} km</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="font-medium flex flex-col gap-1">
+                      <span className="flex items-center gap-1"><User className="h-3 w-3" /> {booking.traveller?.full_name || 'N/A'}</span>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" /> {booking.traveller?.phone || 'N/A'}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <span className="flex items-center gap-1 text-sm font-medium"><Car className="h-3 w-3" /> {booking.cab_type || 'Any Vehicle'}</span>
+                      <span className="text-sm">₹{booking.fare_amount || 0}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <Badge variant={booking.booking_status === 'Confirmed' ? 'default' : booking.booking_status === 'Completed' ? 'secondary' : 'outline'}>
+                        {booking.booking_status || 'Pending'}
+                      </Badge>
+                      {booking.assignment_status && booking.assignment_status !== 'Assigned' && (
+                        <Badge variant="outline" className="text-[10px] w-fit">
+                          {booking.assignment_status}
+                        </Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" variant="ghost" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
-                      <Eye className="w-4 h-4 mr-1" /> View
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Open menu</span>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                              <Eye className="mr-2 h-4 w-4" /> View Details
+                            </DropdownMenuItem>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                              <DialogTitle>Booking Details</DialogTitle>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                              <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div className="font-medium text-muted-foreground">Booking ID</div>
+                                <div className="break-all">{booking.booking_id}</div>
+                                
+                                <div className="font-medium text-muted-foreground">Pickup</div>
+                                <div>{booking.pickup_location}</div>
+                                
+                                <div className="font-medium text-muted-foreground">Drop</div>
+                                <div>{booking.drop_location}</div>
+                                
+                                <div className="font-medium text-muted-foreground">Date & Time</div>
+                                <div>{booking.travel_date ? format(new Date(booking.travel_date), 'PP p') : 'N/A'}</div>
+                                
+                                <div className="font-medium text-muted-foreground">Vehicle Type</div>
+                                <div>{booking.cab_type || 'N/A'}</div>
+                                
+                                <div className="font-medium text-muted-foreground">Total Fare</div>
+                                <div>₹{booking.fare_amount || 0}</div>
+                                
+                                <div className="font-medium text-muted-foreground">Distance</div>
+                                <div>{booking.distance_km || 'N/A'} km</div>
+                                
+                                <div className="font-medium text-muted-foreground">Customer</div>
+                                <div>{booking.traveller?.full_name || 'N/A'}</div>
+                                
+                                <div className="font-medium text-muted-foreground">Mobile</div>
+                                <div>{booking.traveller?.phone || 'N/A'}</div>
+
+                                <div className="font-medium text-muted-foreground">Trip Type</div>
+                                <div>Outstation</div>
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+
+                        <DropdownMenuSeparator />
+                        
+                        {booking.assignment_status === 'Assigned' && (
+                          <>
+                            <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: booking.booking_id, status: 'Accepted', isAssignmentStatus: true })}>
+                              <Check className="mr-2 h-4 w-4 text-emerald-500" /> Accept Booking
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: booking.booking_id, status: 'Rejected', isAssignmentStatus: true })}>
+                              <X className="mr-2 h-4 w-4 text-destructive" /> Reject Booking
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                          </>
+                        )}
+                        
+                        <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: booking.booking_id, status: 'Confirmed' })}>
+                          Mark as Confirmed
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: booking.booking_id, status: 'Completed' })}>
+                          Mark as Completed
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))

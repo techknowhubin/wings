@@ -405,3 +405,8 @@ dark .bg-primary {
 .blog-content [style*="text-align: center"] { text-align: center; }
 .blog-content [style*="text-align: right"] { text-align: right; }
 .blog-content [style*="text-align: justify"] { text-align: justify; }
+
+/* Hide WhatsApp widget when any dialog/modal is open */
+body[data-scroll-locked] .wa {
+  display: none !important;
+}

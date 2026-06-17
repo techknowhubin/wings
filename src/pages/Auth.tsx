@@ -265,6 +265,8 @@ const Auth = () => {
 
     if (r === "admin") {
       navigate("/admin");
+    } else if (r === "hub_partner") {
+      navigate("/hubpartner");
     } else if (r === "host") {
       // Check if they have finished onboarding by seeing if a host_profile exists
       const { data: hostProfile } = await supabase.from('host_profiles').select('id').eq('id', currentUser?.id).maybeSingle();

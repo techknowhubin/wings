@@ -322,12 +322,12 @@ const CabFareCard = ({
   const muvRatio = 16 / 12;
   const sheetMuvRound = muvPriceProp && muvPriceProp > 0 ? muvPriceProp
     : muvDiscountedPriceProp && muvDiscountedPriceProp > 0 ? muvDiscountedPriceProp
-    : 0;
-  const effectiveMuvRound    = sheetMuvRound > 0
+      : 0;
+  const effectiveMuvRound = sheetMuvRound > 0
     ? sheetMuvRound
-    : Math.round(effectiveSedanRound  * muvRatio / 10) * 10;
-  const effectiveMuvOneWay   = Math.round(effectiveMuvRound * 0.7 / 10) * 10;
-  const displayMuvRoundOrig  = Math.round(effectiveMuvRound * 1.15 / 10) * 10;
+    : Math.round(effectiveSedanRound * muvRatio / 10) * 10;
+  const effectiveMuvOneWay = Math.round(effectiveMuvRound * 0.7 / 10) * 10;
+  const displayMuvRoundOrig = Math.round(effectiveMuvRound * 1.15 / 10) * 10;
   const displayMuvOneWayOrig = Math.round(effectiveMuvOneWay * 1.15 / 10) * 10;
 
   // Distance values
@@ -341,13 +341,20 @@ const CabFareCard = ({
 
   const getFareForType = (type: string, trip: "One Way" | "Round Trip") => {
     if (type === "Sedan") return trip === "One Way" ? effectiveSedanOneWay : effectiveSedanRound;
-    if (type === "MUV")   return trip === "One Way" ? effectiveMuvOneWay   : effectiveMuvRound;
-    return                       trip === "One Way" ? effectiveSuvOneWay   : effectiveSuvRound;
+    if (type === "MUV") return trip === "One Way" ? effectiveMuvOneWay : effectiveMuvRound;
+    return trip === "One Way" ? effectiveSuvOneWay : effectiveSuvRound;
+  };
+
+  const getOriginalFareForType = (type: string, trip: "One Way" | "Round Trip") => {
+    if (type === "Sedan") return trip === "One Way" ? displaySedanOneWayOriginal : displaySedanRoundOriginal;
+    if (type === "MUV") return trip === "One Way" ? displayMuvOneWayOrig : displayMuvRoundOrig;
+    return trip === "One Way" ? displaySuvOneWayOriginal : displaySuvRoundOriginal;
   };
 
   const buildWhatsAppUrl = (vehicleType: string) => {
-    const fare = getFareForType(vehicleType, "Round Trip");
+    const fare = getFareForType(vehicleType, selectedTripType);
     const formattedPickupDate = travelDate ? format(new Date(travelDate), "dd MMM yyyy") : "—";
+    const tripDist = selectedTripType === "One Way" ? `${oneWayDistance} km` : distance;
 
     let message = `Hi Xplorwing! I would like to book a Cab.\n\n` +
       `🚗 *Booking Details:*\n` +
@@ -356,8 +363,8 @@ const CabFareCard = ({
       `• *Pickup Location:* ${fromCity} (${fromCode})\n` +
       `• *Drop Location:* ${toCity} (${toCode})\n` +
       `• *Route:* ${fromCity} → ${toCity}\n` +
-      `• *Distance:* ${distance}\n` +
-      `• *Trip Type:* Round Trip\n` +
+      `• *Distance:* ${tripDist}\n` +
+      `• *Trip Type:* ${selectedTripType}\n` +
       `• *Pickup Date:* ${formattedPickupDate}\n` +
       `• *Pickup Time:* ${travelTime}\n` +
       `• *Vehicle Type:* ${vehicleType}\n` +
@@ -421,8 +428,8 @@ const CabFareCard = ({
   // ── Vehicle selection popup ──
   const VEHICLES = [
     { type: "Sedan" as const, img: sedanImg, desc: "4 seats · Comfortable", owFare: effectiveSedanOneWay, rtFare: effectiveSedanRound },
-    { type: "MUV"   as const, img: muvImg,   desc: "6 seats · Spacious",    owFare: effectiveMuvOneWay,   rtFare: effectiveMuvRound },
-    { type: "SUV"   as const, img: suvImg,   desc: "7 seats · Premium",     owFare: effectiveSuvOneWay,   rtFare: effectiveSuvRound },
+    { type: "MUV" as const, img: muvImg, desc: "6 seats · Spacious", owFare: effectiveMuvOneWay, rtFare: effectiveMuvRound },
+    { type: "SUV" as const, img: suvImg, desc: "7 seats · Premium", owFare: effectiveSuvOneWay, rtFare: effectiveSuvRound },
   ];
 
   const vehicleSelectDialog = (
@@ -441,11 +448,10 @@ const CabFareCard = ({
               <button
                 key={type}
                 onClick={() => { setPickedVehicle(type); setSelectedCabType(type); }}
-                className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border-2 transition-all text-center ${
-                  isSelected
-                    ? "border-[#064e3b] bg-[#f0fdf4] shadow-md"
-                    : "border-border hover:border-[#064e3b]/40 hover:bg-muted/40"
-                }`}
+                className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border-2 transition-all text-center ${isSelected
+                  ? "border-[#064e3b] bg-[#f0fdf4] shadow-md"
+                  : "border-border hover:border-[#064e3b]/40 hover:bg-muted/40"
+                  }`}
               >
                 <img
                   src={img}
@@ -453,13 +459,7 @@ const CabFareCard = ({
                   className="h-16 w-full object-contain mix-blend-multiply dark:mix-blend-normal"
                 />
                 <p className={`font-bold text-sm ${isSelected ? "text-[#064e3b]" : "text-foreground"}`}>{type}</p>
-                <p className="text-[10px] text-muted-foreground">{desc}</p>
-                <div className="mt-1 w-full border-t pt-1.5">
-                  <div className="flex justify-between text-[10px]">
-                    <span className="text-muted-foreground">Round Trip</span>
-                    <span className="font-semibold">₹{rtFare.toLocaleString()}</span>
-                  </div>
-                </div>
+                <p className="text-[10px] text-muted-foreground mb-1">{desc}</p>
                 {isSelected && <span className="text-[9px] font-bold text-[#064e3b]">✓ Selected</span>}
               </button>
             );
@@ -468,95 +468,119 @@ const CabFareCard = ({
 
         {/* Booking form — only appears after vehicle is selected */}
         <AnimatePresence>
-        {pickedVehicle && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          exit={{ opacity: 0, height: 0 }}
-          transition={{ duration: 0.3 }}
-          className="mt-4 space-y-4 overflow-hidden"
-        >
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="travelDate" className="text-sm font-semibold text-[#013220]">Travel Date</Label>
-              <Input
-                id="travelDate"
-                type="date"
-                value={travelDate}
-                onChange={(e) => {
-                  setTravelDate(e.target.value);
-                  setTravelTime("");
-                }}
-                min={format(new Date(), "yyyy-MM-dd")}
-                required
-                className="h-10 text-sm rounded-xl border-[#e2e8f0]"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="travelTime" className="text-sm font-semibold text-[#013220]">Pickup Time</Label>
-              <select
-                id="travelTime"
-                value={travelTime}
-                onChange={(e) => setTravelTime(e.target.value)}
-                required
-                className="flex h-10 w-full items-center justify-between rounded-xl border border-[#e2e8f0] bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-[#013220]"
-              >
-                <option value="" disabled>Select time</option>
-                {getFilteredTimeSlots().map((slot) => (
-                  <option key={slot.value} value={slot.value}>{slot.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-[#e2e8f0] p-4 bg-white space-y-3 text-sm shadow-sm">
-            <div className="flex justify-between"><span className="text-muted-foreground">Route</span><span className="font-semibold text-right text-[#013220]">{fromCity} → {toCity}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Distance</span><span className="font-semibold text-[#013220]">{distance}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Vehicle</span><span className="font-semibold text-[#013220]">{pickedVehicle}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Trip</span><span className="font-semibold text-[#013220]">Round Trip</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Pickup Time</span><span className="font-semibold text-[#013220]">{travelTime || "—"}</span></div>
-            <div className="flex justify-between border-t border-[#e2e8f0] pt-3 mt-1">
-              <span className="font-bold text-base text-[#013220]">Estimated Fare</span>
-              <span className="font-bold text-xl text-[#013220]">₹{getFareForType(pickedVehicle, "Round Trip").toLocaleString()}*</span>
-            </div>
-            <p className="text-[10px] text-muted-foreground text-right mt-0">*Excl. tolls & driver night charges</p>
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1 h-12 text-sm font-bold border-[#25D366] text-[#25D366] rounded-xl hover:bg-[#25D366]/10 hover:text-[#25D366]"
-              onClick={() => {
-                if (!travelDate || !travelTime) {
-                  alert("Please fill travel date and time");
-                  return;
-                }
-                window.open(buildWhatsAppUrl(pickedVehicle), "_blank");
-                setIsVehicleSelectOpen(false);
-              }}
+          {pickedVehicle && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="mt-4 space-y-4 overflow-hidden"
             >
-              Book via WhatsApp
-            </Button>
-            <Button
-              type="button"
-              className="flex-1 h-12 text-sm font-bold bg-[#013220] text-white rounded-xl hover:bg-[#013220]/90"
-              onClick={() => {
-                if (!travelDate || !travelTime) {
-                  alert("Please fill travel date and time");
-                  return;
-                }
-                setIsVehicleSelectOpen(false);
-                setSelectedCabType(pickedVehicle);
-                setSelectedTripType("Round Trip");
-                handleOnlinePayment();
-              }}
-            >
-              Book Now (Pay Online)
-            </Button>
-          </div>
-        </motion.div>
-        )}
+              {/* Trip Type Toggle */}
+              <div className="flex items-center justify-center">
+                <div className="flex items-center bg-muted/50 rounded-full p-1 border border-border/50">
+                  <button
+                    onClick={() => setSelectedTripType("One Way")}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${selectedTripType === "One Way" ? "bg-[#013220] shadow-sm text-white" : "text-muted-foreground hover:text-[#013220]"}`}
+                  >
+                    ONE WAY
+                  </button>
+                  <button
+                    onClick={() => setSelectedTripType("Round Trip")}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${selectedTripType === "Round Trip" ? "bg-[#013220] shadow-sm text-white" : "text-muted-foreground hover:text-[#013220]"}`}
+                  >
+                    ROUND TRIP
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="travelDate" className="text-sm font-semibold text-[#013220]">Travel Date</Label>
+                  <Input
+                    id="travelDate"
+                    type="date"
+                    value={travelDate}
+                    onChange={(e) => {
+                      setTravelDate(e.target.value);
+                      setTravelTime("");
+                    }}
+                    min={format(new Date(Date.now() + 12 * 60 * 60 * 1000), "yyyy-MM-dd")}
+                    required
+                    className="h-10 text-sm rounded-xl border-[#e2e8f0]"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="travelTime" className="text-sm font-semibold text-[#013220]">Pickup Time</Label>
+                  <select
+                    id="travelTime"
+                    value={travelTime}
+                    onChange={(e) => setTravelTime(e.target.value)}
+                    required
+                    className="flex h-10 w-full items-center justify-between rounded-xl border border-[#e2e8f0] bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-[#013220]"
+                  >
+                    <option value="" disabled>Select time</option>
+                    {getFilteredTimeSlots().map((slot) => (
+                      <option key={slot.value} value={slot.value}>{slot.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#e2e8f0] p-4 bg-white space-y-3 text-sm shadow-sm">
+                <div className="flex justify-between"><span className="text-muted-foreground">Route</span><span className="font-semibold text-right text-[#013220]">{fromCity} → {toCity}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Distance</span><span className="font-semibold text-[#013220]">{selectedTripType === "One Way" ? `${oneWayDistance} km` : distance}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Vehicle</span><span className="font-semibold text-[#013220]">{pickedVehicle}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Trip</span><span className="font-semibold text-[#013220]">{selectedTripType}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Pickup Time</span><span className="font-semibold text-[#013220]">{travelTime || "—"}</span></div>
+                <div className="flex justify-between border-t border-[#e2e8f0] pt-3 mt-1">
+                  <span className="font-bold text-base text-[#013220] flex items-center">Estimated Fare</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground line-through">
+                      ₹{getOriginalFareForType(pickedVehicle, selectedTripType).toLocaleString()}
+                    </span>
+                    <span className="font-bold text-xl text-[#013220]">
+                      ₹{getFareForType(pickedVehicle, selectedTripType).toLocaleString()}*
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground text-right mt-0">*Excl. tolls, parking,driver allowances and night charges.</p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 h-12 text-sm font-bold border-[#25D366] text-[#25D366] rounded-xl hover:bg-[#25D366]/10 hover:text-[#25D366]"
+                  onClick={() => {
+                    if (!travelDate || !travelTime) {
+                      alert("Please fill travel date and time");
+                      return;
+                    }
+                    window.open(buildWhatsAppUrl(pickedVehicle), "_blank");
+                    setIsVehicleSelectOpen(false);
+                  }}
+                >
+                  Book via WhatsApp
+                </Button>
+                <Button
+                  type="button"
+                  className="flex-1 h-12 text-sm font-bold bg-[#013220] text-white rounded-xl hover:bg-[#013220]/90"
+                  onClick={() => {
+                    if (!travelDate || !travelTime) {
+                      alert("Please fill travel date and time");
+                      return;
+                    }
+                    setIsVehicleSelectOpen(false);
+                    setSelectedCabType(pickedVehicle);
+                    handleOnlinePayment();
+                  }}
+                >
+                  Book Now (Pay Online)
+                </Button>
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
       </DialogContent>
     </Dialog>
@@ -572,35 +596,43 @@ const CabFareCard = ({
             Complete your booking for {fromCity} to {toCity} ({selectedCabType} - {selectedTripType}).
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="travelDate">Travel Date</Label>
-            <Input 
-              id="travelDate" 
-              type="date" 
-              value={travelDate} 
-              onChange={(e) => setTravelDate(e.target.value)} 
-              min={format(new Date(), "yyyy-MM-dd")}
+            <Input
+              id="travelDate"
+              type="date"
+              value={travelDate}
+              onChange={(e) => setTravelDate(e.target.value)}
+              min={format(new Date(Date.now() + 12 * 60 * 60 * 1000), "yyyy-MM-dd")}
               required
             />
           </div>
-          
+
           <div className="rounded-xl border p-4 bg-muted/20 space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Route</span><span className="font-medium text-right">{fromCity} → {toCity}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Vehicle</span><span className="font-medium">{selectedCabType}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Trip Type</span><span className="font-medium">{selectedTripType}</span></div>
-            <div className="flex justify-between border-t pt-2 mt-2"><span className="font-semibold">Estimated Fare</span><span className="font-bold text-lg">
-              ₹{getFareForType(selectedCabType, selectedTripType).toLocaleString()}*
-            </span></div>
-            <p className="text-[10px] text-muted-foreground text-right">*Excl. tolls & driver night charges</p>
+            <div className="flex justify-between border-t border-[#e2e8f0] pt-3 mt-1">
+              <span className="font-bold text-base text-[#013220] flex items-center">Estimated Fare</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground line-through">
+                  ₹{getOriginalFareForType(selectedCabType, selectedTripType).toLocaleString()}
+                </span>
+                <span className="font-bold text-xl text-[#013220]">
+                  ₹{getFareForType(selectedCabType, selectedTripType).toLocaleString()}*
+                </span>
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground text-right">*Excl. tolls, parking,driver allowances and  night charges.</p>
           </div>
         </div>
-        
+
         <DialogFooter className="flex-col sm:flex-row gap-2 w-full">
-          <Button 
-            type="button" 
-            variant="outline" 
+          <Button
+            type="button"
+            variant="outline"
             className="flex-1 border-[#25D366] text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]"
             onClick={() => {
               window.open(buildWhatsAppUrl(selectedCabType), "_blank");
@@ -609,8 +641,8 @@ const CabFareCard = ({
           >
             Book via WhatsApp
           </Button>
-          <Button 
-            type="button" 
+          <Button
+            type="button"
             className="flex-1 bg-primary text-primary-foreground"
             onClick={() => {
               setIsBookModalOpen(false);
@@ -630,49 +662,62 @@ const CabFareCard = ({
   if (variant === "previous") {
     return (
       <>
-      {vehicleSelectDialog}
-      {bookingDialog}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay }}
-        className="bg-card border border-border rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full max-w-full"
-      >
-        <div className="flex items-center w-full relative min-h-[100px] md:min-h-[120px]">
-          {/* From */}
-          <div className="flex-1 p-1 md:p-5 flex flex-col items-center justify-center text-center min-w-[60px] md:min-w-[110px]">
-            <p className="text-sm md:text-2xl font-bold text-foreground leading-tight">{fromCode}</p>
-            <p className="text-[9px] md:text-sm text-muted-foreground leading-tight mt-0.5">{fromCity}</p>
-          </div>
-
-          {/* Car icon + distance */}
-          <div className="flex flex-col items-center px-0.5 md:px-2 py-4 shrink-0">
-            <p className="text-[7px] md:text-[10px] font-bold text-muted-foreground tracking-tighter md:tracking-widest uppercase mb-1">Round Trip</p>
-            <div className="flex items-center gap-0.5 md:gap-1">
-              <div className="w-2 md:w-8 h-[1px] border-t border-dashed border-primary/30" />
-              <img src={carIcon} alt="Car" className="h-5 w-8 md:h-10 md:w-16 object-contain shrink-0" />
-              <div className="w-2 md:w-8 h-[1px] border-t border-dashed border-primary/30" />
+        {vehicleSelectDialog}
+        {bookingDialog}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay }}
+          className="bg-card border border-border rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full max-w-full"
+        >
+          <div className="flex items-center w-full relative min-h-[100px] md:min-h-[120px]">
+            {/* From */}
+            <div className="flex-1 p-1 md:p-5 flex flex-col items-center justify-center text-center min-w-[60px] md:min-w-[110px]">
+              <p className="text-sm md:text-2xl font-bold text-foreground leading-tight">{fromCode}</p>
+              <p className="text-[9px] md:text-sm text-muted-foreground leading-tight mt-0.5">{fromCity}</p>
             </div>
-            <p className="text-[8px] md:text-xs text-muted-foreground mt-1 font-medium whitespace-nowrap">{distance}</p>
-          </div>
 
-          {/* To */}
-          <div className="flex-1 p-1 md:p-5 flex flex-col items-center justify-center text-center min-w-[60px] md:min-w-[110px]">
-            <p className="text-sm md:text-2xl font-bold text-foreground leading-tight">{toCode}</p>
-            <p className="text-[9px] md:text-sm text-muted-foreground leading-tight mt-0.5">{toCity}</p>
-          </div>
+            {/* Car icon + distance */}
+            <div className="flex flex-col items-center px-0.5 md:px-2 py-4 shrink-0">
+              <p className="text-[7px] md:text-[10px] font-bold text-muted-foreground tracking-tighter md:tracking-widest uppercase mb-1">ROUND TRIP</p>
+              <div className="flex items-center gap-0.5 md:gap-1">
+                <div className="w-2 md:w-8 h-[1px] border-t border-dashed border-primary/30" />
+                <img src={carIcon} alt="Car" className="h-5 w-8 md:h-10 md:w-16 object-contain shrink-0" />
+                <div className="w-2 md:w-8 h-[1px] border-t border-dashed border-primary/30" />
+              </div>
+              <p className="text-[8px] md:text-xs text-muted-foreground mt-1 font-medium whitespace-nowrap">
+                {distance}
+              </p>
+            </div>
 
-          {/* Book Now only */}
-          <div className="p-2 md:p-4 self-stretch flex items-center justify-center bg-[#064e3b] border-l border-emerald-900 shadow-inner shrink-0">
-            <button
-              onClick={() => openVehicleSelect("Round Trip")}
-              className="px-3 md:px-5 py-1.5 md:py-2 bg-[#E5F76E] text-gray-900 text-[9px] md:text-xs font-bold rounded-full hover:bg-[#d4e85e] transition-colors whitespace-nowrap"
-            >
-              Book Now
-            </button>
+            {/* To */}
+            <div className="flex-1 p-1 md:p-5 flex flex-col items-center justify-center text-center min-w-[60px] md:min-w-[110px]">
+              <p className="text-sm md:text-2xl font-bold text-foreground leading-tight">{toCode}</p>
+              <p className="text-[9px] md:text-sm text-muted-foreground leading-tight mt-0.5">{toCity}</p>
+            </div>
+
+            {/* Price and Book Now */}
+            <div className="p-2 md:p-4 self-stretch flex flex-col items-center justify-center bg-[#064e3b] border-l border-emerald-900 shadow-inner shrink-0 gap-1.5 md:gap-2 min-w-[90px] md:min-w-[130px]">
+              <div className="flex flex-col items-center text-center text-white">
+                <span className="opacity-80 text-[8px] md:text-[10px] font-semibold">Starting from</span>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="text-[9px] md:text-[11px] text-white/60 line-through">
+                    ₹{displaySedanOneWayOriginal.toLocaleString()}
+                  </span>
+                  <span className="text-sm md:text-lg font-bold text-[#E5F76E]">
+                    ₹{effectiveSedanOneWay.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); openVehicleSelect("Round Trip"); }}
+                className="w-full px-3 md:px-5 py-1 md:py-1.5 bg-[#E5F76E] text-gray-900 text-[9px] md:text-xs font-bold rounded-full hover:bg-[#d4e85e] transition-colors whitespace-nowrap"
+              >
+                Book Now
+              </button>
+            </div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
       </>
     );
   }
@@ -683,187 +728,187 @@ const CabFareCard = ({
 
   return (
     <>
-    {vehicleSelectDialog}
-    {bookingDialog}
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay }}
-      className={`ticket-wrap ${isOpen ? "open" : ""}`}
-    >
-      <div className="ticket">
-        {/* LEFT PANEL */}
-        <div className="ticket-left">
-          <img
-            src={resolveImageUrl(imageUrl || "") || getDestinationImage(toCode)}
-            alt={toCity}
-            onError={(e) => {
-              const img = e.target as HTMLImageElement;
-              const driveId = imageUrl ? extractDriveId(imageUrl) : null;
-              if (driveId && !img.src.includes("lh3") && !img.src.includes("uc?export")) {
-                img.src = `https://lh3.googleusercontent.com/d/${driveId}`;
-              } else if (driveId && !img.src.includes("uc?export")) {
-                img.src = `https://drive.google.com/uc?export=view&id=${driveId}`;
-              } else {
-                img.src = getDestinationImage(toCode);
-              }
-            }}
-          />
-          <div className="dest-label">
-            <div className="dest-code">{toCode}</div>
-            <div className="dest-city">{toCity}</div>
+      {vehicleSelectDialog}
+      {bookingDialog}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay }}
+        className={`ticket-wrap ${isOpen ? "open" : ""}`}
+      >
+        <div className="ticket">
+          {/* LEFT PANEL */}
+          <div className="ticket-left">
+            <img
+              src={resolveImageUrl(imageUrl || "") || getDestinationImage(toCode)}
+              alt={toCity}
+              onError={(e) => {
+                const img = e.target as HTMLImageElement;
+                const driveId = imageUrl ? extractDriveId(imageUrl) : null;
+                if (driveId && !img.src.includes("lh3") && !img.src.includes("uc?export")) {
+                  img.src = `https://lh3.googleusercontent.com/d/${driveId}`;
+                } else if (driveId && !img.src.includes("uc?export")) {
+                  img.src = `https://drive.google.com/uc?export=view&id=${driveId}`;
+                } else {
+                  img.src = getDestinationImage(toCode);
+                }
+              }}
+            />
+            <div className="dest-label">
+              <div className="dest-code">{toCode}</div>
+              <div className="dest-city">{toCity}</div>
+            </div>
+          </div>
+
+          <div className="divider-line"></div>
+
+          {/* RIGHT PANEL */}
+          <div className="ticket-right">
+            {/* ROUTE */}
+            <div className="route-row">
+              <div className="city-block" style={{ alignSelf: "flex-start" }}>
+                <div className="city-c">{fromCode}</div>
+                <div className="city-n">{fromCity}</div>
+              </div>
+              <div className="route-mid">
+                <span className="dist-chip-ow">
+                  One Way · {oneWayDistance} km <span className="dist-buf">+{oneWayBuffer}</span>
+                </span>
+                <div className="route-line">
+                  <div className="rdot"></div>
+                  <div className="rline"></div>
+                  <svg className="car-svg" viewBox="0 0 32 16" fill="none">
+                    <path
+                      d="M4 10h24M7 10V7.5L10 4h12l3 3.5V10"
+                      stroke="#1a5c3a"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle cx="9" cy="11.5" r="1.8" fill="#1a5c3a" />
+                    <circle cx="23" cy="11.5" r="1.8" fill="#1a5c3a" />
+                  </svg>
+                  <div className="rline"></div>
+                  <div className="rdot"></div>
+                </div>
+                <span className="dist-chip-rt">
+                  Round Trip · {numericDistance} km <span className="dist-buf">+{bufferDistance}</span>
+                </span>
+              </div>
+              <div className="city-block right" style={{ alignSelf: "flex-end" }}>
+                <div className="city-c">{toCode}</div>
+                <div className="city-n">{toCity}</div>
+              </div>
+            </div>
+
+            {/* VEHICLE CARDS — Sedan / MUV / SUV */}
+            <div className="vehicle-row">
+              <div className="v-card">
+                <div className="v-type">Sedan</div>
+                <div className="v-prices-inner">
+                  <div className="v-price-col">
+                    <div className="v-trip-label">One Way</div>
+                    <div className="v-price-struck">₹{displaySedanOneWayOriginal.toLocaleString()}</div>
+                    <div className="v-price">₹{effectiveSedanOneWay.toLocaleString()}<sup>*</sup></div>
+                  </div>
+                  <div className="v-price-col">
+                    <div className="v-trip-label">Round Trip</div>
+                    <div className="v-price-struck">₹{displaySedanRoundOriginal.toLocaleString()}</div>
+                    <div className="v-price">₹{effectiveSedanRound.toLocaleString()}<sup>*</sup></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="v-card">
+                <div className="v-type">MUV</div>
+                <div className="v-prices-inner">
+                  <div className="v-price-col">
+                    <div className="v-trip-label">One Way</div>
+                    <div className="v-price-struck">₹{displayMuvOneWayOrig.toLocaleString()}</div>
+                    <div className="v-price">₹{effectiveMuvOneWay.toLocaleString()}<sup>*</sup></div>
+                  </div>
+                  <div className="v-price-col">
+                    <div className="v-trip-label">Round Trip</div>
+                    <div className="v-price-struck">₹{displayMuvRoundOrig.toLocaleString()}</div>
+                    <div className="v-price">₹{effectiveMuvRound.toLocaleString()}<sup>*</sup></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="v-card">
+                <div className="v-type">SUV</div>
+                <div className="v-prices-inner">
+                  <div className="v-price-col">
+                    <div className="v-trip-label">One Way</div>
+                    <div className="v-price-struck">₹{displaySuvOneWayOriginal.toLocaleString()}</div>
+                    <div className="v-price">₹{effectiveSuvOneWay.toLocaleString()}<sup>*</sup></div>
+                  </div>
+                  <div className="v-price-col">
+                    <div className="v-trip-label">Round Trip</div>
+                    <div className="v-price-struck">₹{displaySuvRoundOriginal.toLocaleString()}</div>
+                    <div className="v-price">₹{effectiveSuvRound.toLocaleString()}<sup>*</sup></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SINGLE BOOK NOW BUTTON */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0 2px' }}>
+              <button onClick={() => openVehicleSelect("Round Trip")} className="v-btn" style={{ minWidth: 120 }}>
+                Book Now
+              </button>
+            </div>
+
+            {/* FOOTER */}
+            <div className="ticket-footer">
+              <span className="footer-note">* Excl. tolls & driver night charges</span>
+              <button onClick={() => setIsOpen(!isOpen)} className="acc-toggle" aria-label="Show details">
+                <span className="plus-icon">
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                    <path d="M6 1v10M1 6h10" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+                  </svg>
+                </span>
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="divider-line"></div>
-
-        {/* RIGHT PANEL */}
-        <div className="ticket-right">
-          {/* ROUTE */}
-          <div className="route-row">
-            <div className="city-block" style={{ alignSelf: "flex-start" }}>
-              <div className="city-c">{fromCode}</div>
-              <div className="city-n">{fromCity}</div>
+        {/* ACCORDION */}
+        <div className="acc-panel">
+          <div className="acc-inner">
+            <div>
+              <div className="acc-section-title">Fare Breakdown</div>
+              <div className="acc-trip-header">One Way</div>
+              <div className="acc-row"><span className="acc-key">Distance</span><span className="acc-val">{oneWayDistance} km</span></div>
+              <div className="acc-row"><span className="acc-key">Buffer</span><span className="acc-val">+{oneWayBuffer} km</span></div>
+              <div className="acc-row"><span className="acc-key">Total</span><span className="acc-val">{oneWayDistance + oneWayBuffer} km</span></div>
+              <div className="acc-trip-header">Round Trip</div>
+              <div className="acc-row"><span className="acc-key">Distance</span><span className="acc-val">{numericDistance} km</span></div>
+              <div className="acc-row"><span className="acc-key">Buffer</span><span className="acc-val">+{bufferDistance} km</span></div>
+              <div className="acc-row"><span className="acc-key">Total</span><span className="acc-val">{totalCovered} km</span></div>
+              <div className="acc-trip-header">Extra KM</div>
+              <div className="acc-row"><span className="acc-key">Sedan</span><span className="acc-val">₹12 / km</span></div>
+              <div className="acc-row"><span className="acc-key">MUV</span><span className="acc-val">₹16 / km</span></div>
+              <div className="acc-row"><span className="acc-key">SUV</span><span className="acc-val">₹22 / km</span></div>
             </div>
-            <div className="route-mid">
-              <span className="dist-chip-ow">
-                One Way · {oneWayDistance} km <span className="dist-buf">+{oneWayBuffer}</span>
-              </span>
-              <div className="route-line">
-                <div className="rdot"></div>
-                <div className="rline"></div>
-                <svg className="car-svg" viewBox="0 0 32 16" fill="none">
-                  <path
-                    d="M4 10h24M7 10V7.5L10 4h12l3 3.5V10"
-                    stroke="#1a5c3a"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <circle cx="9" cy="11.5" r="1.8" fill="#1a5c3a" />
-                  <circle cx="23" cy="11.5" r="1.8" fill="#1a5c3a" />
-                </svg>
-                <div className="rline"></div>
-                <div className="rdot"></div>
-              </div>
-              <span className="dist-chip-rt">
-                Round Trip · {numericDistance} km <span className="dist-buf">+{bufferDistance}</span>
-              </span>
+            <div>
+              <div className="acc-section-title">What's Included</div>
+              <div className="acc-row"><span className="acc-key">Fuel</span><span className="acc-val">✓ Included</span></div>
+              <div className="acc-row"><span className="acc-key">GST</span><span className="acc-val">✓ Included</span></div>
+              <div className="acc-row"><span className="acc-key">Driver night</span><span className="acc-val">₹300 / night</span></div>
+              <div className="acc-row"><span className="acc-key">Toll est.</span><span className="acc-val">₹{minToll}–₹{maxToll}</span></div>
+              <div className="acc-section-title" style={{ marginTop: "10px" }}>Policy</div>
+              <div className="acc-note">Fixed · No surge · No disputes · Beyond buffer at base rate</div>
+              <div className="acc-highlight">✓ No penalty charges</div>
             </div>
-            <div className="city-block right" style={{ alignSelf: "flex-end" }}>
-              <div className="city-c">{toCode}</div>
-              <div className="city-n">{toCity}</div>
+            <div className="acc-divider"></div>
+            <div className="acc-full">
+              <div className="acc-section-title">Cancellation</div>
+              <div className="acc-note">Free up to 24 hrs before pickup · 50% within 12 hrs · Full charge on no-show</div>
             </div>
-          </div>
-
-          {/* VEHICLE CARDS — Sedan / MUV / SUV */}
-          <div className="vehicle-row">
-            <div className="v-card">
-              <div className="v-type">Sedan</div>
-              <div className="v-prices-inner">
-                <div className="v-price-col">
-                  <div className="v-trip-label">One Way</div>
-                  <div className="v-price-struck">₹{displaySedanOneWayOriginal.toLocaleString()}</div>
-                  <div className="v-price">₹{effectiveSedanOneWay.toLocaleString()}<sup>*</sup></div>
-                </div>
-                <div className="v-price-col">
-                  <div className="v-trip-label">Round Trip</div>
-                  <div className="v-price-struck">₹{displaySedanRoundOriginal.toLocaleString()}</div>
-                  <div className="v-price">₹{effectiveSedanRound.toLocaleString()}<sup>*</sup></div>
-                </div>
-              </div>
-            </div>
-
-            <div className="v-card">
-              <div className="v-type">MUV</div>
-              <div className="v-prices-inner">
-                <div className="v-price-col">
-                  <div className="v-trip-label">One Way</div>
-                  <div className="v-price-struck">₹{displayMuvOneWayOrig.toLocaleString()}</div>
-                  <div className="v-price">₹{effectiveMuvOneWay.toLocaleString()}<sup>*</sup></div>
-                </div>
-                <div className="v-price-col">
-                  <div className="v-trip-label">Round Trip</div>
-                  <div className="v-price-struck">₹{displayMuvRoundOrig.toLocaleString()}</div>
-                  <div className="v-price">₹{effectiveMuvRound.toLocaleString()}<sup>*</sup></div>
-                </div>
-              </div>
-            </div>
-
-            <div className="v-card">
-              <div className="v-type">SUV</div>
-              <div className="v-prices-inner">
-                <div className="v-price-col">
-                  <div className="v-trip-label">One Way</div>
-                  <div className="v-price-struck">₹{displaySuvOneWayOriginal.toLocaleString()}</div>
-                  <div className="v-price">₹{effectiveSuvOneWay.toLocaleString()}<sup>*</sup></div>
-                </div>
-                <div className="v-price-col">
-                  <div className="v-trip-label">Round Trip</div>
-                  <div className="v-price-struck">₹{displaySuvRoundOriginal.toLocaleString()}</div>
-                  <div className="v-price">₹{effectiveSuvRound.toLocaleString()}<sup>*</sup></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SINGLE BOOK NOW BUTTON */}
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0 2px' }}>
-            <button onClick={() => openVehicleSelect("Round Trip")} className="v-btn" style={{ minWidth: 120 }}>
-              Book Now
-            </button>
-          </div>
-
-          {/* FOOTER */}
-          <div className="ticket-footer">
-            <span className="footer-note">* Excl. tolls & driver night charges</span>
-            <button onClick={() => setIsOpen(!isOpen)} className="acc-toggle" aria-label="Show details">
-              <span className="plus-icon">
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                  <path d="M6 1v10M1 6h10" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-                </svg>
-              </span>
-            </button>
           </div>
         </div>
-      </div>
-
-      {/* ACCORDION */}
-      <div className="acc-panel">
-        <div className="acc-inner">
-          <div>
-            <div className="acc-section-title">Fare Breakdown</div>
-            <div className="acc-trip-header">One Way</div>
-            <div className="acc-row"><span className="acc-key">Distance</span><span className="acc-val">{oneWayDistance} km</span></div>
-            <div className="acc-row"><span className="acc-key">Buffer</span><span className="acc-val">+{oneWayBuffer} km</span></div>
-            <div className="acc-row"><span className="acc-key">Total</span><span className="acc-val">{oneWayDistance + oneWayBuffer} km</span></div>
-            <div className="acc-trip-header">Round Trip</div>
-            <div className="acc-row"><span className="acc-key">Distance</span><span className="acc-val">{numericDistance} km</span></div>
-            <div className="acc-row"><span className="acc-key">Buffer</span><span className="acc-val">+{bufferDistance} km</span></div>
-            <div className="acc-row"><span className="acc-key">Total</span><span className="acc-val">{totalCovered} km</span></div>
-            <div className="acc-trip-header">Extra KM</div>
-            <div className="acc-row"><span className="acc-key">Sedan</span><span className="acc-val">₹12 / km</span></div>
-            <div className="acc-row"><span className="acc-key">MUV</span><span className="acc-val">₹16 / km</span></div>
-            <div className="acc-row"><span className="acc-key">SUV</span><span className="acc-val">₹22 / km</span></div>
-          </div>
-          <div>
-            <div className="acc-section-title">What's Included</div>
-            <div className="acc-row"><span className="acc-key">Fuel</span><span className="acc-val">✓ Included</span></div>
-            <div className="acc-row"><span className="acc-key">GST</span><span className="acc-val">✓ Included</span></div>
-            <div className="acc-row"><span className="acc-key">Driver night</span><span className="acc-val">₹300 / night</span></div>
-            <div className="acc-row"><span className="acc-key">Toll est.</span><span className="acc-val">₹{minToll}–₹{maxToll}</span></div>
-            <div className="acc-section-title" style={{ marginTop: "10px" }}>Policy</div>
-            <div className="acc-note">Fixed · No surge · No disputes · Beyond buffer at base rate</div>
-            <div className="acc-highlight">✓ No penalty charges</div>
-          </div>
-          <div className="acc-divider"></div>
-          <div className="acc-full">
-            <div className="acc-section-title">Cancellation</div>
-            <div className="acc-note">Free up to 24 hrs before pickup · 50% within 12 hrs · Full charge on no-show</div>
-          </div>
-        </div>
-      </div>
-    </motion.div>
+      </motion.div>
     </>
   );
 };

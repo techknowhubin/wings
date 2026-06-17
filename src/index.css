@@ -410,3 +410,5 @@ dark .bg-primary {
 body[data-scroll-locked] .wa {
   display: none !important;
 }
+
+body.hide-wa-btn .wa { display: none !important; }

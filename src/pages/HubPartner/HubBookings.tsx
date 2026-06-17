@@ -127,9 +127,12 @@ export default function HubBookings() {
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
                         <Calendar className="h-3 w-3" /> 
                         {booking.travel_date ? format(new Date(booking.travel_date), 'PP p') : 'TBD'}
+                        {booking.return_date && ` - ${format(new Date(booking.return_date), 'PP p')}`}
                       </span>
                       {booking.distance_km && (
-                        <span className="text-xs text-muted-foreground">{booking.distance_km} km</span>
+                        <span className="text-xs text-muted-foreground">
+                          {booking.distance_km} km ({booking.return_date ? 'Round Trip' : 'One-way'})
+                        </span>
                       )}
                     </div>
                   </TableCell>
@@ -189,8 +192,15 @@ export default function HubBookings() {
                                 <div className="font-medium text-muted-foreground">Drop</div>
                                 <div>{booking.drop_location}</div>
                                 
-                                <div className="font-medium text-muted-foreground">Date & Time</div>
+                                <div className="font-medium text-muted-foreground">Pickup Date & Time</div>
                                 <div>{booking.travel_date ? format(new Date(booking.travel_date), 'PP p') : 'N/A'}</div>
+
+                                {booking.return_date && (
+                                  <>
+                                    <div className="font-medium text-muted-foreground">Return Date & Time</div>
+                                    <div>{format(new Date(booking.return_date), 'PP p')}</div>
+                                  </>
+                                )}
                                 
                                 <div className="font-medium text-muted-foreground">Vehicle Type</div>
                                 <div>{booking.cab_type || 'N/A'}</div>
@@ -208,7 +218,7 @@ export default function HubBookings() {
                                 <div>{booking.traveller?.phone || 'N/A'}</div>
 
                                 <div className="font-medium text-muted-foreground">Trip Type</div>
-                                <div>Outstation</div>
+                                <div>{booking.return_date ? 'Outstation Round Trip' : 'Outstation One-way'}</div>
                               </div>
                             </div>
                           </DialogContent>

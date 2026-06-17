@@ -217,6 +217,15 @@ const CabFareCard = ({
   }, []);
 
   useEffect(() => {
+    if (isVehicleSelectOpen || isBookModalOpen) {
+      document.body.classList.add('hide-wa-btn');
+    } else {
+      document.body.classList.remove('hide-wa-btn');
+    }
+    return () => document.body.classList.remove('hide-wa-btn');
+  }, [isVehicleSelectOpen, isBookModalOpen]);
+
+  useEffect(() => {
     if (travelDate && returnDate && returnDate < travelDate) {
       setReturnDate(travelDate);
     }
@@ -505,7 +514,7 @@ const CabFareCard = ({
                       setTravelDate(e.target.value);
                       setTravelTime("");
                     }}
-                    min={format(new Date(Date.now() + 12 * 60 * 60 * 1000), "yyyy-MM-dd")}
+                    min={format(new Date(Date.now() + 24 * 60 * 60 * 1000), "yyyy-MM-dd")}
                     required
                     className="h-10 text-sm rounded-xl border-[#e2e8f0]"
                   />
@@ -605,7 +614,7 @@ const CabFareCard = ({
               type="date"
               value={travelDate}
               onChange={(e) => setTravelDate(e.target.value)}
-              min={format(new Date(Date.now() + 12 * 60 * 60 * 1000), "yyyy-MM-dd")}
+              min={format(new Date(Date.now() + 24 * 60 * 60 * 1000), "yyyy-MM-dd")}
               required
             />
           </div>
@@ -803,52 +812,16 @@ const CabFareCard = ({
 
             {/* VEHICLE CARDS — Sedan / MUV / SUV */}
             <div className="vehicle-row">
-              <div className="v-card">
-                <div className="v-type">Sedan</div>
-                <div className="v-prices-inner">
-                  <div className="v-price-col">
-                    <div className="v-trip-label">One Way</div>
-                    <div className="v-price-struck">₹{displaySedanOneWayOriginal.toLocaleString()}</div>
-                    <div className="v-price">₹{effectiveSedanOneWay.toLocaleString()}<sup>*</sup></div>
-                  </div>
-                  <div className="v-price-col">
-                    <div className="v-trip-label">Round Trip</div>
-                    <div className="v-price-struck">₹{displaySedanRoundOriginal.toLocaleString()}</div>
-                    <div className="v-price">₹{effectiveSedanRound.toLocaleString()}<sup>*</sup></div>
-                  </div>
-                </div>
+              <div className="v-card flex justify-center items-center py-4">
+                <div className="v-type mb-0" style={{ fontSize: '10px' }}>Sedan</div>
               </div>
 
-              <div className="v-card">
-                <div className="v-type">MUV</div>
-                <div className="v-prices-inner">
-                  <div className="v-price-col">
-                    <div className="v-trip-label">One Way</div>
-                    <div className="v-price-struck">₹{displayMuvOneWayOrig.toLocaleString()}</div>
-                    <div className="v-price">₹{effectiveMuvOneWay.toLocaleString()}<sup>*</sup></div>
-                  </div>
-                  <div className="v-price-col">
-                    <div className="v-trip-label">Round Trip</div>
-                    <div className="v-price-struck">₹{displayMuvRoundOrig.toLocaleString()}</div>
-                    <div className="v-price">₹{effectiveMuvRound.toLocaleString()}<sup>*</sup></div>
-                  </div>
-                </div>
+              <div className="v-card flex justify-center items-center py-4">
+                <div className="v-type mb-0" style={{ fontSize: '10px' }}>MUV</div>
               </div>
 
-              <div className="v-card">
-                <div className="v-type">SUV</div>
-                <div className="v-prices-inner">
-                  <div className="v-price-col">
-                    <div className="v-trip-label">One Way</div>
-                    <div className="v-price-struck">₹{displaySuvOneWayOriginal.toLocaleString()}</div>
-                    <div className="v-price">₹{effectiveSuvOneWay.toLocaleString()}<sup>*</sup></div>
-                  </div>
-                  <div className="v-price-col">
-                    <div className="v-trip-label">Round Trip</div>
-                    <div className="v-price-struck">₹{displaySuvRoundOriginal.toLocaleString()}</div>
-                    <div className="v-price">₹{effectiveSuvRound.toLocaleString()}<sup>*</sup></div>
-                  </div>
-                </div>
+              <div className="v-card flex justify-center items-center py-4">
+                <div className="v-type mb-0" style={{ fontSize: '10px' }}>SUV</div>
               </div>
             </div>
 

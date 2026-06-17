@@ -86,6 +86,8 @@ import HubDrivers from "./pages/HubPartner/HubDrivers";
 import HubMap from "./pages/HubPartner/HubMap";
 import HubSupport from "./pages/HubPartner/HubSupport";
 import HubReports from "./pages/HubPartner/HubReports";
+import HubProfile from "./pages/HubPartner/HubProfile";
+import HubSettings from "./pages/HubPartner/HubSettings";
 
 const queryClient = new QueryClient();
 
@@ -222,7 +224,7 @@ const App = () =>
 
             {/* Hub Partner Dashboard */}
             <Route
-              path="/hubpartner"
+              path="/hub/:uuid"
               element={
                 <ProtectedHubRoute>
                   <HubLayout />
@@ -235,10 +237,16 @@ const App = () =>
               <Route path="bookings" element={<HubBookings />} />
               <Route path="travellers" element={<HubTravellers />} />
               <Route path="drivers" element={<HubDrivers />} />
+              <Route path="vehicles" element={<HubDrivers />} /> {/* Placeholder if separate page needed later */}
               <Route path="map" element={<HubMap />} />
               <Route path="support" element={<HubSupport />} />
               <Route path="reports" element={<HubReports />} />
+              <Route path="profile" element={<HubProfile />} />
+              <Route path="settings" element={<HubSettings />} />
             </Route>
+
+            {/* Backwards compatibility for old Hub Partner URL */}
+            <Route path="/hubpartner" element={<Navigate to="/profile" replace />} />
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

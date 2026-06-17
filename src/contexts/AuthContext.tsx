@@ -86,8 +86,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         }
 
-        // Close the popup window automatically after a successful login
-        if (newSession && typeof window !== 'undefined' && window.opener && window.opener !== window) {
+        // Close the popup window automatically after a successful login, but ONLY if we are on the /auth route
+        if (
+          newSession &&
+          typeof window !== 'undefined' &&
+          window.opener &&
+          window.opener !== window &&
+          window.location.pathname === '/auth'
+        ) {
           setTimeout(() => { window.close(); }, 500); // 500ms buffer to ensure localStorage is flushed
         }
       }

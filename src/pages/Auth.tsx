@@ -265,8 +265,45 @@ const Auth = () => {
 
     if (r === "admin") {
       navigate("/admin");
-    } else if (r === "hub_partner") {
-      navigate("/hubpartner");
+    } else if (r === "hub_partner" || r === "HUB_PARTNER") {
+      // Fetch hub UUID
+      const { data: hubData } = await supabase
+        .from('hubs')
+        .select('uuid')
+        .eq('id', currentUser?.id)
+        .maybeSingle();
+      let finalUuid = hubData?.uuid;
+
+      if (!finalUuid && currentUser) {
+        console.log("[Auth] Missing hub record, attempting auto-create for existing partner");
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
+        
+        if (profile) {
+          const { error: insertErr } = await supabase.from('hubs').insert({
+            id: currentUser.id,
+            hub_name: `${profile.full_name || 'Partner'} Hub`,
+            owner_name: profile.full_name || 'Hub Owner',
+            email: currentUser.email || '',
+            mobile: profile.phone || '',
+            district: profile.assigned_district || '',
+            area: profile.assigned_area || '',
+            status: 'active'
+          });
+
+          if (!insertErr) {
+            const { data: newHub } = await supabase.from('hubs').select('uuid').eq('id', currentUser.id).maybeSingle();
+            finalUuid = newHub?.uuid;
+          }
+        }
+      }
+
+      if (finalUuid) {
+        navigate(`/hub/${finalUuid}`);
+      } else {
+        // Fallback if hub record isn't created yet for some reason
+        toast({ variant: "destructive", title: "Hub not found", description: "Your hub profile could not be auto-created. Contact admin." });
+        navigate("/");
+      }
     } else if (r === "host") {
       // Check if they have finished onboarding by seeing if a host_profile exists
       const { data: hostProfile } = await supabase.from('host_profiles').select('id').eq('id', currentUser?.id).maybeSingle();

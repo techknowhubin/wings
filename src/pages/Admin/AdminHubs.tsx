@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import {
   Building2, Plus, Search, Pencil, Trash2,
-  ToggleLeft, ToggleRight, Users, MapPin, Eye, EyeOff, Copy,
+  ToggleLeft, ToggleRight, Users, MapPin, Eye, EyeOff, Copy, ExternalLink,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import indiaLocationsData from '@/constants/indiaLocations.json';
@@ -44,22 +44,24 @@ function useHubPartnerProfiles(search: string) {
         .order('created_at', { ascending: false });
       if (pErr) throw pErr;
 
-      // 3. Fetch their booking counts
-      const { data: cabBookings, error: cabErr } = await supabase
-        .from('cab_bookings')
-        .select('hub_partner_id')
-        .in('hub_partner_id', hubIds)
-        .not('hub_partner_id', 'is', null);
+      // 3. Fetch their hub UUIDs and emails
+      const { data: hubsData, error: hubsErr } = await supabase
+        .from('hubs')
+        .select('id, uuid, email')
+        .in('id', hubIds);
+      
+      if (hubsErr) throw hubsErr;
 
-      const bookingCounts = (cabBookings || []).reduce((acc: Record<string, number>, curr: any) => {
-        const id = curr.hub_partner_id;
-        acc[id] = (acc[id] || 0) + 1;
+      const hubMap = (hubsData || []).reduce((acc: Record<string, any>, curr: any) => {
+        acc[curr.id] = { uuid: curr.uuid, email: curr.email };
         return acc;
       }, {});
 
       let results = (profiles ?? []).map(p => ({
         ...p,
-        total_assigned_bookings: bookingCounts[p.id] || 0
+        uuid: hubMap[p.id]?.uuid || null,
+        email: hubMap[p.id]?.email || null,
+        total_assigned_bookings: 0
       }));
 
       if (search) {
@@ -96,6 +98,20 @@ function useCreateHubPartnerAccount() {
       
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+
+      // Create the hub record in the new hubs table
+      const { error: hubError } = await supabase.from('hubs').insert({
+        id: data.userId,
+        hub_name: `${form.full_name} Hub`,
+        owner_name: form.full_name,
+        email: form.email,
+        mobile: form.phone,
+        district: form.assigned_district || '',
+        area: form.assigned_area || '',
+        status: 'active'
+      });
+
+      if (hubError) throw hubError;
 
       return { userId: data.userId, email: form.email };
     },
@@ -412,13 +428,39 @@ export default function AdminHubs() {
                         <Button
                           size="icon" variant="ghost"
                           className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          title="Copy Dashboard URL"
-                          onClick={() => {
-                            navigator.clipboard.writeText(`${window.location.origin}/hubpartner`);
-                            toast.success('Hub Partner dashboard link copied!');
+                          title="View Hub Dashboard"
+                          onClick={async () => {
+                            if (h.uuid) {
+                              window.open(`/hub/${h.uuid}`, '_blank');
+                            } else {
+                              const toastId = toast.loading('Generating Hub dashboard...');
+                              try {
+                                const { error: insertErr } = await supabase.from('hubs').insert({
+                                  id: h.id,
+                                  hub_name: `${h.full_name || 'Partner'} Hub`,
+                                  owner_name: h.full_name || 'Hub Owner',
+                                  email: h.email || '',
+                                  mobile: h.phone || '',
+                                  district: h.assigned_district || '',
+                                  area: h.assigned_area || '',
+                                  status: 'active'
+                                });
+                                if (insertErr) throw insertErr;
+                                
+                                const { data: newHub, error: fetchErr } = await supabase.from('hubs').select('uuid').eq('id', h.id).maybeSingle();
+                                if (fetchErr) throw fetchErr;
+                                
+                                toast.success('Dashboard generated!', { id: toastId });
+                                if (newHub?.uuid) {
+                                  window.open(`/hub/${newHub.uuid}`, '_blank');
+                                }
+                              } catch (err: any) {
+                                toast.error('Failed to generate Hub: ' + err.message, { id: toastId });
+                              }
+                            }
                           }}
                         >
-                          <Copy className="h-3.5 w-3.5" />
+                          <ExternalLink className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           size="icon" variant="ghost"
@@ -444,7 +486,7 @@ export default function AdminHubs() {
           <DialogHeader>
             <DialogTitle>Create Hub Partner Account</DialogTitle>
             <DialogDescription>
-              This will create a new user account with the <strong>hub_partner</strong> role. Share the credentials with the partner so they can log in at <code>/hubpartner</code>.
+              This will create a new user account with the <strong>hub_partner</strong> role. Share the credentials with the partner so they can log in at their personalized dashboard URL.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -524,7 +566,7 @@ export default function AdminHubs() {
               <p className="font-semibold text-foreground">What happens next:</p>
               <p>• A new user account is created with the <strong>hub_partner</strong> role.</p>
               <p>• The partner's dashboard is auto-filtered to show only data from their assigned state.</p>
-              <p>• Share the email + password with the partner. They log in at <code>/hubpartner</code>.</p>
+              <p>• Share the email + password with the partner. They log in and will be redirected to their dashboard.</p>
             </div>
           </div>
           <DialogFooter>

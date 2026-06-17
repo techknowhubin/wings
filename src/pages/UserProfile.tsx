@@ -108,10 +108,19 @@ export default function UserProfile() {
   const updateProfile = useUpdateProfile();
 
   useEffect(() => {
-    if (profile?.role === 'hub_partner') {
-      navigate('/hubpartner');
+    if (profile?.role === 'hub_partner' && user?.id) {
+      const fetchHubAndRedirect = async () => {
+        const { data } = await supabase.from('hubs').select('uuid').eq('id', user.id).maybeSingle();
+        if (data?.uuid) {
+          navigate(`/hub/${data.uuid}`);
+        } else {
+          // Fallback if no hub record found yet
+          navigate('/');
+        }
+      };
+      fetchHubAndRedirect();
     }
-  }, [profile?.role, navigate]);
+  }, [profile?.role, user?.id, navigate]);
 
   // Determine section from URL
   const pathSection = location.pathname.split("/profile/")[1] || "profile";

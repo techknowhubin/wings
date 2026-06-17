@@ -690,6 +690,135 @@ export type Database = {
           },
         ]
       }
+      hub_drivers: {
+        Row: {
+          created_at: string | null
+          driver_name: string
+          hub_uuid: string | null
+          id: string
+          license_number: string | null
+          mobile: string
+          status: string | null
+          vehicle_assigned: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          driver_name: string
+          hub_uuid?: string | null
+          id?: string
+          license_number?: string | null
+          mobile: string
+          status?: string | null
+          vehicle_assigned?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          driver_name?: string
+          hub_uuid?: string | null
+          id?: string
+          license_number?: string | null
+          mobile?: string
+          status?: string | null
+          vehicle_assigned?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hub_drivers_hub_uuid_fkey"
+            columns: ["hub_uuid"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["uuid"]
+          },
+        ]
+      }
+      hub_vehicles: {
+        Row: {
+          created_at: string | null
+          hub_uuid: string | null
+          id: string
+          seating_capacity: number | null
+          status: string | null
+          vehicle_name: string
+          vehicle_number: string
+          vehicle_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          hub_uuid?: string | null
+          id?: string
+          seating_capacity?: number | null
+          status?: string | null
+          vehicle_name: string
+          vehicle_number: string
+          vehicle_type: string
+        }
+        Update: {
+          created_at?: string | null
+          hub_uuid?: string | null
+          id?: string
+          seating_capacity?: number | null
+          status?: string | null
+          vehicle_name?: string
+          vehicle_number?: string
+          vehicle_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hub_vehicles_hub_uuid_fkey"
+            columns: ["hub_uuid"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["uuid"]
+          },
+        ]
+      }
+      hubs: {
+        Row: {
+          area: string | null
+          created_at: string | null
+          district: string
+          email: string | null
+          hub_name: string
+          id: string
+          mobile: string
+          owner_name: string
+          status: string | null
+          uuid: string
+        }
+        Insert: {
+          area?: string | null
+          created_at?: string | null
+          district: string
+          email?: string | null
+          hub_name: string
+          id: string
+          mobile: string
+          owner_name: string
+          status?: string | null
+          uuid?: string
+        }
+        Update: {
+          area?: string | null
+          created_at?: string | null
+          district?: string
+          email?: string | null
+          hub_name?: string
+          id?: string
+          mobile?: string
+          owner_name?: string
+          status?: string | null
+          uuid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hubs_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotels: {
         Row: {
           amenities: Json | null

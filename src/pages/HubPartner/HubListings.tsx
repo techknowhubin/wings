@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import {
   Search, Loader2, Building, Eye, Star, Check, X, Pause, Play,
-  Hotel, Home, TreePine, Backpack, Map, Bike, MoreHorizontal, TrendingUp, Phone, Mail, Clock, MessageSquare, Image as ImageIcon
+  Hotel, Home, TreePine, Backpack, Map, Bike, MoreHorizontal, TrendingUp, Phone, Mail, Clock, MessageSquare, Image as ImageIcon,
+  User, Calendar
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -41,93 +42,159 @@ function ListingDetailView({ listing, onClose }: { listing: Listing, onClose: ()
       const tableMap: Record<string, string> = { hotel: 'hotels', stay: 'stays', resort: 'resorts', experience: 'experiences', car: 'cars', bike: 'bikes' };
       const table = tableMap[listing.listing_type] || 'stays';
       
-      const { data: listData, error: listErr } = await supabase.from(table as any).select('*').eq('id', listing.id).single();
-      if (listErr) throw listErr;
+      const { data: listData, error: listErr } = await supabase.from(table as any).select('*').eq('id', listing.id).maybeSingle();
+      if (listErr || !listData) throw new Error('LISTING_NOT_FOUND');
       
-      const { data: hostProfile, error: hostErr } = await supabase.from('profiles').select('full_name, phone, kyc_status').eq('id', listData.host_id).single();
-      
-      // Attempt to fetch host_profiles separately to avoid join errors
       let hostDetails = null;
+      let hostProfile = null;
+      
       if (listData.host_id) {
-        const { data: hp } = await supabase.from('host_profiles').select('business_name, business_type').eq('id', listData.host_id).single();
+        const { data: pData } = await supabase.from('profiles').select('full_name, phone, kyc_status, email_encrypted, created_at').eq('id', listData.host_id).maybeSingle();
+        hostProfile = pData;
+        const { data: hp } = await supabase.from('host_profiles').select('business_name, business_type, address, city, state, verification_status').eq('id', listData.host_id).maybeSingle();
         hostDetails = hp;
       }
       
-      return { ...listData, host: { ...hostProfile, host_profiles: hostDetails ? [hostDetails] : [] } };
+      const { data: recentBookings } = await supabase.from('bookings').select('id, user_id, start_date, end_date, total_price, booking_status, profiles(full_name)').eq('listing_id', listing.id).order('created_at', { ascending: false }).limit(5);
+
+      return { ...listData, host: hostProfile, host_profiles: hostDetails, recent_bookings: recentBookings || [] };
     }
   });
 
-  if (isLoading) return <div className="h-40 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
+  if (isLoading) {
+    return (
+      <div className="space-y-6 py-4 animate-pulse">
+        <div className="grid grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-40 bg-muted/50 rounded-xl" />)}
+        </div>
+        <div className="h-32 bg-muted/50 rounded-xl" />
+      </div>
+    );
+  }
+
+  if (error?.message === 'LISTING_NOT_FOUND') return <div className="p-8 text-muted-foreground text-center"><Building className="h-8 w-8 mx-auto mb-2 opacity-30" />Listing not found</div>;
   if (error) return <div className="p-4 text-red-500 font-mono text-xs overflow-auto">Error: {error.message || String(error)}</div>;
-  if (!details) return <div className="p-4 text-muted-foreground text-center">No details found.</div>;
+  if (!details) return null;
 
   return (
     <div className="space-y-6 py-2">
       <div className="grid grid-cols-2 gap-4">
-        {/* Section A: Listing Info */}
+        {/* Section 1: Listing Details */}
         <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
-          <h3 className="font-bold text-sm text-primary flex items-center gap-2"><Building className="h-4 w-4" /> Listing Information</h3>
+          <h3 className="font-bold text-sm text-[#059669] flex items-center gap-2"><Building className="h-4 w-4" /> Section 1: Listing Details</h3>
           <div className="space-y-2 text-sm">
-            <p><span className="text-muted-foreground">Name:</span> <span className="font-semibold">{details.title || details.name}</span></p>
+            <p><span className="text-muted-foreground">Listing Name:</span> <span className="font-semibold">{details.title || details.name || 'Unnamed'}</span></p>
             <p><span className="text-muted-foreground">Type:</span> <span className="capitalize">{listing.listing_type}</span></p>
             <p><span className="text-muted-foreground">Category:</span> {details.property_type || 'Standard'}</p>
+            <p><span className="text-muted-foreground">Location:</span> {details.city || details.state || 'Unknown'}</p>
             <p><span className="text-muted-foreground">Status:</span> {listing.status === 'published' ? 'Active' : listing.status}</p>
             <p><span className="text-muted-foreground">Listing ID:</span> <span className="text-xs">{details.id}</span></p>
-            <div className="pt-1"><p className="text-xs text-muted-foreground line-clamp-3">{details.description || 'No description provided.'}</p></div>
+            <p><span className="text-muted-foreground">Created Date:</span> {details.created_at ? format(new Date(details.created_at), 'dd-MMM-yyyy') : 'N/A'}</p>
+            <p><span className="text-muted-foreground">Last Updated:</span> {details.updated_at ? format(new Date(details.updated_at), 'dd-MMM-yyyy') : 'N/A'}</p>
+            <div className="pt-1"><p className="text-xs text-muted-foreground line-clamp-3"><span className="font-semibold">Description:</span> {details.description || 'No description provided.'}</p></div>
           </div>
         </div>
 
-        {/* Section B: Host Info */}
+        {/* Section 2: Host Information */}
         <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
-          <h3 className="font-bold text-sm text-primary flex items-center gap-2"><User className="h-4 w-4" /> Owner Information</h3>
+          <h3 className="font-bold text-sm text-[#059669] flex items-center gap-2"><User className="h-4 w-4" /> Section 2: Host Information</h3>
+          {details.host ? (
+            <div className="space-y-2 text-sm">
+              <p><span className="text-muted-foreground">Host Name:</span> <span className="font-semibold">{details.host.full_name || 'N/A'}</span></p>
+              <p><span className="text-muted-foreground">Business Name:</span> {details.host_profiles?.business_name || 'Individual'}</p>
+              <p><span className="text-muted-foreground">Mobile:</span> {details.host.phone || 'N/A'}</p>
+              <p><span className="text-muted-foreground">Email Address:</span> {details.host.email_encrypted ? 'Encrypted (Contact via Hub)' : 'N/A'}</p>
+              <p><span className="text-muted-foreground">City:</span> {details.host_profiles?.city || details.host.city || 'N/A'}</p>
+              <p><span className="text-muted-foreground">Address:</span> {details.host_profiles?.address || 'N/A'}</p>
+              <p><span className="text-muted-foreground">Verification Status:</span> {details.host_profiles?.verification_status || details.host.kyc_status?.replace('_', ' ') || 'Pending'}</p>
+              <p><span className="text-muted-foreground">Registration Date:</span> {details.host.created_at ? format(new Date(details.host.created_at), 'dd-MMM-yyyy') : 'N/A'}</p>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground text-sm flex flex-col items-center">
+              <User className="h-8 w-8 mb-2 opacity-20" />
+              Host information unavailable
+            </div>
+          )}
+        </div>
+
+        {/* Section 3: Listing Ownership */}
+        <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
+          <h3 className="font-bold text-sm text-[#059669] flex items-center gap-2"><Check className="h-4 w-4" /> Section 3: Listing Ownership</h3>
           <div className="space-y-2 text-sm">
-            <p><span className="text-muted-foreground">Host Name:</span> <span className="font-semibold">{details.host?.full_name}</span></p>
-            <p><span className="text-muted-foreground">Business:</span> {details.host?.host_profiles?.[0]?.business_name || 'Individual'}</p>
-            <p><span className="text-muted-foreground">Mobile:</span> {details.host?.phone || 'N/A'}</p>
-            <p><span className="text-muted-foreground">City:</span> {details.city || 'N/A'}</p>
-            <p><span className="text-muted-foreground">KYC Status:</span> {details.host?.kyc_status?.replace('_', ' ') || 'Pending'}</p>
+            <p><span className="text-muted-foreground">Created By:</span> {details.host?.full_name || 'Unknown'}</p>
+            <p><span className="text-muted-foreground">Host ID:</span> <span className="text-xs">{details.host_id || 'N/A'}</span></p>
+            <p><span className="text-muted-foreground">Account Status:</span> {details.host?.kyc_status === 'approved' ? 'Active' : 'Pending/Restricted'}</p>
           </div>
         </div>
 
-        {/* Section C: Creation Details */}
+        {/* Section 4: Listing Analytics */}
         <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
-          <h3 className="font-bold text-sm text-primary flex items-center gap-2"><Clock className="h-4 w-4" /> Timeline</h3>
-          <div className="space-y-2 text-sm">
-            <p><span className="text-muted-foreground">Created On:</span> {details.created_at ? format(new Date(details.created_at), 'dd MMM yyyy') : 'N/A'}</p>
-            <p><span className="text-muted-foreground">Last Updated:</span> {details.updated_at ? format(new Date(details.updated_at), 'dd MMM yyyy') : 'N/A'}</p>
-            {details.verified_by && <p><span className="text-muted-foreground">Verified By Admin</span></p>}
-          </div>
-        </div>
-
-        {/* Section D: Statistics */}
-        <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
-          <h3 className="font-bold text-sm text-primary flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Statistics</h3>
+          <h3 className="font-bold text-sm text-[#059669] flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Section 4: Listing Analytics</h3>
           <div className="space-y-2 text-sm">
             <p><span className="text-muted-foreground">Total Views:</span> {details.views_count || 0}</p>
             <p><span className="text-muted-foreground">Total Bookings:</span> {details.booking_count || 0}</p>
-            <p><span className="text-muted-foreground">Rating:</span> {details.rating || 0} ⭐ ({details.total_reviews || 0} reviews)</p>
-            <p><span className="text-muted-foreground">Price/Night:</span> ₹{details.price_per_night || 0}</p>
+            <p><span className="text-muted-foreground">Revenue Generated:</span> ₹{((details.booking_count || 0) * (details.price_per_night || 0)).toLocaleString('en-IN')}</p>
+            <p><span className="text-muted-foreground">Average Rating:</span> {details.rating || 0} ⭐</p>
+            <p><span className="text-muted-foreground">Review Count:</span> {details.total_reviews || 0} reviews</p>
           </div>
         </div>
       </div>
 
-      {/* Section E: Gallery */}
-      {details.images && details.images.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="font-bold text-sm text-primary flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Gallery</h3>
-          <div className="flex gap-2 overflow-x-auto pb-2">
+      {/* Section 5: Listing Gallery */}
+      <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
+        <h3 className="font-bold text-sm text-[#059669] flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Section 5: Listing Gallery</h3>
+        {details.images && details.images.length > 0 ? (
+          <div className="flex gap-3 overflow-x-auto pb-2">
             {details.images.map((img: string, i: number) => (
-              <img key={i} src={img} alt="listing" className="h-24 w-32 object-cover rounded-xl border border-border" />
+              <img key={i} src={img} alt="listing" className="h-32 w-48 object-cover rounded-xl border border-border shrink-0" />
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="py-6 text-center text-muted-foreground text-sm bg-muted/50 rounded-xl border border-dashed border-border">
+            No images uploaded
+          </div>
+        )}
+      </div>
 
-      {/* Section F: Actions */}
-      <div className="flex gap-2 pt-2">
-        <Button variant="outline" className="rounded-xl flex-1 text-emerald-600"><Phone className="h-4 w-4 mr-2" /> Contact Host</Button>
-        <Button variant="outline" className="rounded-xl flex-1"><MessageSquare className="h-4 w-4 mr-2" /> View Reviews</Button>
-        <Button variant="outline" className="rounded-xl flex-1"><Calendar className="h-4 w-4 mr-2" /> View Bookings</Button>
+      {/* Section 6: Recent Bookings */}
+      <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
+        <h3 className="font-bold text-sm text-[#059669] flex items-center gap-2"><Calendar className="h-4 w-4" /> Section 6: Recent Bookings</h3>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="text-xs">Booking ID</TableHead>
+                <TableHead className="text-xs">Traveller Name</TableHead>
+                <TableHead className="text-xs">Check-In</TableHead>
+                <TableHead className="text-xs">Check-Out</TableHead>
+                <TableHead className="text-xs text-right">Amount</TableHead>
+                <TableHead className="text-xs">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {details.recent_bookings && details.recent_bookings.length > 0 ? (
+                details.recent_bookings.map((b: any) => (
+                  <TableRow key={b.id}>
+                    <TableCell className="text-[10px] font-mono truncate max-w-[100px]">{b.id}</TableCell>
+                    <TableCell className="text-xs">{b.profiles?.full_name || 'Unknown'}</TableCell>
+                    <TableCell className="text-xs">{b.start_date ? format(new Date(b.start_date), 'dd MMM yyyy') : 'N/A'}</TableCell>
+                    <TableCell className="text-xs">{b.end_date ? format(new Date(b.end_date), 'dd MMM yyyy') : 'N/A'}</TableCell>
+                    <TableCell className="text-xs text-right font-semibold">₹{(b.total_price || 0).toLocaleString('en-IN')}</TableCell>
+                    <TableCell>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${b.booking_status === 'Confirmed' ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}>
+                        {b.booking_status || 'Pending'}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-6">No recent bookings found for this listing.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   );

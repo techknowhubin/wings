@@ -101,6 +101,7 @@ import HubDrivers from "./pages/HubPartner/HubDrivers";
 import HubMap from "./pages/HubPartner/HubMap";
 import HubSupport from "./pages/HubPartner/HubSupport";
 import HubReports from "./pages/HubPartner/HubReports";
+import HubEarnings from "./pages/HubPartner/HubEarnings";
 import HubProfile from "./pages/HubPartner/HubProfile";
 import HubSettings from "./pages/HubPartner/HubSettings";
 import AssignedPackages from "./pages/HubPartner/Packages/AssignedPackages";
@@ -283,7 +284,7 @@ const App = () =>
               <Route path="travellers" element={<HubTravellers />} />
               <Route path="reviews" element={<HubReviews />} />
               {/* Finance */}
-              <Route path="earnings" element={<HubReports />} />
+              <Route path="earnings" element={<HubEarnings />} />
               {/* Platform */}
               <Route path="bookings" element={<HubBookingRequests />} /> {/* backwards compat */}
               <Route path="map" element={<HubMap />} />

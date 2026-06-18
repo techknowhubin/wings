@@ -87,17 +87,6 @@ export default function HubLayout() {
     }
   });
 
-  const handleSignOut = async () => {
-    await signOut();
-    toast({ title: 'Signed out', description: 'You have been signed out of the hub panel.' });
-    navigate('/auth');
-  };
-
-  const isActivePath = (path: string) => {
-    if (path === baseUrl) return location.pathname === baseUrl;
-    return location.pathname.startsWith(path);
-  };
-
   const sections: NavSection[] = [
     {
       title: 'Overview',
@@ -154,6 +143,24 @@ export default function HubLayout() {
     },
   ];
 
+  const handleSignOut = async () => {
+    await signOut();
+    toast({ title: 'Signed out', description: 'You have been signed out of the hub panel.' });
+    navigate('/auth');
+  };
+
+  const isActivePath = (path: string) => {
+    if (path === baseUrl) return location.pathname === baseUrl;
+    if (location.pathname === path) return true;
+    
+    const allPaths = sections.flatMap(s => s.items.map(i => i.to));
+    if (allPaths.includes(location.pathname)) {
+        return false;
+    }
+    
+    return location.pathname.startsWith(path + '/');
+  };
+
   const renderNavGroup = (section: NavSection) => (
     <div key={section.title} className="mb-1">
       <p className="px-4 mb-1 mt-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
@@ -171,8 +178,8 @@ export default function HubLayout() {
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 mx-2 rounded-xl text-sm transition-all duration-200 relative group',
                   isActive
-                    ? 'bg-primary text-primary-foreground font-semibold shadow-md'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                    ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-100 font-semibold shadow-sm'
+                    : 'text-muted-foreground bg-transparent hover:text-emerald-800 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
                 )}
               >
                 <item.icon className="h-[17px] w-[17px] shrink-0" />

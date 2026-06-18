@@ -6,12 +6,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useParams } from 'react-router-dom';
+import { HubPackageDetailsModal } from './components/HubPackageDetailsModal';
+import { TourPackage } from '@/types/tour-packages';
 
 export default function AssignedPackages() {
   const { uuid } = useParams();
   const [assignments, setAssignments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [hubId, setHubId] = useState<string | null>(null);
+
+  const [selectedPkg, setSelectedPkg] = useState<TourPackage | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchAssignments();
@@ -32,14 +38,24 @@ export default function AssignedPackages() {
     const { data, error } = await supabase
       .from('package_assignments')
       .select(`
-        id, status,
-        tour_packages(*)
+        id, status, created_at,
+        tour_packages(
+          *,
+          package_gallery(*),
+          package_itineraries(*),
+          package_itinerary_days(*)
+        )
       `)
       .eq('hub_id', hubData.id)
       .order('created_at', { ascending: false });
       
     if (!error && data) {
       setAssignments(data);
+      // update selected assignment if open
+      if (selectedAssignment) {
+        const updated = data.find(a => a.id === selectedAssignment.id);
+        if (updated) setSelectedAssignment(updated);
+      }
     }
     setLoading(false);
   };
@@ -58,6 +74,12 @@ export default function AssignedPackages() {
       toast.success(`Package ${newStatus} successfully`);
       fetchAssignments();
     }
+  };
+
+  const openDetails = (ast: any) => {
+    setSelectedPkg(ast.tour_packages);
+    setSelectedAssignment(ast);
+    setIsModalOpen(true);
   };
 
   return (
@@ -93,7 +115,7 @@ export default function AssignedPackages() {
                   </TableRow>
                 ) : (
                   assignments.map((ast) => (
-                    <TableRow key={ast.id}>
+                    <TableRow key={ast.id} className="cursor-pointer hover:bg-muted/50" onClick={() => openDetails(ast)}>
                       <TableCell className="font-medium">{ast.tour_packages?.name}</TableCell>
                       <TableCell>{ast.tour_packages?.destination}</TableCell>
                       <TableCell>₹{ast.tour_packages?.adult_price}</TableCell>
@@ -105,7 +127,7 @@ export default function AssignedPackages() {
                           {ast.status}
                         </span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Button 
                           variant={ast.status === 'published' ? "outline" : "default"} 
                           size="sm"
@@ -122,6 +144,14 @@ export default function AssignedPackages() {
           )}
         </CardContent>
       </Card>
+
+      <HubPackageDetailsModal 
+        pkg={selectedPkg} 
+        assignment={selectedAssignment} 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onTogglePublish={togglePublish}
+      />
     </div>
   );
 }

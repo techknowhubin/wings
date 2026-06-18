@@ -9,11 +9,14 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { MediaUploads, PackageMedia } from './components/MediaUploads';
+import { ItineraryDocuments, ItineraryDocument } from './components/ItineraryDocuments';
+import { ManualItineraryBuilder, ItineraryDay } from './components/ManualItineraryBuilder';
+import { PackagePreviewModal } from './components/PackagePreviewModal';
 
 export default function CreatePackage() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -34,39 +37,63 @@ export default function CreatePackage() {
     exclusions: '',
   });
 
+  const [media, setMedia] = useState<PackageMedia>({
+    coverImage: null,
+    galleryImages: [],
+    destinationImages: [],
+    promotionalBanners: []
+  });
+
+  const [documents, setDocuments] = useState<ItineraryDocument[]>([]);
+  const [itineraryDays, setItineraryDays] = useState<ItineraryDay[]>([]);
+
   const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const validateForm = () => {
+    if (!formData.name) return 'Package Name is required';
+    if (!formData.destination) return 'Destination is required';
+    if (!formData.start_date || !formData.end_date) return 'Travel Dates are required';
+    if (!formData.max_capacity) return 'Capacity is required';
+    if (!formData.adult_price) return 'Adult Price is required';
+    if (!media.coverImage) return 'At least one Cover Image is required';
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const validationError = validateForm();
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
     setLoading(true);
     
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Not authenticated");
 
+      // 1. Upload Cover Image
       let coverImageUrl = null;
-      if (coverImageFile) {
-        const fileExt = coverImageFile.name.split('.').pop();
+      if (media.coverImage && typeof media.coverImage !== 'string') {
+        const fileExt = media.coverImage.name.split('.').pop();
         const filePath = `covers/${Date.now()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('package-gallery')
-          .upload(filePath, coverImageFile);
-          
+          .upload(filePath, media.coverImage);
         if (uploadError) throw uploadError;
-        
-        const { data: { publicUrl } } = supabase.storage
-          .from('package-gallery')
-          .getPublicUrl(filePath);
-          
+        const { data: { publicUrl } } = supabase.storage.from('package-gallery').getPublicUrl(filePath);
         coverImageUrl = publicUrl;
       }
 
       const inclusionsArray = formData.inclusions.split(',').map(s => s.trim()).filter(Boolean);
       const exclusionsArray = formData.exclusions.split(',').map(s => s.trim()).filter(Boolean);
 
-      const { data, error } = await supabase.from('tour_packages').insert({
+      // 2. Insert Package
+      const { data: pkgData, error: pkgError } = await supabase.from('tour_packages').insert({
         name: formData.name,
         category: formData.category,
         destination: formData.destination,
@@ -88,7 +115,56 @@ export default function CreatePackage() {
         status: 'draft'
       }).select().single();
 
-      if (error) throw error;
+      if (pkgError) throw pkgError;
+      const packageId = pkgData.id;
+
+      // 3. Upload Gallery Images
+      for (const img of media.galleryImages) {
+        if (typeof img !== 'string') {
+          const fileExt = img.name.split('.').pop();
+          const filePath = `gallery/${packageId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+          const { error: uploadError } = await supabase.storage.from('package-gallery').upload(filePath, img);
+          if (!uploadError) {
+            const { data: { publicUrl } } = supabase.storage.from('package-gallery').getPublicUrl(filePath);
+            await supabase.from('package_gallery').insert({
+              package_id: packageId,
+              image_url: publicUrl,
+              is_cover: false
+            });
+          }
+        }
+      }
+
+      // 4. Upload Documents
+      for (const doc of documents) {
+        const fileExt = doc.file.name.split('.').pop();
+        const filePath = `${packageId}/${Date.now()}_${doc.file.name}`;
+        const { error: uploadError } = await supabase.storage.from('package-itineraries').upload(filePath, doc.file);
+        if (!uploadError) {
+          const { data: { publicUrl } } = supabase.storage.from('package-itineraries').getPublicUrl(filePath);
+          await supabase.from('package_itineraries').insert({
+            package_id: packageId,
+            file_url: publicUrl,
+            file_type: doc.type,
+            uploaded_by: userData.user.id,
+            version: 1
+          });
+        }
+      }
+
+      // 5. Insert Manual Itinerary Days
+      if (itineraryDays.length > 0) {
+        const daysToInsert = itineraryDays.map(day => ({
+          package_id: packageId,
+          day_number: day.day_number,
+          title: day.title,
+          description: day.description,
+          meals: day.meals ? [day.meals] : [],
+          stay_details: day.stay_details,
+          activities: day.activities ? [day.activities] : []
+        }));
+        await supabase.from('package_itinerary_days').insert(daysToInsert);
+      }
 
       toast.success('Package created successfully');
       navigate('/admin/experiences');
@@ -100,12 +176,13 @@ export default function CreatePackage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Create Experience</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Create Experience</h1>
+        <PackagePreviewModal formData={formData} media={media} documents={documents} itineraryDays={itineraryDays} />
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="space-y-8">
         <Card>
           <CardHeader>
             <CardTitle>Basic Information</CardTitle>
@@ -113,7 +190,7 @@ export default function CreatePackage() {
           <CardContent className="grid gap-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Package Name</Label>
+                <Label>Package Name <span className="text-destructive">*</span></Label>
                 <Input required value={formData.name} onChange={e => handleChange('name', e.target.value)} placeholder="e.g. Coorg Monsoon Special" />
               </div>
               <div className="space-y-2">
@@ -132,59 +209,59 @@ export default function CreatePackage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Destination</Label>
+                <Label>Destination <span className="text-destructive">*</span></Label>
                 <Input required value={formData.destination} onChange={e => handleChange('destination', e.target.value)} placeholder="e.g. Coorg" />
               </div>
               <div className="space-y-2">
                 <Label>Departure City</Label>
-                <Input required value={formData.departure_city} onChange={e => handleChange('departure_city', e.target.value)} placeholder="e.g. Hyderabad" />
+                <Input value={formData.departure_city} onChange={e => handleChange('departure_city', e.target.value)} placeholder="e.g. Hyderabad" />
               </div>
               <div className="space-y-2">
-                <Label>Start Date</Label>
+                <Label>Start Date <span className="text-destructive">*</span></Label>
                 <Input required type="date" value={formData.start_date} onChange={e => handleChange('start_date', e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>End Date</Label>
+                <Label>End Date <span className="text-destructive">*</span></Label>
                 <Input required type="date" value={formData.end_date} onChange={e => handleChange('end_date', e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label>Duration</Label>
-                <Input required value={formData.duration} onChange={e => handleChange('duration', e.target.value)} placeholder="e.g. 3D/2N" />
+                <Input value={formData.duration} onChange={e => handleChange('duration', e.target.value)} placeholder="e.g. 3D/2N" />
               </div>
               <div className="space-y-2 grid grid-cols-2 gap-2">
                 <div>
                   <Label>Min Capacity</Label>
-                  <Input required type="number" value={formData.min_capacity} onChange={e => handleChange('min_capacity', Number(e.target.value))} />
+                  <Input type="number" value={formData.min_capacity} onChange={e => handleChange('min_capacity', Number(e.target.value))} />
                 </div>
                 <div>
-                  <Label>Max Capacity</Label>
+                  <Label>Max Capacity <span className="text-destructive">*</span></Label>
                   <Input required type="number" value={formData.max_capacity} onChange={e => handleChange('max_capacity', Number(e.target.value))} />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Cover Image</Label>
-                <Input 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      setCoverImageFile(e.target.files[0]);
-                    }
-                  }} 
-                />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="mt-6">
+        {/* Media Uploads */}
+        <MediaUploads media={media} onChange={setMedia} />
+
+        {/* Itinerary Management */}
+        <div className="space-y-6">
+          <h2 className="text-xl font-bold tracking-tight">Itinerary Details</h2>
+          <div className="grid grid-cols-1 gap-6">
+            <ManualItineraryBuilder days={itineraryDays} onChange={setItineraryDays} />
+            <ItineraryDocuments documents={documents} onChange={setDocuments} />
+          </div>
+        </div>
+
+        <Card>
           <CardHeader>
-            <CardTitle>Pricing & inclusions</CardTitle>
+            <CardTitle>Pricing & Inclusions</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Adult Price</Label>
+                <Label>Adult Price <span className="text-destructive">*</span></Label>
                 <Input required type="number" value={formData.adult_price} onChange={e => handleChange('adult_price', e.target.value)} />
               </div>
               <div className="space-y-2">
@@ -218,10 +295,13 @@ export default function CreatePackage() {
           </CardContent>
         </Card>
 
-        <div className="mt-6 flex justify-end">
-          <Button type="submit" disabled={loading}>
+        <div className="flex justify-end gap-4 border-t pt-6">
+          <Button variant="outline" type="button" onClick={() => navigate('/admin/experiences')}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={loading} size="lg">
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Create Experience
+            Save Package
           </Button>
         </div>
       </form>

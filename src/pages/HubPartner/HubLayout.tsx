@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { DynamicLogo } from '@/components/DynamicLogo';
 import {
   LayoutDashboard, Users, Building, CalendarCheck, MapPin, Navigation, Car,
-  LifeBuoy, BarChart3, Settings, User, LogOut, Menu, X, Bell, Search, Mail, Building2
+  LifeBuoy, BarChart3, Settings, User, LogOut, Menu, X, Bell, Search, Mail, Building2, Map
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -99,6 +99,13 @@ export default function HubLayout() {
         { label: 'Hosts', to: `${baseUrl}/hosts`, icon: Users },
         { label: 'Listings', to: `${baseUrl}/listings`, icon: Building },
         { label: 'Drivers & Vehicles', to: `${baseUrl}/drivers`, icon: Car },
+      ],
+    },
+    {
+      title: 'Experiences',
+      items: [
+        { label: 'Assigned Packages', to: `${baseUrl}/experiences`, icon: Map },
+        { label: 'Package Bookings', to: `${baseUrl}/experiences/bookings`, icon: Map },
       ],
     },
     {

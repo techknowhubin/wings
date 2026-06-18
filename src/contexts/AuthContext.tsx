@@ -192,6 +192,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    // Clear all pending session data on logout
+    localStorage.removeItem("pending_booking");
+    localStorage.removeItem("intended_url");
+    localStorage.removeItem("pending_role");
+    localStorage.removeItem("google_auth_mode");
+    localStorage.removeItem("remember_me");
+
     const { error } = await supabase.auth.signOut();
     return { error };
   };

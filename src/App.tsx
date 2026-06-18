@@ -52,6 +52,8 @@ import CabsBookingPage from "./pages/CabsBookingPage";
 import WhatsAppButton from "./components/WhatsAppButton";
 import PartnerDashboard from "./pages/PartnerDashboard";
 
+import { ProtectedTravelerRoute } from "./components/ProtectedTravelerRoute";
+
 // Host Dashboard
 import HostLayout from "./pages/HostLayout";
 import HostSection from "./pages/HostSection";
@@ -168,8 +170,12 @@ const App = () =>
             <Route path="/onboarding/user" element={<UserOnboarding />} />
             <Route path="/onboarding/host" element={<HostOnboarding />} />
             <Route path="/host/onboarding" element={<HostOnboarding />} />
-            <Route path="/profile" element={<UserProfile />} />
-            <Route path="/profile/:section" element={<UserProfile />} />
+            
+            {/* Traveler Dashboard & Profile */}
+            <Route path="/traveler/dashboard" element={<Navigate to="/profile" replace />} />
+            <Route path="/profile" element={<ProtectedTravelerRoute><UserProfile /></ProtectedTravelerRoute>} />
+            <Route path="/profile/:section" element={<ProtectedTravelerRoute><UserProfile /></ProtectedTravelerRoute>} />
+            
             <Route path="/confirm-and-pay" element={<ConfirmAndPay />} />
             <Route path="/booking-confirmation" element={<BookingConfirmation />} />
             <Route path="/transaction-failed" element={<TransactionFailed />} />
@@ -178,6 +184,11 @@ const App = () =>
             <Route path="/cookie-settings" element={<CookieSettings />} />
             <Route path="/partner-dashboard/:referralId" element={<PartnerDashboard />} />
             <Route path="/partner/:partnerId" element={<PartnerDashboard />} />
+            
+            {/* Dashboard Aliases */}
+            <Route path="/host/dashboard" element={<Navigate to="/host" replace />} />
+            <Route path="/admin/dashboard" element={<Navigate to="/admin" replace />} />
+            <Route path="/super-admin/dashboard" element={<Navigate to="/admin" replace />} />
             
             {/* Host Dashboard — shared layout, only content transitions */}
             <Route 

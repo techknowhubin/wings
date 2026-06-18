@@ -54,7 +54,16 @@ const ConfirmAndPay = () => {
       return state.booking;
     }
     const saved = localStorage.getItem("pending_booking");
-    return saved ? JSON.parse(saved) : null;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // support both new format with timestamp and old format
+        return parsed.booking || parsed;
+      } catch {
+        return null;
+      }
+    }
+    return null;
   });
 
   useEffect(() => {
@@ -67,7 +76,7 @@ const ConfirmAndPay = () => {
   useEffect(() => {
     if (!authLoading && !user) {
       if (booking) {
-        localStorage.setItem("pending_booking", JSON.stringify(booking));
+        localStorage.setItem("pending_booking", JSON.stringify({ booking, timestamp: Date.now() }));
       }
       toast.info("Please sign up or sign in to complete your booking.");
       navigate("/auth");

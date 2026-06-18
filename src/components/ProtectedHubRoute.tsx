@@ -58,7 +58,8 @@ export function ProtectedHubRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return <Navigate to="/auth" state={{ from: location }} replace />;
+    localStorage.setItem('intended_url', window.location.pathname + window.location.search);
+    return <Navigate to="/auth" replace />;
   }
 
   if (!hubAuthorized) {

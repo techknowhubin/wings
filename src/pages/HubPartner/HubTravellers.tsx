@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Search, Loader2, MapPin, History, Phone, Mail, Calendar,
-  TrendingUp, Car, MoreHorizontal, IndianRupee, Send, User, Tag
+  TrendingUp, Car, MoreHorizontal, IndianRupee, Send, User, Tag, ArrowUpDown
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -19,28 +19,14 @@ type Traveller = any;
 export default function HubTravellers() {
   const { profile } = useAuth();
   const [search, setSearch] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
   const [viewTraveller, setViewTraveller] = useState<Traveller | null>(null);
   const [travBookings, setTravBookings] = useState<any[]>([]);
 
   const { data: travellers, isLoading } = useQuery({
     queryKey: ['hub-travellers'],
     queryFn: async () => {
-      // Get traveller user IDs from user_roles table (profiles has no 'role' column)
-      const { data: travRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'user');
-      if (rolesError) throw rolesError;
-
-      const travIds = (travRoles || []).map((r: any) => r.user_id);
-      if (travIds.length === 0) return [];
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('id', travIds)
-        .order('created_at', { ascending: false })
-        .limit(500);
+      const { data, error } = await supabase.rpc('get_hub_travellers');
       if (error) throw error;
       return data || [];
     }
@@ -52,11 +38,29 @@ export default function HubTravellers() {
     setTravBookings(data || []);
   };
 
-  const filtered = (travellers || []).filter((t: Traveller) =>
+  const handleSort = (key: string) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sorted = [...(travellers || [])].sort((a, b) => {
+    let aVal = a[sortConfig.key];
+    let bVal = b[sortConfig.key];
+    if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+    if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const filtered = sorted.filter((t: Traveller) =>
     !search ||
     t.full_name?.toLowerCase().includes(search.toLowerCase()) ||
     t.phone?.includes(search) ||
-    t.email?.toLowerCase().includes(search.toLowerCase())
+    t.email?.toLowerCase().includes(search.toLowerCase()) ||
+    t.wing_id?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -72,10 +76,17 @@ export default function HubTravellers() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search by name, phone, email..." className="pl-10 rounded-xl" value={search} onChange={e => setSearch(e.target.value)} />
+      <div className="flex items-center justify-between">
+        <div className="relative max-w-sm w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search by name, phone, email, wing id..." className="pl-10 rounded-xl" value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <div className="flex gap-2 text-sm">
+          <Button variant="outline" size="sm" onClick={() => handleSort('full_name')} className="rounded-xl"><ArrowUpDown className="h-3.5 w-3.5 mr-2" /> Name</Button>
+          <Button variant="outline" size="sm" onClick={() => handleSort('email')} className="rounded-xl hidden sm:flex"><ArrowUpDown className="h-3.5 w-3.5 mr-2" /> Email</Button>
+          <Button variant="outline" size="sm" onClick={() => handleSort('created_at')} className="rounded-xl hidden sm:flex"><ArrowUpDown className="h-3.5 w-3.5 mr-2" /> Date</Button>
+          <Button variant="outline" size="sm" onClick={() => handleSort('total_trips')} className="rounded-xl"><ArrowUpDown className="h-3.5 w-3.5 mr-2" /> Trips</Button>
+        </div>
       </div>
 
       {/* Table */}
@@ -84,16 +95,16 @@ export default function HubTravellers() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">
-                {['Traveller', 'Mobile', 'City', 'Member Since', 'KYC', 'Actions'].map(h => (
+                {['Name', 'Mobile', 'Email', 'Wing ID', 'City', 'Total Trips', 'Status', 'Actions'].map(h => (
                   <TableHead key={h} className="text-xs font-semibold uppercase tracking-wider">{h}</TableHead>
                 ))}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={6} className="h-32 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" /></TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="h-32 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" /></TableCell></TableRow>
               ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                   <MapPin className="h-8 w-8 mx-auto mb-2 opacity-30" /><p>No travellers found</p>
                 </TableCell></TableRow>
               ) : (
@@ -108,10 +119,10 @@ export default function HubTravellers() {
                       </div>
                     </TableCell>
                     <TableCell className="text-xs">{t.phone || 'N/A'}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate">{t.email || 'N/A'}</TableCell>
+                    <TableCell className="text-xs font-medium">{t.wing_id || 'N/A'}</TableCell>
                     <TableCell className="text-xs">{t.city || t.state || 'N/A'}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {t.created_at ? format(new Date(t.created_at), 'dd MMM yyyy') : 'N/A'}
-                    </TableCell>
+                    <TableCell className="text-xs font-semibold">{t.total_trips || 0}</TableCell>
                     <TableCell>
                       <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
                         t.kyc_status === 'approved' ? 'bg-emerald-100 text-emerald-700'
@@ -174,10 +185,12 @@ export default function HubTravellers() {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {[
                   ['Mobile', viewTraveller.phone],
+                  ['Email', viewTraveller.email],
+                  ['Wing ID', viewTraveller.wing_id],
                   ['City', viewTraveller.city || viewTraveller.state || 'N/A'],
                   ['KYC Status', viewTraveller.kyc_status?.replace('_', ' ') || 'Not Started'],
                   ['Member Since', viewTraveller.created_at ? format(new Date(viewTraveller.created_at), 'MMM yyyy') : 'N/A'],
-                  ['Total Bookings', travBookings.length],
+                  ['Total Bookings', viewTraveller.total_trips || travBookings.length || 0],
                   ['Lifetime Value', `₹${travBookings.reduce((s, b) => s + (b.total_price || 0), 0).toLocaleString('en-IN')}`],
                 ].map(([label, value]) => (
                   <div key={label}>

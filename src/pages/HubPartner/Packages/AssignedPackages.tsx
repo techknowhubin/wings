@@ -47,6 +47,7 @@ export default function AssignedPackages() {
         )
       `)
       .eq('hub_id', hubData.id)
+      .neq('status', 'revoked')
       .order('created_at', { ascending: false });
       
     if (!error && data) {

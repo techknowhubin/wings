@@ -7,6 +7,16 @@ import { TourPackage } from '@/types/tour-packages';
 import { Loader2, MapPin, Calendar, Users, IndianRupee, Clock } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function PackageAssignments() {
   const [packages, setPackages] = useState<TourPackage[]>([]);
@@ -19,6 +29,9 @@ export default function PackageAssignments() {
   
   const [packageDetails, setPackageDetails] = useState<any>(null);
   const [assignedHubs, setAssignedHubs] = useState<any[]>([]);
+
+  const [assignmentToRemove, setAssignmentToRemove] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   useEffect(() => {
     fetchInitialData();
@@ -74,16 +87,43 @@ export default function PackageAssignments() {
     try {
       const { data: userData } = await supabase.auth.getUser();
       
-      const { error } = await supabase.from('package_assignments').insert({
-        package_id: selectedPackageId,
-        hub_id: selectedHubId,
-        status: 'assigned',
-        assigned_by: userData.user?.id
-      });
-      
-      if (error) {
-        if (error.code === '23505') throw new Error('Package is already assigned to this Hub');
-        throw error;
+      // Check for existing assignment
+      const { data: existing } = await supabase
+        .from('package_assignments')
+        .select('id, status')
+        .eq('package_id', selectedPackageId)
+        .eq('hub_id', selectedHubId)
+        .maybeSingle();
+
+      if (existing) {
+        if (existing.status !== 'revoked') {
+          throw new Error('Package is already assigned to this Hub');
+        }
+        
+        // Reactivate revoked assignment
+        const { error } = await supabase
+          .from('package_assignments')
+          .update({ 
+            status: 'assigned', 
+            assigned_by: userData.user?.id,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+          
+        if (error) throw error;
+      } else {
+        // Create new assignment
+        const { error } = await supabase.from('package_assignments').insert({
+          package_id: selectedPackageId,
+          hub_id: selectedHubId,
+          status: 'assigned',
+          assigned_by: userData.user?.id
+        });
+        
+        if (error) {
+          if (error.code === '23505') throw new Error('Package is already assigned to this Hub');
+          throw error;
+        }
       }
       
       toast.success('Assigned successfully');
@@ -96,6 +136,27 @@ export default function PackageAssignments() {
     }
   };
 
+  const handleRemoveAssignment = async () => {
+    if (!assignmentToRemove) return;
+    setRemoving(true);
+    try {
+      const { error } = await supabase
+        .from('package_assignments')
+        .update({ status: 'revoked' })
+        .eq('id', assignmentToRemove);
+
+      if (error) throw error;
+      
+      toast.success('Assignment removed successfully');
+      setAssignmentToRemove(null);
+      fetchPackageDetails(selectedPackageId);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to remove assignment');
+    } finally {
+      setRemoving(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const statusStyles: Record<string, string> = {
       'draft': 'bg-gray-100 text-gray-800 border-gray-200',
@@ -103,7 +164,8 @@ export default function PackageAssignments() {
       'published': 'bg-purple-100 text-purple-800 border-purple-200',
       'booking open': 'bg-green-100 text-green-800 border-green-200',
       'sold out': 'bg-red-100 text-red-800 border-red-200',
-      'completed': 'bg-teal-100 text-teal-800 border-teal-200'
+      'completed': 'bg-teal-100 text-teal-800 border-teal-200',
+      'revoked': 'bg-rose-100 text-rose-800 border-rose-200'
     };
     
     const style = statusStyles[status?.toLowerCase()] || 'bg-gray-100 text-gray-800 border-gray-200';
@@ -227,6 +289,7 @@ export default function PackageAssignments() {
                         <TableHead>Contact Info</TableHead>
                         <TableHead>Assignment Date</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -250,6 +313,17 @@ export default function PackageAssignments() {
                               </TableCell>
                               <TableCell className="text-sm">{new Date(ast.created_at).toLocaleDateString()}</TableCell>
                               <TableCell>{getStatusBadge(ast.status)}</TableCell>
+                              <TableCell className="text-right">
+                                {ast.status !== 'revoked' && (
+                                  <Button 
+                                    variant="destructive" 
+                                    size="sm"
+                                    onClick={() => setAssignmentToRemove(ast.id)}
+                                  >
+                                    Remove
+                                  </Button>
+                                )}
+                              </TableCell>
                             </TableRow>
                           );
                         })
@@ -262,6 +336,32 @@ export default function PackageAssignments() {
           </div>
         </div>
       )}
+
+      <AlertDialog open={!!assignmentToRemove} onOpenChange={(open) => !open && setAssignmentToRemove(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Assignment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this package assignment from the selected Hub Partner? 
+              They will no longer be able to publish or sell this package.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault();
+                handleRemoveAssignment();
+              }} 
+              disabled={removing} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {removing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Remove Assignment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

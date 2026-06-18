@@ -80,6 +80,7 @@ import AdminBlogPosts from "./pages/Admin/AdminBlogPosts";
 import AdminWalletManagement from "./pages/Admin/AdminWalletManagement";
 import AdminSecurityDashboard from "./pages/Admin/AdminSecurityDashboard";
 import CreatePackage from "./pages/Admin/Packages/CreatePackage";
+import EditPackage from "./pages/Admin/Packages/EditPackage";
 import PackageList from "./pages/Admin/Packages/PackageList";
 import PackageAssignments from "./pages/Admin/Packages/PackageAssignments";
 import Departures from "./pages/Admin/Packages/Departures";
@@ -255,6 +256,7 @@ const App = () =>
               
               <Route path="experiences" element={<PackageList />} />
               <Route path="experiences/create" element={<CreatePackage />} />
+              <Route path="experiences/edit/:id" element={<EditPackage />} />
               <Route path="experiences/assignments" element={<PackageAssignments />} />
               <Route path="experiences/departures" element={<Departures />} />
             </Route>

@@ -1,28 +1,54 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, MapPin, Calendar, Users, Clock, Check, X as XIcon } from "lucide-react";
+import { Loader2, MapPin, Calendar, Users, Clock, Check, X as XIcon, FileText, Plus, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { TourPackage } from "@/types/tour-packages";
+import { toast } from "sonner";
 
 export default function TourPackageDetail() {
   const { id } = useParams();
-  const [pkg, setPkg] = useState<TourPackage | null>(null);
+  const navigate = useNavigate();
+  const [pkg, setPkg] = useState<any>(null); // Extended to include relations
   const [loading, setLoading] = useState(true);
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [bookedSeats, setBookedSeats] = useState<number>(0);
 
   useEffect(() => {
     const fetchPackage = async () => {
       if (!id) return;
       const { data, error } = await supabase
         .from('tour_packages')
-        .select('*')
+        .select(`
+          *,
+          package_itineraries(*),
+          package_itinerary_days(*)
+        `)
         .eq('id', id)
         .single();
         
       if (!error && data) {
-        setPkg(data as TourPackage);
+        setPkg(data);
+        
+        // Fetch current bookings to calculate available seats
+        const { data: bookings } = await supabase
+          .from('package_bookings')
+          .select('id')
+          .eq('package_id', id)
+          .not('booking_status', 'eq', 'Cancelled');
+
+        if (bookings && bookings.length > 0) {
+          const bookingIds = bookings.map(b => b.id);
+          const { count } = await supabase
+            .from('package_travellers')
+            .select('*', { count: 'exact', head: true })
+            .in('booking_id', bookingIds);
+          
+          setBookedSeats(count || 0);
+        } else {
+          setBookedSeats(0);
+        }
       }
       setLoading(false);
     };
@@ -54,29 +80,77 @@ export default function TourPackageDetail() {
     );
   }
 
+  const packageOptions = [
+    { type: 'Adult Package', price: pkg?.adult_price },
+    { type: 'Child Package', price: pkg?.child_price },
+    { type: 'Single Sharing', price: pkg?.single_sharing_price },
+    { type: 'Twin Sharing', price: pkg?.twin_sharing_price }
+  ].filter(opt => opt.price);
+
+  const updateQuantity = (type: string, delta: number) => {
+    setQuantities(prev => {
+      const current = prev[type] || 0;
+      const next = Math.max(0, current + delta);
+      return { ...prev, [type]: next };
+    });
+  };
+
+  const totalTravellers = Object.values(quantities).reduce((acc, curr) => acc + curr, 0);
+  const grandTotal = packageOptions.reduce((acc, opt) => acc + (opt.price * (quantities[opt.type] || 0)), 0);
+  const availableSeats = (pkg?.max_capacity || 0) - bookedSeats;
+
+  const handleBooking = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (totalTravellers === 0) {
+      toast.error('Please select at least one traveler before continuing.');
+      return;
+    }
+    if (pkg.max_capacity && totalTravellers > availableSeats) {
+      toast.error(`Only ${availableSeats} seats are available for this package.`);
+      return;
+    }
+
+    const selectedPackages = packageOptions
+      .filter(opt => quantities[opt.type] > 0)
+      .map(opt => ({
+        type: opt.type,
+        quantity: quantities[opt.type],
+        price: opt.price
+      }));
+
+    navigate(`/experiences/${pkg.id}/book`, {
+      state: { selectedPackages, totalTravellers, grandTotal }
+    });
+  };
+
+  const itineraryDays = pkg?.package_itinerary_days?.sort((a: any, b: any) => a.day_number - b.day_number) || [];
+  const documents = pkg?.package_itineraries || [];
+  const pdfItinerary = documents.find((d: any) => d.file_type === 'application/pdf');
+  const imageItineraries = documents.filter((d: any) => d.file_type?.startsWith('image/'));
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-muted/20">
       <Header />
       
       {/* Hero Banner */}
-      <div className="relative h-[40vh] md:h-[60vh] bg-muted">
+      <div className="relative h-[50vh] md:h-[65vh] bg-muted">
         {pkg.cover_image ? (
           <img src={pkg.cover_image} alt={pkg.name} className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground">No Cover Image</div>
+          <div className="w-full h-full bg-slate-800 flex items-center justify-center"></div>
         )}
-        <div className="absolute inset-0 bg-black/40" />
-        <div className="absolute inset-0 flex items-center">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+        <div className="absolute inset-0 flex flex-col justify-end pb-12">
           <div className="container mx-auto px-4">
-            <span className="bg-primary/90 text-primary-foreground px-3 py-1 rounded-full text-sm font-semibold mb-4 inline-block">
-              {pkg.category}
+            <span className="bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wider mb-5 inline-block shadow-sm">
+              Group Tour • {pkg.category}
             </span>
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">{pkg.name}</h1>
-            <div className="flex flex-wrap gap-4 text-white/90">
-              <div className="flex items-center gap-2"><MapPin className="h-5 w-5" /> {pkg.destination}</div>
-              <div className="flex items-center gap-2"><Clock className="h-5 w-5" /> {pkg.duration}</div>
-              <div className="flex items-center gap-2"><Calendar className="h-5 w-5" /> {pkg.start_date}</div>
-              <div className="flex items-center gap-2"><Users className="h-5 w-5" /> Max {pkg.max_capacity} Seats</div>
+            <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold text-white mb-6 drop-shadow-md">{pkg.name}</h1>
+            <div className="flex flex-wrap items-center gap-6 text-white/95 font-medium text-lg">
+              <div className="flex items-center gap-2 drop-shadow-sm"><MapPin className="h-6 w-6" /> {pkg.destination}</div>
+              <div className="flex items-center gap-2 drop-shadow-sm"><Clock className="h-6 w-6" /> {pkg.duration}</div>
+              <div className="flex items-center gap-2 drop-shadow-sm"><Calendar className="h-6 w-6" /> Departs: {pkg.start_date}</div>
+              <div className="flex items-center gap-2 drop-shadow-sm"><Users className="h-6 w-6" /> Max {pkg.max_capacity} Seats</div>
             </div>
           </div>
         </div>
@@ -95,14 +169,14 @@ export default function TourPackageDetail() {
               </p>
             </section>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-card border rounded-2xl p-8">
               <section>
-                <h2 className="text-xl font-bold mb-4">Inclusions</h2>
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Check className="h-6 w-6 text-green-500" /> Inclusions</h2>
                 <ul className="space-y-3">
-                  {pkg.inclusions.map((inc, i) => (
+                  {pkg.inclusions.map((inc: string, i: number) => (
                     <li key={i} className="flex items-start gap-3">
-                      <Check className="h-5 w-5 text-green-500 shrink-0" />
-                      <span>{inc}</span>
+                      <span className="h-1.5 w-1.5 rounded-full bg-green-500 mt-2 shrink-0" />
+                      <span className="text-muted-foreground">{inc}</span>
                     </li>
                   ))}
                   {pkg.inclusions.length === 0 && <p className="text-muted-foreground">Not specified</p>}
@@ -110,50 +184,169 @@ export default function TourPackageDetail() {
               </section>
               
               <section>
-                <h2 className="text-xl font-bold mb-4">Exclusions</h2>
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><XIcon className="h-6 w-6 text-red-500" /> Exclusions</h2>
                 <ul className="space-y-3">
-                  {pkg.exclusions.map((exc, i) => (
+                  {pkg.exclusions.map((exc: string, i: number) => (
                     <li key={i} className="flex items-start gap-3">
-                      <XIcon className="h-5 w-5 text-red-500 shrink-0" />
-                      <span>{exc}</span>
+                      <span className="h-1.5 w-1.5 rounded-full bg-red-500 mt-2 shrink-0" />
+                      <span className="text-muted-foreground">{exc}</span>
                     </li>
                   ))}
                   {pkg.exclusions.length === 0 && <p className="text-muted-foreground">Not specified</p>}
                 </ul>
               </section>
             </div>
+
+            {/* Itinerary Section */}
+            <section className="bg-card border rounded-2xl p-8">
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-2xl font-bold">Detailed Itinerary</h2>
+              </div>
+              
+              {(itineraryDays.length > 0 || pdfItinerary || imageItineraries.length > 0) ? (
+                <div className="space-y-8">
+                  
+                  {pdfItinerary && (
+                     <div className="mb-6 p-4 border border-border rounded-xl bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                       <div className="flex items-center gap-3">
+                         <FileText className="h-8 w-8 text-red-500 shrink-0" />
+                         <div>
+                           <p className="font-bold text-base md:text-lg">Day-wise Tour Plan (PDF)</p>
+                           <p className="text-sm text-muted-foreground">Official Itinerary Document</p>
+                         </div>
+                       </div>
+                       <div className="flex items-center gap-2">
+                         <Button variant="outline" asChild>
+                           <a href={pdfItinerary.file_url} target="_blank" rel="noopener noreferrer">View PDF</a>
+                         </Button>
+                         <Button asChild>
+                           <a href={pdfItinerary.file_url} download>Download</a>
+                         </Button>
+                       </div>
+                     </div>
+                  )}
+
+                  {imageItineraries.length > 0 && (
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                       {imageItineraries.map((img: any, i: number) => (
+                         <div key={i} className="rounded-xl overflow-hidden border border-border bg-muted">
+                           <img src={img.file_url} alt={`Itinerary Day ${i + 1}`} className="w-full h-auto object-cover" />
+                         </div>
+                       ))}
+                     </div>
+                  )}
+
+                  {itineraryDays.length > 0 && (
+                    <div className="space-y-8 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent mt-8">
+                      {itineraryDays.map((day: any, i: number) => (
+                        <div key={i} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                          <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-background bg-primary text-primary-foreground shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 font-bold z-10">
+                            {day.day_number}
+                          </div>
+                          <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border bg-background shadow-sm">
+                            <div className="flex items-center justify-between mb-2">
+                              <h3 className="font-bold text-lg">{day.title}</h3>
+                            </div>
+                            <p className="text-muted-foreground text-sm whitespace-pre-wrap">{day.description}</p>
+                            {day.meals && day.meals.length > 0 && day.meals[0] !== "" && (
+                              <div className="mt-3 pt-3 border-t text-sm">
+                                <span className="font-semibold mr-2">Meals:</span> 
+                                {Array.isArray(day.meals) ? day.meals.join(', ') : day.meals}
+                              </div>
+                            )}
+                            {day.stay_details && (
+                              <div className="mt-2 text-sm text-muted-foreground">
+                                <span className="font-semibold text-foreground mr-2">Stay:</span> 
+                                {day.stay_details}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <p>Detailed itinerary will be shared after booking.</p>
+                </div>
+              )}
+            </section>
           </div>
 
           {/* Sidebar / Booking Card */}
           <div className="lg:col-span-1">
             <div className="bg-card border border-border rounded-2xl p-6 sticky top-24 shadow-sm">
-              <h3 className="text-2xl font-bold mb-2">₹{pkg.adult_price} <span className="text-sm font-normal text-muted-foreground">/ adult</span></h3>
+              <h3 className="text-3xl font-bold mb-6 text-primary">
+                ₹{grandTotal > 0 ? grandTotal.toLocaleString('en-IN') : pkg.adult_price.toLocaleString('en-IN')} 
+                <span className="text-base font-normal text-muted-foreground">{grandTotal > 0 ? ' total' : ' / person'}</span>
+              </h3>
               
-              <div className="space-y-4 my-6">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Child Price</span>
-                  <span className="font-medium">₹{pkg.child_price || '-'}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Single Sharing</span>
-                  <span className="font-medium">₹{pkg.single_sharing_price || '-'}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Twin Sharing</span>
-                  <span className="font-medium">₹{pkg.twin_sharing_price || '-'}</span>
+              <div className="space-y-6 mb-6">
+                <h4 className="font-bold text-sm uppercase tracking-wider text-muted-foreground">Select Travelers</h4>
+                
+                <div className="space-y-4">
+                  {packageOptions.map((opt) => (
+                    <div key={opt.type} className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-sm md:text-base">{opt.type}</div>
+                        <div className="text-sm text-muted-foreground">₹{opt.price.toLocaleString('en-IN')}</div>
+                      </div>
+                      <div className="flex items-center space-x-3 bg-muted rounded-lg p-1">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 rounded-md" 
+                          onClick={() => updateQuantity(opt.type, -1)}
+                          disabled={(quantities[opt.type] || 0) === 0}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="w-4 text-center font-bold text-sm">{quantities[opt.type] || 0}</span>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 rounded-md" 
+                          onClick={() => updateQuantity(opt.type, 1)}
+                          disabled={totalTravellers >= availableSeats}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              <Button className="w-full h-12 text-base rounded-xl" asChild>
-                <Link to={`/experiences/${pkg.id}/book`}>Book Now</Link>
+              {totalTravellers > 0 && (
+                <div className="bg-primary/5 rounded-xl p-4 mb-6 space-y-2 border border-primary/20">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Available Seats</span>
+                    <span className="font-medium">{availableSeats}</span>
+                  </div>
+                  {packageOptions.filter(opt => quantities[opt.type] > 0).map(opt => (
+                    <div key={opt.type} className="flex justify-between text-sm">
+                      <span>{opt.type} x {quantities[opt.type]}</span>
+                      <span>₹{(opt.price * quantities[opt.type]).toLocaleString('en-IN')}</span>
+                    </div>
+                  ))}
+                  <div className="border-t border-primary/20 pt-2 mt-2 flex justify-between text-sm font-bold">
+                    <span>Total Amount</span>
+                    <span className="text-primary">₹{grandTotal.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+              )}
+
+              <Button 
+                className="w-full h-12 text-base rounded-xl font-bold shadow-md" 
+                onClick={handleBooking}
+                disabled={totalTravellers === 0}
+              >
+                Continue Booking
               </Button>
-              
-              <p className="text-center text-xs text-muted-foreground mt-4">
-                You won't be charged yet
-              </p>
             </div>
           </div>
-          
+
         </div>
       </div>
 

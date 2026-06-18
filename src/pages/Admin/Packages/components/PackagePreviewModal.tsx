@@ -35,19 +35,21 @@ export function PackagePreviewModal({ formData, media, documents, itineraryDays 
         
         <div className="bg-muted/10 pb-8">
           {/* Hero Banner */}
-          <div className="relative w-full h-64 md:h-80 lg:h-96">
+          <div className="relative w-full h-[50vh] md:h-[65vh] bg-slate-800">
             <img src={coverUrl} alt="Cover" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end p-6 md:p-10 text-white">
-              <div className="flex items-center gap-2 text-primary-foreground/80 mb-2 text-sm md:text-base font-medium">
-                <span className="bg-primary px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider">{formData.category || 'Category'}</span>
-                <span>•</span>
-                <span className="flex items-center gap-1"><MapPin className="h-4 w-4"/> {formData.destination || 'Destination'}</span>
-              </div>
-              <h1 className="text-3xl md:text-5xl font-bold mb-2">{formData.name || 'Package Name'}</h1>
-              <div className="flex flex-wrap items-center gap-4 text-sm md:text-base opacity-90">
-                <span className="flex items-center gap-1"><Clock className="h-4 w-4"/> {formData.duration || 'Duration'}</span>
-                <span className="flex items-center gap-1"><Calendar className="h-4 w-4"/> {formData.start_date || 'Start'} to {formData.end_date || 'End'}</span>
-                <span className="flex items-center gap-1"><Users className="h-4 w-4"/> {formData.max_capacity ? `Up to ${formData.max_capacity} Seats` : 'Capacity'}</span>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+            <div className="absolute inset-0 flex flex-col justify-end pb-12">
+              <div className="container mx-auto px-4 md:px-8">
+                <span className="bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wider mb-5 inline-block shadow-sm">
+                  Group Tour • {formData.category || 'Category'}
+                </span>
+                <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold text-white mb-6 drop-shadow-md">{formData.name || 'Package Name'}</h1>
+                <div className="flex flex-wrap items-center gap-6 text-white/95 font-medium text-lg">
+                  <div className="flex items-center gap-2 drop-shadow-sm"><MapPin className="h-6 w-6"/> {formData.destination || 'Destination'}</div>
+                  <div className="flex items-center gap-2 drop-shadow-sm"><Clock className="h-6 w-6"/> {formData.duration || 'Duration'}</div>
+                  <div className="flex items-center gap-2 drop-shadow-sm"><Calendar className="h-6 w-6"/> Departs: {formData.start_date || 'Start'}</div>
+                  <div className="flex items-center gap-2 drop-shadow-sm"><Users className="h-6 w-6"/> Max {formData.max_capacity || '0'} Seats</div>
+                </div>
               </div>
             </div>
           </div>
@@ -143,37 +145,63 @@ export function PackagePreviewModal({ formData, media, documents, itineraryDays 
 
             {/* Right Sidebar - Pricing Card */}
             <div className="lg:col-span-1">
-              <div className="sticky top-20 bg-card rounded-2xl border shadow-lg overflow-hidden">
-                <div className="p-6 border-b bg-muted/10">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Starting from</p>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-bold">₹{formData.adult_price || '0'}</span>
-                    <span className="text-muted-foreground">/ adult</span>
-                  </div>
-                </div>
-                <div className="p-6 space-y-6">
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Child Price</span>
-                      <span className="font-medium">₹{formData.child_price || '-'}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Single Sharing</span>
-                      <span className="font-medium">₹{formData.single_sharing_price || '-'}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Twin Sharing</span>
-                      <span className="font-medium">₹{formData.twin_sharing_price || '-'}</span>
-                    </div>
-                  </div>
+              <div className="bg-card border border-border rounded-2xl p-6 sticky top-24 shadow-sm">
+                <h3 className="text-3xl font-bold mb-6 text-primary">₹{formData.adult_price || '0'} <span className="text-base font-normal text-muted-foreground">/ person</span></h3>
+                
+                <div className="space-y-6 mb-8">
+                  <h4 className="font-bold text-sm uppercase tracking-wider text-muted-foreground">Accommodation Type</h4>
                   
-                  <div className="bg-primary/5 rounded-lg p-3 flex items-center justify-between text-sm">
-                    <span className="font-medium text-primary">Available Seats</span>
-                    <span className="font-bold text-primary">{formData.max_capacity || '0'}</span>
-                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between space-x-2 border p-3 rounded-xl cursor-pointer transition-colors border-primary bg-primary/5">
+                      <div className="flex items-center space-x-2">
+                        <span className="h-4 w-4 rounded-full border border-primary bg-primary shrink-0 flex items-center justify-center"><span className="h-2 w-2 rounded-full bg-white"/></span>
+                        <span className="font-medium">Adult Package</span>
+                      </div>
+                      <span className="font-semibold">₹{formData.adult_price || '0'}</span>
+                    </div>
 
-                  <Button className="w-full text-lg h-12 rounded-xl" size="lg">Book Now</Button>
+                    {formData.child_price && (
+                      <div className="flex items-center justify-between space-x-2 border p-3 rounded-xl hover:bg-muted opacity-50 cursor-not-allowed">
+                        <div className="flex items-center space-x-2">
+                          <span className="h-4 w-4 rounded-full border border-input" />
+                          <span className="font-medium">Child Package</span>
+                        </div>
+                        <span className="font-semibold">₹{formData.child_price}</span>
+                      </div>
+                    )}
+                    
+                    {formData.single_sharing_price && (
+                      <div className="flex items-center justify-between space-x-2 border p-3 rounded-xl hover:bg-muted opacity-50 cursor-not-allowed">
+                        <div className="flex items-center space-x-2">
+                          <span className="h-4 w-4 rounded-full border border-input" />
+                          <span className="font-medium">Single Sharing</span>
+                        </div>
+                        <span className="font-semibold">₹{formData.single_sharing_price}</span>
+                      </div>
+                    )}
+
+                    {formData.twin_sharing_price && (
+                      <div className="flex items-center justify-between space-x-2 border p-3 rounded-xl hover:bg-muted opacity-50 cursor-not-allowed">
+                        <div className="flex items-center space-x-2">
+                          <span className="h-4 w-4 rounded-full border border-input" />
+                          <span className="font-medium">Twin Sharing</span>
+                        </div>
+                        <span className="font-semibold">₹{formData.twin_sharing_price}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                <div className="bg-primary/5 rounded-lg p-3 flex items-center justify-between text-sm mb-4">
+                  <span className="font-medium text-primary">Available Seats</span>
+                  <span className="font-bold text-primary">{formData.max_capacity || '0'}</span>
+                </div>
+
+                <Button className="w-full h-12 text-base rounded-xl font-bold shadow-md" size="lg">Book Selected Package</Button>
+                
+                <p className="text-center text-xs text-muted-foreground mt-4">
+                  Preview Mode
+                </p>
               </div>
             </div>
             

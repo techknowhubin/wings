@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import {
   Search, Loader2, Building, Eye, Star, Check, X, Pause, Play,
-  Hotel, Home, TreePine, Backpack, Map, Bike, MoreHorizontal, TrendingUp
+  Hotel, Home, TreePine, Backpack, Map, Bike, MoreHorizontal, TrendingUp, Phone, Mail, Clock, MessageSquare, Image as ImageIcon
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -34,13 +34,103 @@ const typeFilters: Record<string, string[]> = {
   'Experiences': ['experience'], 'Cars': ['car'], 'Bikes': ['bike'],
 };
 
-async function fetchTable(table: string, profile: any) {
-  const { data } = await supabase
-    .from(table)
-    .select(`id, title, name, city, state, status, is_published, host_id, created_at, currency`)
-    .order('created_at', { ascending: false })
-    .limit(100);
-  return (data || []).map((d: any) => ({ ...d, listing_type: table.replace(/s$/, '').replace('stay', 'stay') === 'stay' ? 'stay' : table.replace(/s$/, '') }));
+function ListingDetailView({ listing, onClose }: { listing: Listing, onClose: () => void }) {
+  const { data: details, isLoading, error } = useQuery({
+    queryKey: ['listing-details', listing.id, listing.listing_type],
+    queryFn: async () => {
+      const tableMap: Record<string, string> = { hotel: 'hotels', stay: 'stays', resort: 'resorts', experience: 'experiences', car: 'cars', bike: 'bikes' };
+      const table = tableMap[listing.listing_type] || 'stays';
+      
+      const { data: listData, error: listErr } = await supabase.from(table as any).select('*').eq('id', listing.id).single();
+      if (listErr) throw listErr;
+      
+      const { data: hostProfile, error: hostErr } = await supabase.from('profiles').select('full_name, phone, kyc_status').eq('id', listData.host_id).single();
+      
+      // Attempt to fetch host_profiles separately to avoid join errors
+      let hostDetails = null;
+      if (listData.host_id) {
+        const { data: hp } = await supabase.from('host_profiles').select('business_name, business_type').eq('id', listData.host_id).single();
+        hostDetails = hp;
+      }
+      
+      return { ...listData, host: { ...hostProfile, host_profiles: hostDetails ? [hostDetails] : [] } };
+    }
+  });
+
+  if (isLoading) return <div className="h-40 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
+  if (error) return <div className="p-4 text-red-500 font-mono text-xs overflow-auto">Error: {error.message || String(error)}</div>;
+  if (!details) return <div className="p-4 text-muted-foreground text-center">No details found.</div>;
+
+  return (
+    <div className="space-y-6 py-2">
+      <div className="grid grid-cols-2 gap-4">
+        {/* Section A: Listing Info */}
+        <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
+          <h3 className="font-bold text-sm text-primary flex items-center gap-2"><Building className="h-4 w-4" /> Listing Information</h3>
+          <div className="space-y-2 text-sm">
+            <p><span className="text-muted-foreground">Name:</span> <span className="font-semibold">{details.title || details.name}</span></p>
+            <p><span className="text-muted-foreground">Type:</span> <span className="capitalize">{listing.listing_type}</span></p>
+            <p><span className="text-muted-foreground">Category:</span> {details.property_type || 'Standard'}</p>
+            <p><span className="text-muted-foreground">Status:</span> {listing.status === 'published' ? 'Active' : listing.status}</p>
+            <p><span className="text-muted-foreground">Listing ID:</span> <span className="text-xs">{details.id}</span></p>
+            <div className="pt-1"><p className="text-xs text-muted-foreground line-clamp-3">{details.description || 'No description provided.'}</p></div>
+          </div>
+        </div>
+
+        {/* Section B: Host Info */}
+        <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
+          <h3 className="font-bold text-sm text-primary flex items-center gap-2"><User className="h-4 w-4" /> Owner Information</h3>
+          <div className="space-y-2 text-sm">
+            <p><span className="text-muted-foreground">Host Name:</span> <span className="font-semibold">{details.host?.full_name}</span></p>
+            <p><span className="text-muted-foreground">Business:</span> {details.host?.host_profiles?.[0]?.business_name || 'Individual'}</p>
+            <p><span className="text-muted-foreground">Mobile:</span> {details.host?.phone || 'N/A'}</p>
+            <p><span className="text-muted-foreground">City:</span> {details.city || 'N/A'}</p>
+            <p><span className="text-muted-foreground">KYC Status:</span> {details.host?.kyc_status?.replace('_', ' ') || 'Pending'}</p>
+          </div>
+        </div>
+
+        {/* Section C: Creation Details */}
+        <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
+          <h3 className="font-bold text-sm text-primary flex items-center gap-2"><Clock className="h-4 w-4" /> Timeline</h3>
+          <div className="space-y-2 text-sm">
+            <p><span className="text-muted-foreground">Created On:</span> {details.created_at ? format(new Date(details.created_at), 'dd MMM yyyy') : 'N/A'}</p>
+            <p><span className="text-muted-foreground">Last Updated:</span> {details.updated_at ? format(new Date(details.updated_at), 'dd MMM yyyy') : 'N/A'}</p>
+            {details.verified_by && <p><span className="text-muted-foreground">Verified By Admin</span></p>}
+          </div>
+        </div>
+
+        {/* Section D: Statistics */}
+        <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
+          <h3 className="font-bold text-sm text-primary flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Statistics</h3>
+          <div className="space-y-2 text-sm">
+            <p><span className="text-muted-foreground">Total Views:</span> {details.views_count || 0}</p>
+            <p><span className="text-muted-foreground">Total Bookings:</span> {details.booking_count || 0}</p>
+            <p><span className="text-muted-foreground">Rating:</span> {details.rating || 0} ⭐ ({details.total_reviews || 0} reviews)</p>
+            <p><span className="text-muted-foreground">Price/Night:</span> ₹{details.price_per_night || 0}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Section E: Gallery */}
+      {details.images && details.images.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="font-bold text-sm text-primary flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Gallery</h3>
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {details.images.map((img: string, i: number) => (
+              <img key={i} src={img} alt="listing" className="h-24 w-32 object-cover rounded-xl border border-border" />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Section F: Actions */}
+      <div className="flex gap-2 pt-2">
+        <Button variant="outline" className="rounded-xl flex-1 text-emerald-600"><Phone className="h-4 w-4 mr-2" /> Contact Host</Button>
+        <Button variant="outline" className="rounded-xl flex-1"><MessageSquare className="h-4 w-4 mr-2" /> View Reviews</Button>
+        <Button variant="outline" className="rounded-xl flex-1"><Calendar className="h-4 w-4 mr-2" /> View Bookings</Button>
+      </div>
+    </div>
+  );
 }
 
 export default function HubListings() {
@@ -214,6 +304,16 @@ export default function HubListings() {
           </Table>
         </div>
       </Card>
+
+      {/* Listing Detail Dialog */}
+      <Dialog open={!!viewListing} onOpenChange={(open) => !open && setViewListing(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Listing Details</DialogTitle>
+          </DialogHeader>
+          {viewListing && <ListingDetailView listing={viewListing} onClose={() => setViewListing(null)} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

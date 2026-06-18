@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Search, Loader2, HeadphonesIcon, User, Phone, Car, Calendar,
   CreditCard, LifeBuoy, MessageCircle, ArrowUpRight, AlertTriangle,
-  CheckCircle, Clock, MapPin, Mail, Plus, RefreshCw
+  CheckCircle, Clock, MapPin, Mail, Plus, RefreshCw, Hash
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -61,39 +61,38 @@ export default function HubTravellerAssistance() {
     setSearching(true);
     setSearched(searchQuery);
     try {
-      // Search traveller by phone, name, or email
-      const { data: travellers } = await supabase
-        .from('profiles')
-        .select('*')
-        .or(`phone.ilike.%${searchQuery}%,full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`)
-        .limit(1);
+      const { data: searchResults, error: searchError } = await supabase.rpc('search_traveller_assistance', { search_term: searchQuery });
+      if (searchError) throw searchError;
 
-      const traveller = travellers?.[0] || null;
-      let bookings: any[] = [];
-      let tickets: any[] = [];
-
-      if (traveller) {
-        const [bRes, tRes] = await Promise.all([
-          supabase.from('bookings').select('*').eq('user_id', traveller.id).order('created_at', { ascending: false }).limit(10),
-          supabase.from('hub_support_tickets').select('*').eq('traveller_id', traveller.id).order('created_at', { ascending: false }).limit(5),
-        ]);
-        bookings = bRes.data || [];
-        tickets = tRes.data || [];
-      } else {
-        // Try searching by booking ID
-        const { data: cabB } = await supabase
-          .from('cab_bookings')
-          .select(`*, traveller:profiles!cab_bookings_traveller_id_fkey(*)`)
-          .or(`booking_id.ilike.%${searchQuery}%`)
-          .limit(1);
-        if (cabB?.[0]?.traveller) {
-          setResult({ traveller: cabB[0].traveller, bookings: [cabB[0]], tickets: [] });
-          setSearching(false);
-          return;
-        }
+      const matchedTravellerId = searchResults?.[0]?.traveller_id;
+      
+      if (!matchedTravellerId) {
+        setResult(null);
+        setSearching(false);
+        return;
       }
 
-      setResult({ traveller, bookings, tickets });
+      // Re-map traveller object from search results
+      const traveller = {
+        id: matchedTravellerId,
+        full_name: searchResults[0].full_name,
+        phone: searchResults[0].phone,
+        email: searchResults[0].email,
+        wing_id: searchResults[0].wing_id,
+        city: searchResults[0].city,
+        created_at: searchResults[0].created_at,
+        kyc_status: searchResults[0].kyc_status
+      };
+
+      const [bRes, cbRes, tRes] = await Promise.all([
+        supabase.from('bookings').select('*').eq('user_id', matchedTravellerId).order('created_at', { ascending: false }).limit(10),
+        supabase.from('cab_bookings').select('*').eq('traveller_id', matchedTravellerId).order('created_at', { ascending: false }).limit(10),
+        supabase.from('hub_support_tickets').select('*').eq('traveller_id', matchedTravellerId).order('created_at', { ascending: false }).limit(5),
+      ]);
+
+      const allBookings = [...(bRes.data || []), ...(cbRes.data || [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      setResult({ traveller, bookings: allBookings, tickets: tRes.data || [] });
     } catch (e: any) {
       toast({ title: 'Search failed', description: e.message, variant: 'destructive' });
     }
@@ -191,9 +190,10 @@ export default function HubTravellerAssistance() {
                     { icon: User, label: 'Full Name', value: result.traveller.full_name || 'N/A' },
                     { icon: Phone, label: 'Mobile', value: result.traveller.phone || 'N/A' },
                     { icon: Mail, label: 'Email', value: result.traveller.email || 'N/A' },
+                    { icon: Hash, label: 'Wing ID', value: result.traveller.wing_id || 'N/A' },
                     { icon: MapPin, label: 'City', value: result.traveller.city || result.traveller.state || 'N/A' },
                     { icon: Calendar, label: 'Member Since', value: result.traveller.created_at ? format(new Date(result.traveller.created_at), 'MMM yyyy') : 'N/A' },
-                    { icon: CheckCircle, label: 'KYC Status', value: result.traveller.kyc_status || 'Not Started' },
+                    { icon: CheckCircle, label: 'KYC Status', value: result.traveller.kyc_status?.replace('_', ' ') || 'Not Started' },
                     { icon: Car, label: 'Total Bookings', value: result.bookings.length },
                     { icon: CreditCard, label: 'Lifetime Value', value: `₹${result.bookings.reduce((s: number, b: any) => s + (b.total_price || 0), 0).toLocaleString('en-IN')}` },
                   ].map(({ icon: Icon, label, value }) => (

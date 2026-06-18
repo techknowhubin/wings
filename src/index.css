@@ -88,22 +88,55 @@ All colors MUST be HSL.
     --input: 158 25% 20%;
     --ring: 68 90% 70%;
 
-    /* Primary text color - lime green is fine on dark backgrounds */
     --primary-text: 68 90% 70%;
-
-    /* Dark lime-green gradient */
     --gradient-primary: linear-gradient(135deg, hsl(68 80% 55%), hsl(68 90% 70%));
-
-    /* Dark mode glassmorphism */
     --glass-bg: 158 35% 12% / 0.7;
     --glass-border: 158 25% 20% / 0.3;
-
-    /* Dark mode shadows with glow */
     --shadow-subtle: 0 2px 8px hsl(0 0% 0% / 0.3), 0 0 20px hsl(68 90% 70% / 0.1);
     --shadow-medium: 0 4px 16px hsl(0 0% 0% / 0.4), 0 0 30px hsl(68 90% 70% / 0.15);
     --shadow-strong: 0 8px 32px hsl(0 0% 0% / 0.5), 0 0 40px hsl(68 90% 70% / 0.2);
+    --glow-subtle: 0 0 15px hsl(68 90% 70% / 0.15);
+    --glow-medium: 0 0 25px hsl(68 90% 70% / 0.2);
+    --glow-strong: 0 0 40px hsl(68 90% 70% / 0.3);
+  }
 
-    /* Element glow */
+  /* Dark Green theme — #064E3B base, applied via .dark.dark-green on <html> */
+  .dark-green {
+    --background: 164 86% 16%;      /* #064E3B */
+    --foreground: 0 0% 98%;
+
+    --card: 164 65% 19%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 164 65% 17%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 68 90% 70%;
+    --primary-foreground: 158 100% 10%;
+
+    --secondary: 164 45% 23%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 164 35% 26%;
+    --muted-foreground: 164 20% 72%;
+
+    --accent: 164 55% 30%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 164 40% 24%;
+    --input: 164 40% 24%;
+    --ring: 68 90% 70%;
+
+    --primary-text: 68 90% 70%;
+    --gradient-primary: linear-gradient(135deg, hsl(68 80% 55%), hsl(68 90% 70%));
+    --glass-bg: 164 65% 19% / 0.7;
+    --glass-border: 164 40% 24% / 0.3;
+    --shadow-subtle: 0 2px 8px hsl(0 0% 0% / 0.35);
+    --shadow-medium: 0 4px 16px hsl(0 0% 0% / 0.45);
+    --shadow-strong: 0 8px 32px hsl(0 0% 0% / 0.55);
     --glow-subtle: 0 0 15px hsl(68 90% 70% / 0.15);
     --glow-medium: 0 0 25px hsl(68 90% 70% / 0.2);
     --glow-strong: 0 0 40px hsl(68 90% 70% / 0.3);
@@ -117,6 +150,7 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }

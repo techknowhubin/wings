@@ -10,24 +10,32 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Search, Loader2, Building, Eye, Star, Check, X, Pause, Play,
-  Hotel, Home, TreePine, Backpack, Map, Bike, MoreHorizontal, TrendingUp, Phone, Mail, Clock, MessageSquare, Image as ImageIcon,
-  User, Calendar
+  Search, Loader2, Building, Eye, Check, X, Pause,
+  Hotel, Home, TreePine, Backpack, Car as CarIcon, Bike as BikeIcon, MoreHorizontal, TrendingUp,
+  Image as ImageIcon, User, Calendar
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
+
+// Category photo imports
+import hotelImg from "@/assets/hotel.jpeg";
+import homestayImg from "@/assets/homestay.jpeg";
+import resortImg from "@/assets/resort.jpg";
+import experienceImg from "@/assets/experience.jpeg";
+import carImg from "@/assets/car.jpeg";
+import bikeImg from "@/assets/bike.jpeg";
 
 type Listing = any;
 
 const TYPE_TABS = ['All', 'Hotels', 'Homestays', 'Resorts', 'Experiences', 'Cars', 'Bikes'];
 
-const TYPE_MAP: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
-  hotel: { icon: Hotel, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-  stay: { icon: Home, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-  resort: { icon: TreePine, color: 'text-teal-600', bg: 'bg-teal-50 dark:bg-teal-900/20' },
-  experience: { icon: Backpack, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-  car: { icon: Map, color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-900/20' },
-  bike: { icon: Bike, color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/20' },
+const TYPE_MAP: Record<string, { icon: React.ElementType; color: string; bg: string; img: string; label: string }> = {
+  hotel:      { icon: Hotel,    color: 'text-blue-600',    bg: 'bg-blue-50 dark:bg-blue-900/20',       img: hotelImg,      label: 'Hotels' },
+  stay:       { icon: Home,     color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20', img: homestayImg,   label: 'Homestays' },
+  resort:     { icon: TreePine, color: 'text-teal-600',    bg: 'bg-teal-50 dark:bg-teal-900/20',       img: resortImg,     label: 'Resorts' },
+  experience: { icon: Backpack, color: 'text-amber-600',   bg: 'bg-amber-50 dark:bg-amber-900/20',     img: experienceImg, label: 'Experiences' },
+  car:        { icon: CarIcon,  color: 'text-purple-600',  bg: 'bg-purple-50 dark:bg-purple-900/20',   img: carImg,        label: 'Cars' },
+  bike:       { icon: BikeIcon, color: 'text-rose-600',    bg: 'bg-rose-50 dark:bg-rose-900/20',       img: bikeImg,       label: 'Bikes' },
 };
 
 const typeFilters: Record<string, string[]> = {
@@ -268,16 +276,35 @@ export default function HubListings() {
         <p className="text-sm text-muted-foreground mt-0.5">Manage all host listings across categories</p>
       </div>
 
-      {/* Type Counts */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+      {/* Type Counts — photo cards */}
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
         {Object.entries(TYPE_MAP).map(([type, cfg]) => {
           const count = (allListings || []).filter((l: Listing) => l.listing_type === type).length;
           return (
-            <div key={type} className={`rounded-xl p-3 border border-border/30 ${cfg.bg}`}>
-              <cfg.icon className={`h-4 w-4 ${cfg.color} mb-1.5`} />
-              <p className="text-xl font-black text-foreground">{count}</p>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{type}</p>
-            </div>
+            <button
+              key={type}
+              onClick={() => setActiveTab(cfg.label)}
+              className={`relative rounded-2xl overflow-hidden border-2 transition-all duration-200 hover:scale-[1.03] hover:shadow-lg text-left group ${activeTab === cfg.label ? 'border-primary shadow-md' : 'border-transparent'}`}
+            >
+              {/* Photo */}
+              <div className="h-24 w-full overflow-hidden">
+                <img
+                  src={cfg.img}
+                  alt={cfg.label}
+                  className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+              </div>
+              {/* Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+              {/* Count badge */}
+              <div className="absolute top-2 right-2">
+                <span className={`text-xs font-black px-2 py-0.5 rounded-full bg-white/90 ${cfg.color}`}>{count}</span>
+              </div>
+              {/* Label */}
+              <div className="absolute bottom-0 left-0 right-0 px-2.5 pb-2.5">
+                <p className="text-white text-[11px] font-bold leading-tight">{cfg.label}</p>
+              </div>
+            </button>
           );
         })}
       </div>

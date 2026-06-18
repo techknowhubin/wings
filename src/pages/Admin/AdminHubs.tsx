@@ -130,6 +130,12 @@ function useUpdateHubPartnerProfile() {
         .update({ ...fields, updated_at: new Date().toISOString() })
         .eq('id', id);
       if (error) throw error;
+      if (fields.full_name) {
+        await supabase
+          .from('hubs')
+          .update({ hub_name: fields.full_name, owner_name: fields.full_name })
+          .eq('id', id);
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'hub-partner-profiles'] });

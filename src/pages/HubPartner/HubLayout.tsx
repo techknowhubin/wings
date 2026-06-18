@@ -213,9 +213,9 @@ export default function HubLayout() {
           <Building2 className="h-3 w-3 text-emerald-600 shrink-0" />
           <div className="min-w-0">
             <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest leading-none">Hub Partner</p>
-            {hubDetails?.hub_name && (
+            {(hubDetails?.display_name || hubDetails?.hub_name) && (
               <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 truncate mt-0.5 leading-none">
-                {hubDetails.hub_name}
+                {hubDetails.display_name || hubDetails.hub_name}
               </p>
             )}
           </div>

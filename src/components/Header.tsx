@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Moon, Sun, Menu, User, Heart, X, Home, Car, Bike, Compass, MapPin, ChevronRight, Building, Palmtree, LogOut, LayoutDashboard, Settings } from "lucide-react";
+import { Moon, Sun, Leaf, Menu, User, Heart, X, Home, Car, Bike, Compass, MapPin, ChevronRight, Building, Palmtree, LogOut, LayoutDashboard, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/ThemeProvider";
 import { motion, AnimatePresence } from "framer-motion";
@@ -145,10 +145,13 @@ const Header = () => {
                 size="icon"
                 onClick={toggleTheme}
                 className="rounded-full"
-                aria-label="Toggle theme"
+                aria-label={theme === "light" ? "Switch to Dark" : theme === "dark" ? "Switch to Dark Green" : "Switch to Light"}
+                title={theme === "light" ? "Switch to Dark" : theme === "dark" ? "Switch to Dark Green" : "Switch to Light"}
               >
                 {theme === "light" ? (
                   <Moon className="h-5 w-5" />
+                ) : theme === "dark" ? (
+                  <Leaf className="h-5 w-5 text-emerald-400" />
                 ) : (
                   <Sun className="h-5 w-5" />
                 )}

@@ -77,6 +77,7 @@ export default function AdminLayout() {
       title: 'Finance',
       items: [
         { label: 'Payouts', to: '/admin/payouts', icon: Wallet },
+        { label: 'Wing Credits', to: '/admin/wing-credits', icon: Store },
         { label: 'Revenue Analytics', to: '/admin/analytics', icon: BarChart3 },
       ],
     },

@@ -52,6 +52,8 @@ import CabsBookingPage from "./pages/CabsBookingPage";
 import WhatsAppButton from "./components/WhatsAppButton";
 import PartnerDashboard from "./pages/PartnerDashboard";
 
+import { ProtectedTravelerRoute } from "./components/ProtectedTravelerRoute";
+
 // Host Dashboard
 import HostLayout from "./pages/HostLayout";
 import HostSection from "./pages/HostSection";
@@ -72,6 +74,7 @@ import AdminPayouts from "./pages/Admin/AdminPayouts";
 import AdminAnalytics from "./pages/Admin/AdminAnalytics";
 import AdminSettings from "./pages/Admin/AdminSettings";
 import AdminBlogPosts from "./pages/Admin/AdminBlogPosts";
+import AdminWalletManagement from "./pages/Admin/AdminWalletManagement";
 import AdminSecurityDashboard from "./pages/Admin/AdminSecurityDashboard";
 
 // Hub Partner Dashboard
@@ -172,8 +175,12 @@ const App = () =>
             <Route path="/onboarding/user" element={<UserOnboarding />} />
             <Route path="/onboarding/host" element={<HostOnboarding />} />
             <Route path="/host/onboarding" element={<HostOnboarding />} />
-            <Route path="/profile" element={<UserProfile />} />
-            <Route path="/profile/:section" element={<UserProfile />} />
+            
+            {/* Traveler Dashboard & Profile */}
+            <Route path="/traveler/dashboard" element={<Navigate to="/profile" replace />} />
+            <Route path="/profile" element={<ProtectedTravelerRoute><UserProfile /></ProtectedTravelerRoute>} />
+            <Route path="/profile/:section" element={<ProtectedTravelerRoute><UserProfile /></ProtectedTravelerRoute>} />
+            
             <Route path="/confirm-and-pay" element={<ConfirmAndPay />} />
             <Route path="/booking-confirmation" element={<BookingConfirmation />} />
             <Route path="/transaction-failed" element={<TransactionFailed />} />
@@ -182,6 +189,11 @@ const App = () =>
             <Route path="/cookie-settings" element={<CookieSettings />} />
             <Route path="/partner-dashboard/:referralId" element={<PartnerDashboard />} />
             <Route path="/partner/:partnerId" element={<PartnerDashboard />} />
+            
+            {/* Dashboard Aliases */}
+            <Route path="/host/dashboard" element={<Navigate to="/host" replace />} />
+            <Route path="/admin/dashboard" element={<Navigate to="/admin" replace />} />
+            <Route path="/super-admin/dashboard" element={<Navigate to="/admin" replace />} />
             
             {/* Host Dashboard — shared layout, only content transitions */}
             <Route 
@@ -222,6 +234,7 @@ const App = () =>
               <Route path="referrals" element={<AdminReferrals />} />
               <Route path="payouts" element={<AdminPayouts />} />
               <Route path="analytics" element={<AdminAnalytics />} />
+              <Route path="wing-credits" element={<AdminWalletManagement />} />
               <Route path="blog-posts" element={<AdminBlogPosts />} />
               <Route path="security" element={<AdminSecurityDashboard />} />
               <Route path="settings" element={<AdminSettings />} />

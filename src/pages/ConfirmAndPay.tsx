@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { initiateRazorpayPayment } from "@/lib/razorpay";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { CalendarDays, CreditCard, MapPin, Plus, Receipt, ShieldCheck, Trash2, UserPlus, UserRound, X } from "lucide-react";
+import { CalendarDays, CreditCard, MapPin, Plus, Receipt, ShieldCheck, Trash2, UserPlus, UserRound, X, Wallet } from "lucide-react";
 import type { BookingDetails } from "@/types/booking";
 import type { CouponOffer } from "@/lib/discounts";
 import { getReferralCode, clearReferral } from "@/lib/referral";
@@ -54,7 +54,16 @@ const ConfirmAndPay = () => {
       return state.booking;
     }
     const saved = localStorage.getItem("pending_booking");
-    return saved ? JSON.parse(saved) : null;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // support both new format with timestamp and old format
+        return parsed.booking || parsed;
+      } catch {
+        return null;
+      }
+    }
+    return null;
   });
 
   useEffect(() => {
@@ -67,7 +76,7 @@ const ConfirmAndPay = () => {
   useEffect(() => {
     if (!authLoading && !user) {
       if (booking) {
-        localStorage.setItem("pending_booking", JSON.stringify(booking));
+        localStorage.setItem("pending_booking", JSON.stringify({ booking, timestamp: Date.now() }));
       }
       toast.info("Please sign up or sign in to complete your booking.");
       navigate("/auth");
@@ -96,8 +105,13 @@ const ConfirmAndPay = () => {
   const [referralPartner, setReferralPartner] = useState<{ id: string; business_name: string; commission_rate: number } | null>(null);
   const [referralValidating, setReferralValidating] = useState(false);
 
+  // Wing Credits
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [maxRedemptionPercentage, setMaxRedemptionPercentage] = useState(10);
+  const [useWingCredits, setUseWingCredits] = useState(false);
+
   useEffect(() => {
-    async function fetchPlatformCommission() {
+    async function fetchPlatformCommissionAndWallet() {
       if (!booking) return;
       const { data, error } = await supabase.from('platform_settings').select('marketplace_commission_pct, linkinbio_commission_pct').maybeSingle();
       if (!error && data) {
@@ -107,9 +121,18 @@ const ConfirmAndPay = () => {
           setBookingFeeRate(Number(data.marketplace_commission_pct));
         }
       }
+
+      if (user) {
+        const [walletRes, settingsRes] = await Promise.all([
+          supabase.from('wallets').select('balance').eq('user_id', user.id).maybeSingle(),
+          supabase.from('wallet_settings').select('max_redemption_percentage').maybeSingle()
+        ]);
+        if (walletRes.data) setWalletBalance(Number(walletRes.data.balance || 0));
+        if (settingsRes.data) setMaxRedemptionPercentage(Number(settingsRes.data.max_redemption_percentage || 10));
+      }
     }
-    fetchPlatformCommission();
-  }, [booking?.bookingChannel]);
+    fetchPlatformCommissionAndWallet();
+  }, [booking?.bookingChannel, user]);
 
   useEffect(() => {
     const prefillFromProfile = async () => {
@@ -304,11 +327,19 @@ const ConfirmAndPay = () => {
     return (normalBookingFee * appliedCoupon.value) / 100;
   }, [appliedCoupon, booking, normalBookingFee]);
 
+  const maxRedeemableCredits = useMemo(() => {
+    if (!booking) return 0;
+    const rawMax = (baseTotal * maxRedemptionPercentage) / 100;
+    return Math.min(rawMax, walletBalance);
+  }, [baseTotal, maxRedemptionPercentage, walletBalance, booking]);
+
+  const wingCreditsDiscountAmount = useWingCredits ? maxRedeemableCredits : 0;
+
   const totalPayable = useMemo(() => {
-    const raw = normalBookingFee - couponDiscountAmount;
+    const raw = normalBookingFee - couponDiscountAmount - wingCreditsDiscountAmount;
     if (raw <= 0) return 0;
     return Math.max(raw, 1.00);
-  }, [normalBookingFee, couponDiscountAmount]);
+  }, [normalBookingFee, couponDiscountAmount, wingCreditsDiscountAmount]);
 
   const formatAmount = (val: number) => val.toFixed(2);
 
@@ -552,6 +583,7 @@ const ConfirmAndPay = () => {
               coupon_id: appliedCoupon?.id,
               referral_code: referralPartner ? referralCode.trim().toUpperCase() : undefined,
               referral_partner_id: referralPartner?.id ?? undefined,
+              used_wing_credits: wingCreditsDiscountAmount,
             }
           });
 
@@ -1012,6 +1044,38 @@ const ConfirmAndPay = () => {
           <Card className="rounded-2xl border-border shadow-sm bg-white dark:bg-card p-6 h-fit">
             <h2 className="text-xl font-semibold text-foreground mb-4">Checkout Summary</h2>
 
+            {/* Wing Credits */}
+            {walletBalance > 0 && (
+              <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-semibold text-foreground flex items-center gap-2">
+                      <Wallet className="h-4 w-4 text-primary" />
+                      Wing Credits
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Available: <span className="font-semibold text-foreground">{booking?.currencySymbol}{formatAmount(walletBalance)}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      You can use up to <span className="font-semibold">{booking?.currencySymbol}{formatAmount(maxRedeemableCredits)}</span> for this booking.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="checkbox" 
+                      id="use-wing-credits"
+                      checked={useWingCredits}
+                      onChange={(e) => setUseWingCredits(e.target.checked)}
+                      className="h-4 w-4 rounded border-primary/30 accent-primary"
+                    />
+                    <Label htmlFor="use-wing-credits" className="text-xs font-semibold cursor-pointer">
+                      Apply
+                    </Label>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Promo Code */}
             <div className="flex gap-2 mb-4">
               <Input
@@ -1084,6 +1148,14 @@ const ConfirmAndPay = () => {
                     Coupon discount ({appliedCoupon.type === "flat" ? `₹${appliedCoupon.value} flat` : `${appliedCoupon.value}%`})
                   </span>
                   <span className="font-medium text-accent">-{booking.currencySymbol}{formatAmount(couponDiscountAmount)}</span>
+                </div>
+              ) : null}
+              {useWingCredits && wingCreditsDiscountAmount > 0 ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground font-semibold text-accent">
+                    Wing Credits Used
+                  </span>
+                  <span className="font-medium text-accent">-{booking.currencySymbol}{formatAmount(wingCreditsDiscountAmount)}</span>
                 </div>
               ) : null}
               {extraGuests.filter(g => g.name.trim()).length > 0 && (

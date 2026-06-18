@@ -9,6 +9,7 @@ import { DynamicLogo } from "@/components/DynamicLogo";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { supabase } from "@/integrations/supabase/client";
 import { useRateLimit } from "@/hooks/useRateLimit";
+import { executeRoleBasedRedirect } from "@/lib/auth-routing";
 import {
   Dialog,
   DialogContent,
@@ -251,84 +252,7 @@ const Auth = () => {
   /* ─── routing ─── */
   const handleSuccessRoleRouting = async (currentUser = user) => {
     setLoading(true);
-    let r = await getUserRole();
-    const savedRole = localStorage.getItem("pending_role");
-
-    const pendingBooking = localStorage.getItem("pending_booking");
-    if (pendingBooking) {
-      console.log("[Auth] Found pending booking, redirecting to confirm-and-pay");
-      // Let the ConfirmAndPay component read from localStorage itself, or pass state:
-      navigate("/confirm-and-pay");
-      setLoading(false);
-      return;
-    }
-
-    if (r === "admin") {
-      navigate("/admin");
-    } else if (r === "hub_partner" || r === "HUB_PARTNER") {
-      // Fetch hub UUID
-      const { data: hubData } = await supabase
-        .from('hubs')
-        .select('uuid')
-        .eq('id', currentUser?.id)
-        .maybeSingle();
-      let finalUuid = hubData?.uuid;
-
-      if (!finalUuid && currentUser) {
-        console.log("[Auth] Missing hub record, attempting auto-create for existing partner");
-        const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
-        
-        if (profile) {
-          const { error: insertErr } = await supabase.from('hubs').insert({
-            id: currentUser.id,
-            hub_name: `${profile.full_name || 'Partner'} Hub`,
-            owner_name: profile.full_name || 'Hub Owner',
-            email: currentUser.email || '',
-            mobile: profile.phone || '',
-            district: profile.assigned_district || '',
-            area: profile.assigned_area || '',
-            status: 'active'
-          });
-
-          if (!insertErr) {
-            const { data: newHub } = await supabase.from('hubs').select('uuid').eq('id', currentUser.id).maybeSingle();
-            finalUuid = newHub?.uuid;
-          }
-        }
-      }
-
-      if (finalUuid) {
-        navigate(`/hub/${finalUuid}`);
-      } else {
-        // Fallback if hub record isn't created yet for some reason
-        toast({ variant: "destructive", title: "Hub not found", description: "Your hub profile could not be auto-created. Contact admin." });
-        navigate("/");
-      }
-    } else if (r === "host") {
-      // Check if they have finished onboarding by seeing if a host_profile exists
-      const { data: hostProfile } = await supabase.from('host_profiles').select('id').eq('id', currentUser?.id).maybeSingle();
-      if (hostProfile) {
-        navigate("/host");
-      } else {
-        navigate("/host/onboarding");
-      }
-    } else if (targetRole === "host" || savedRole === "host") {
-      // User specifically clicked "Become a host"
-      localStorage.removeItem("pending_role");
-      navigate("/host/onboarding");
-    } else {
-      // Regular user — check if onboarding is done
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', currentUser?.id)
-        .maybeSingle();
-      if (!profile?.full_name) {
-        navigate("/onboarding/user");
-      } else {
-        navigate("/");
-      }
-    }
+    await executeRoleBasedRedirect(currentUser, navigate, targetRole);
     setLoading(false);
   };
 

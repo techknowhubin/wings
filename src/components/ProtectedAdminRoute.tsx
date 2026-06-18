@@ -23,6 +23,7 @@ export function ProtectedAdminRoute({ children }: ProtectedAdminRouteProps) {
 
   // 2. Auth resolved — no session → go to login
   if (!user) {
+    localStorage.setItem('intended_url', window.location.pathname + window.location.search);
     return <Navigate to="/auth" replace />;
   }
 

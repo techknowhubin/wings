@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
+import { WalletSection } from "@/components/dashboard/WalletSection";
 import {
   User, Calendar, ShieldCheck, Lock, Bell, HelpCircle, LogOut,
   Camera, Edit2, Save, Check, Clock, Upload, X, Eye, EyeOff,
-  FileText, ChevronRight, ExternalLink, MessageSquare, Loader2, Ticket,
+  FileText, ChevronRight, ExternalLink, MessageSquare, Loader2, Ticket, Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -34,7 +35,7 @@ import { CalendarIcon } from "lucide-react";
 
 // ======================== Types ========================
 
-type Section = "profile" | "bookings" | "kyc" | "security" | "notifications" | "help" | "coupons";
+type Section = "profile" | "bookings" | "kyc" | "security" | "notifications" | "help" | "coupons" | "wallet";
 
 interface KYCDoc {
   name: string;
@@ -47,6 +48,7 @@ interface KYCDoc {
 
 const navItems: { icon: typeof User; label: string; section: Section }[] = [
   { icon: User, label: "My Profile", section: "profile" },
+  { icon: Wallet, label: "Wing Credits", section: "wallet" },
   { icon: Calendar, label: "Booking History", section: "bookings" },
   { icon: Ticket, label: "My Coupons", section: "coupons" },
   { icon: ShieldCheck, label: "KYC Details", section: "kyc" },
@@ -798,7 +800,7 @@ export default function UserProfile() {
                               <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">Amount Paid (Online)</span>
-                                  <span className="font-medium">₹{totalAmount.toLocaleString('en-IN')}</span>
+                                  <span className="font-semibold text-foreground">₹{totalAmount.toLocaleString()}</span>
                                 </div>
                                 {selectedBooking.booking_channel && (
                                   <div className="flex justify-between">
@@ -1398,6 +1400,18 @@ export default function UserProfile() {
             )}
 
           </motion.div>
+
+          {/* ====== Wing Credits ====== */}
+          {activeSection === "wallet" && (
+            <motion.div
+              key="wallet"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <WalletSection />
+            </motion.div>
+          )}
         </main>
       </div>
     </div>

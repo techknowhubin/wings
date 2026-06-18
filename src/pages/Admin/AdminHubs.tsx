@@ -425,43 +425,7 @@ export default function AdminHubs() {
                         >
                           {h.account_status === 'active' ? <ToggleRight className="h-3.5 w-3.5" /> : <ToggleLeft className="h-3.5 w-3.5" />}
                         </Button>
-                        <Button
-                          size="icon" variant="ghost"
-                          className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          title="View Hub Dashboard"
-                          onClick={async () => {
-                            if (h.uuid) {
-                              window.open(`/hub/${h.uuid}`, '_blank');
-                            } else {
-                              const toastId = toast.loading('Generating Hub dashboard...');
-                              try {
-                                const { error: insertErr } = await supabase.from('hubs').insert({
-                                  id: h.id,
-                                  hub_name: `${h.full_name || 'Partner'} Hub`,
-                                  owner_name: h.full_name || 'Hub Owner',
-                                  email: h.email || '',
-                                  mobile: h.phone || '',
-                                  district: h.assigned_district || '',
-                                  area: h.assigned_area || '',
-                                  status: 'active'
-                                });
-                                if (insertErr) throw insertErr;
-                                
-                                const { data: newHub, error: fetchErr } = await supabase.from('hubs').select('uuid').eq('id', h.id).maybeSingle();
-                                if (fetchErr) throw fetchErr;
-                                
-                                toast.success('Dashboard generated!', { id: toastId });
-                                if (newHub?.uuid) {
-                                  window.open(`/hub/${newHub.uuid}`, '_blank');
-                                }
-                              } catch (err: any) {
-                                toast.error('Failed to generate Hub: ' + err.message, { id: toastId });
-                              }
-                            }
-                          }}
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </Button>
+
                         <Button
                           size="icon" variant="ghost"
                           className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50"

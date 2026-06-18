@@ -21,6 +21,9 @@ import Stays from "./pages/Stays";
 import Hotels from "./pages/Hotels";
 import Resorts from "./pages/Resorts";
 import Experiences from "./pages/Experiences";
+import TourPackages from "./pages/TourPackages";
+import TourPackageDetail from "./pages/TourPackageDetail";
+import PackageBookingFlow from "./pages/PackageBookingFlow";
 import OutstationCabs from "./pages/OutstationCabs";
 import Bikes from "./pages/Bikes";
 import Cars from "./pages/Cars";
@@ -76,6 +79,10 @@ import AdminSettings from "./pages/Admin/AdminSettings";
 import AdminBlogPosts from "./pages/Admin/AdminBlogPosts";
 import AdminWalletManagement from "./pages/Admin/AdminWalletManagement";
 import AdminSecurityDashboard from "./pages/Admin/AdminSecurityDashboard";
+import CreatePackage from "./pages/Admin/Packages/CreatePackage";
+import PackageList from "./pages/Admin/Packages/PackageList";
+import PackageAssignments from "./pages/Admin/Packages/PackageAssignments";
+import Departures from "./pages/Admin/Packages/Departures";
 
 // Hub Partner Dashboard
 import { ProtectedHubRoute } from "./components/ProtectedHubRoute";
@@ -96,6 +103,8 @@ import HubSupport from "./pages/HubPartner/HubSupport";
 import HubReports from "./pages/HubPartner/HubReports";
 import HubProfile from "./pages/HubPartner/HubProfile";
 import HubSettings from "./pages/HubPartner/HubSettings";
+import AssignedPackages from "./pages/HubPartner/Packages/AssignedPackages";
+import HubBookingsPackages from "./pages/HubPartner/Packages/HubBookings";
 
 const queryClient = new QueryClient();
 
@@ -153,8 +162,12 @@ const App = () =>
             <Route path="/hotels/:id" element={<StayDetail tableType="hotels" />} />
             <Route path="/resorts" element={<Resorts />} />
             <Route path="/resorts/:id" element={<StayDetail tableType="resorts" />} />
-            <Route path="/experiences" element={<Experiences />} />
-            <Route path="/experiences/:id" element={<ExperienceDetail />} />
+            <Route path="/local-experiences" element={<Experiences />} />
+            <Route path="/local-experiences/:id" element={<ExperienceDetail />} />
+            <Route path="/experiences" element={<TourPackages />} />
+            <Route path="/experiences/:id" element={<TourPackageDetail />} />
+            <Route path="/experiences/:id/book" element={<PackageBookingFlow />} />
+            <Route path="/packages" element={<Navigate to="/experiences" replace />} />
             <Route path="/outstation-cabs" element={<Navigate to="/" replace />} />
             <Route path="/cabs-booking" element={<CabsBookingPage />} />
             <Route path="/bikes" element={<Bikes />} />
@@ -238,6 +251,11 @@ const App = () =>
               <Route path="blog-posts" element={<AdminBlogPosts />} />
               <Route path="security" element={<AdminSecurityDashboard />} />
               <Route path="settings" element={<AdminSettings />} />
+              
+              <Route path="experiences" element={<PackageList />} />
+              <Route path="experiences/create" element={<CreatePackage />} />
+              <Route path="experiences/assignments" element={<PackageAssignments />} />
+              <Route path="experiences/departures" element={<Departures />} />
             </Route>
 
             {/* Hub Partner Dashboard */}
@@ -273,6 +291,9 @@ const App = () =>
               <Route path="reports" element={<HubReports />} />
               <Route path="profile" element={<HubProfile />} />
               <Route path="settings" element={<HubSettings />} />
+              
+              <Route path="experiences" element={<AssignedPackages />} />
+              <Route path="experiences/bookings" element={<HubBookingsPackages />} />
             </Route>
 
             {/* Backwards compatibility for old Hub Partner URL */}

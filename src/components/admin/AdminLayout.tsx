@@ -10,7 +10,7 @@ import { DynamicLogo } from '@/components/DynamicLogo';
 import {
   LayoutDashboard, ShieldCheck, CheckSquare, Store, Users,
   CalendarCheck, Building2, Wallet, BarChart3, Settings,
-  LogOut, FileText, Menu, X, Bell, Search, Mail, Lock, QrCode,
+  LogOut, FileText, Menu, X, Bell, Search, Mail, Lock, QrCode, Map,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -71,6 +71,15 @@ export default function AdminLayout() {
         { label: 'All Bookings', to: '/admin/bookings', icon: CalendarCheck },
         { label: 'Hub Partners', to: '/admin/hubs', icon: Building2 },
         { label: 'Referrals', to: '/admin/referrals', icon: QrCode },
+      ],
+    },
+    {
+      title: 'Experiences',
+      items: [
+        { label: 'Create Package', to: '/admin/experiences/create', icon: Map },
+        { label: 'All Packages', to: '/admin/experiences', icon: Map },
+        { label: 'Assignments', to: '/admin/experiences/assignments', icon: Map },
+        { label: 'Departures', to: '/admin/experiences/departures', icon: Map },
       ],
     },
     {

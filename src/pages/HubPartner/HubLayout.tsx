@@ -11,7 +11,8 @@ import {
   LayoutDashboard, Users, Building, CalendarCheck, Car,
   LifeBuoy, BarChart3, Settings, User, LogOut, Menu, X, Bell, Search,
   Building2, PhoneIncoming, HeadphonesIcon, MapPin, Star,
-  ShoppingBag, Coins, FileText, ChevronDown, ChevronRight, Truck
+  ShoppingBag, Coins, FileText, ChevronDown, ChevronRight, Truck,
+  Navigation, Mail, Map
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -127,6 +128,13 @@ export default function HubLayout() {
       items: [
         { label: 'Travellers', to: `${baseUrl}/travellers`, icon: MapPin },
         { label: 'Reviews', to: `${baseUrl}/reviews`, icon: Star },
+      ],
+    },
+    {
+      title: 'Experiences',
+      items: [
+        { label: 'Assigned Packages', to: `${baseUrl}/experiences`, icon: Map },
+        { label: 'Package Bookings', to: `${baseUrl}/experiences/bookings`, icon: Map },
       ],
     },
     {

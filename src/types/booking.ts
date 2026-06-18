@@ -8,6 +8,7 @@ export interface BookingDetails {
   hostId?: string;
   listingTitle: string;
   listingImage?: string;
+  packageType?: string;
   currencySymbol: string;
   unitLabel: string;
   unitPrice: number;

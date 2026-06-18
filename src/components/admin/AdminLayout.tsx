@@ -38,17 +38,6 @@ export default function AdminLayout() {
   const { data: profile } = useProfile(user?.id);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleSignOut = async () => {
-    await signOut();
-    toast({ title: 'Signed out', description: 'You have been signed out of the admin panel.' });
-    navigate('/auth');
-  };
-
-  const isActivePath = (path: string) => {
-    if (path === '/admin') return location.pathname === '/admin';
-    return location.pathname.startsWith(path);
-  };
-
   const sections: NavSection[] = [
     {
       title: 'Overview',
@@ -104,6 +93,24 @@ export default function AdminLayout() {
       ],
     },
   ];
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast({ title: 'Signed out', description: 'You have been signed out of the admin panel.' });
+    navigate('/auth');
+  };
+
+  const isActivePath = (path: string) => {
+    if (path === '/admin') return location.pathname === '/admin';
+    if (location.pathname === path) return true;
+    
+    const allPaths = sections.flatMap(s => s.items.map(i => i.to));
+    if (allPaths.includes(location.pathname)) {
+        return false;
+    }
+    
+    return location.pathname.startsWith(path + '/');
+  };
 
   const renderNavGroup = (section: NavSection) => (
     <div key={section.title} className="mb-2">

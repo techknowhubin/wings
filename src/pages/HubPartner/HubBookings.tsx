@@ -1,258 +1,293 @@
 import { useState } from "react";
+import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, Check, X, Car, Calendar, MapPin, Eye, MoreHorizontal, User, Phone } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Search, Loader2, Car, Phone, MessageCircle, UserPlus, FileText,
+  Download, MapPin, Calendar, MoreHorizontal, Navigation, CheckCircle,
+  Clock, AlertCircle, RefreshCw
+} from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Card, CardContent } from "@/components/ui/card";
+import { format } from "date-fns";
 
-export default function HubBookings() {
-  const { user } = useAuth();
+type Booking = any;
+
+const TRIP_STATUSES = [
+  'All', 'Awaiting Assignment', 'Driver Assigned', 'Driver Accepted', 'En Route', 'Trip Started', 'Trip Completed', 'Cancelled'
+];
+
+const TRIP_STATUS_COLORS: Record<string, string> = {
+  'Awaiting Assignment': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  'Driver Assigned': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  'Driver Accepted': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+  'En Route': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  'Trip Started': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
+  'Trip Completed': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  'Cancelled': 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+};
+
+function TripStatusBadge({ status }: { status: string }) {
+  const cls = TRIP_STATUS_COLORS[status] || 'bg-muted text-muted-foreground';
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${cls}`}>{status || 'Awaiting Assignment'}</span>;
+}
+
+export default function HubOutstationCabs() {
+  const { uuid } = useParams<{ uuid: string }>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [searchTerm, setSearchTerm] = useState("");
+  const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState('All');
+  const [assigningBooking, setAssigningBooking] = useState<Booking | null>(null);
+  const [selectedDriverId, setSelectedDriverId] = useState('');
 
   const { data: bookings, isLoading } = useQuery({
-    queryKey: ['hub-partner-bookings', user?.id],
-    enabled: !!user?.id,
+    queryKey: ['hub-outstation-cabs', uuid],
+    enabled: !!uuid,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('cab_bookings')
-        .select(`
-          *,
-          traveller:profiles!cab_bookings_traveller_id_fkey(full_name, phone)
-        `)
-        .eq('hub_partner_id', user?.id)
+        .select(`*, traveller:profiles!cab_bookings_traveller_id_fkey(full_name, phone)`)
+        .eq('assigned_hub_uuid', uuid)
         .order('created_at', { ascending: false });
-        
       if (error) throw error;
       return data || [];
     }
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status, isAssignmentStatus = false }: { id: string, status: string, isAssignmentStatus?: boolean }) => {
-      if (isAssignmentStatus) {
-        const { error } = await supabase
-          .from('cab_bookings')
-          .update({ assignment_status: status })
-          .eq('booking_id', id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('bookings')
-          .update({ booking_status: status })
-          .eq('id', id);
-        if (error) throw error;
-        // The trigger will update cab_bookings
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hub-partner-bookings', user?.id] });
-      toast({
-        title: "Status updated",
-        description: "Booking status has been updated successfully."
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Update failed",
-        description: error.message,
-        variant: "destructive"
-      });
+  const { data: drivers } = useQuery({
+    queryKey: ['hub-active-drivers', uuid],
+    enabled: !!uuid,
+    queryFn: async () => {
+      const { data } = await supabase.from('hub_drivers').select('*').eq('hub_uuid', uuid).eq('status', 'active');
+      return data || [];
     }
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-      </div>
-    );
-  }
+  const updateTrip = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Record<string, any> }) => {
+      const { error } = await supabase.from('cab_bookings').update(updates).eq('booking_id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hub-outstation-cabs'] });
+      toast({ title: 'Trip updated' });
+    },
+    onError: (e: any) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+  });
 
-  const filteredBookings = bookings?.filter((b: any) => 
-    b.pickup_location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.drop_location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.booking_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.traveller?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const doAssignDriver = () => {
+    if (!assigningBooking || !selectedDriverId) return;
+    updateTrip.mutate({
+      id: assigningBooking.booking_id,
+      updates: { driver_id: selectedDriverId, trip_status: 'Driver Assigned', booking_status: 'Assigned' }
+    }, {
+      onSuccess: () => { setAssigningBooking(null); setSelectedDriverId(''); }
+    });
+  };
+
+  const filtered = (bookings || []).filter((b: Booking) => {
+    const matchSearch = !search ||
+      b.booking_id?.includes(search) ||
+      b.traveller?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+      b.pickup_location?.toLowerCase().includes(search.toLowerCase()) ||
+      b.drop_location?.toLowerCase().includes(search.toLowerCase());
+    const tripStatus = b.trip_status || 'Awaiting Assignment';
+    const matchTab = activeTab === 'All' || tripStatus === activeTab;
+    return matchSearch && matchTab;
+  });
+
+  const statCounts = {
+    active: (bookings || []).filter((b: Booking) => ['Driver Assigned', 'En Route', 'Trip Started'].includes(b.trip_status || '')).length,
+    awaiting: (bookings || []).filter((b: Booking) => !b.trip_status || b.trip_status === 'Awaiting Assignment').length,
+    completed: (bookings || []).filter((b: Booking) => b.trip_status === 'Trip Completed').length,
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-2xl font-bold tracking-tight">Hub Bookings</h2>
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search location, name, ID..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight">Outstation Cabs</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Manage cab trips, driver assignments, and trip tracking</p>
         </div>
       </div>
 
-      <div className="border rounded-md bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Route & Date</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead>Vehicle & Fare</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredBookings?.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                  No bookings found
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredBookings?.map((booking: any) => (
-                <TableRow key={booking.booking_id}>
-                  <TableCell>
-                    <div className="font-medium flex flex-col gap-1">
-                      <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {booking.pickup_location} → {booking.drop_location}</span>
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Calendar className="h-3 w-3" /> 
-                        {booking.travel_date ? format(new Date(booking.travel_date), 'PP p') : 'TBD'}
-                        {booking.return_date && ` - ${format(new Date(booking.return_date), 'PP p')}`}
-                      </span>
-                      {booking.distance_km && (
-                        <span className="text-xs text-muted-foreground">
-                          {booking.distance_km} km ({booking.return_date ? 'Round Trip' : 'One-way'})
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium flex flex-col gap-1">
-                      <span className="flex items-center gap-1"><User className="h-3 w-3" /> {booking.traveller?.full_name || 'N/A'}</span>
-                      <span className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" /> {booking.traveller?.phone || 'N/A'}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <span className="flex items-center gap-1 text-sm font-medium"><Car className="h-3 w-3" /> {booking.cab_type || 'Any Vehicle'}</span>
-                      <span className="text-sm">₹{booking.fare_amount || 0}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <Badge variant={booking.booking_status === 'Confirmed' ? 'default' : booking.booking_status === 'Completed' ? 'secondary' : 'outline'}>
-                        {booking.booking_status || 'Pending'}
-                      </Badge>
-                      {booking.assignment_status && booking.assignment_status !== 'Assigned' && (
-                        <Badge variant="outline" className="text-[10px] w-fit">
-                          {booking.assignment_status}
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                              <Eye className="mr-2 h-4 w-4" /> View Details
-                            </DropdownMenuItem>
-                          </DialogTrigger>
-                          <DialogContent className="sm:max-w-[425px]">
-                            <DialogHeader>
-                              <DialogTitle>Booking Details</DialogTitle>
-                            </DialogHeader>
-                            <div className="grid gap-4 py-4">
-                              <div className="grid grid-cols-2 gap-2 text-sm">
-                                <div className="font-medium text-muted-foreground">Booking ID</div>
-                                <div className="break-all">{booking.booking_id}</div>
-                                
-                                <div className="font-medium text-muted-foreground">Pickup</div>
-                                <div>{booking.pickup_location}</div>
-                                
-                                <div className="font-medium text-muted-foreground">Drop</div>
-                                <div>{booking.drop_location}</div>
-                                
-                                <div className="font-medium text-muted-foreground">Pickup Date & Time</div>
-                                <div>{booking.travel_date ? format(new Date(booking.travel_date), 'PP p') : 'N/A'}</div>
-
-                                {booking.return_date && (
-                                  <>
-                                    <div className="font-medium text-muted-foreground">Return Date & Time</div>
-                                    <div>{format(new Date(booking.return_date), 'PP p')}</div>
-                                  </>
-                                )}
-                                
-                                <div className="font-medium text-muted-foreground">Vehicle Type</div>
-                                <div>{booking.cab_type || 'N/A'}</div>
-                                
-                                <div className="font-medium text-muted-foreground">Total Fare</div>
-                                <div>₹{booking.fare_amount || 0}</div>
-                                
-                                <div className="font-medium text-muted-foreground">Distance</div>
-                                <div>{booking.distance_km || 'N/A'} km</div>
-                                
-                                <div className="font-medium text-muted-foreground">Customer</div>
-                                <div>{booking.traveller?.full_name || 'N/A'}</div>
-                                
-                                <div className="font-medium text-muted-foreground">Mobile</div>
-                                <div>{booking.traveller?.phone || 'N/A'}</div>
-
-                                <div className="font-medium text-muted-foreground">Trip Type</div>
-                                <div>{booking.return_date ? 'Outstation Round Trip' : 'Outstation One-way'}</div>
-                              </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-
-                        <DropdownMenuSeparator />
-                        
-                        {booking.assignment_status === 'Assigned' && (
-                          <>
-                            <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: booking.booking_id, status: 'Accepted', isAssignmentStatus: true })}>
-                              <Check className="mr-2 h-4 w-4 text-emerald-500" /> Accept Booking
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: booking.booking_id, status: 'Rejected', isAssignmentStatus: true })}>
-                              <X className="mr-2 h-4 w-4 text-destructive" /> Reject Booking
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                          </>
-                        )}
-                        
-                        <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: booking.booking_id, status: 'Confirmed' })}>
-                          Mark as Confirmed
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: booking.booking_id, status: 'Completed' })}>
-                          Mark as Completed
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      {/* Stat Tiles */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Active Trips', value: statCounts.active, icon: Car, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+          { label: 'Awaiting Driver', value: statCounts.awaiting, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+          { label: 'Completed', value: statCounts.completed, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
+        ].map((s, i) => (
+          <div key={i} className={`rounded-xl p-4 ${s.bg} border border-border/30`}>
+            <div className="flex items-center gap-2">
+              <s.icon className={`h-5 w-5 ${s.color}`} />
+              <span className="text-2xl font-black text-foreground">{s.value}</span>
+            </div>
+            <p className="text-xs font-semibold text-muted-foreground mt-1">{s.label}</p>
+          </div>
+        ))}
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-muted/50 p-1 rounded-xl overflow-x-auto">
+        {TRIP_STATUSES.map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${activeTab === tab ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+          >{tab}</button>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Search by ID, name, location..." className="pl-10 rounded-xl" value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+
+      {/* Table */}
+      <Card className="border-border/50 overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
+                {['Booking ID', 'Traveller', 'Route', 'Date', 'Vehicle', 'Driver', 'Amount', 'Trip Status', 'Actions'].map(h => (
+                  <TableHead key={h} className="text-xs font-semibold uppercase tracking-wider">{h}</TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow><TableCell colSpan={9} className="h-32 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" /></TableCell></TableRow>
+              ) : filtered.length === 0 ? (
+                <TableRow><TableCell colSpan={9} className="h-32 text-center text-muted-foreground"><Car className="h-8 w-8 mx-auto mb-2 opacity-30" /><p>No cab bookings found</p></TableCell></TableRow>
+              ) : (
+                filtered.map((b: Booking) => (
+                  <TableRow key={b.booking_id} className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="font-mono text-xs text-muted-foreground">#{b.booking_id?.slice(-8).toUpperCase()}</TableCell>
+                    <TableCell>
+                      <p className="font-semibold text-sm">{b.traveller?.full_name || 'N/A'}</p>
+                      <p className="text-xs text-muted-foreground">{b.traveller?.phone || 'N/A'}</p>
+                    </TableCell>
+                    <TableCell>
+                      <p className="text-xs font-medium">{b.pickup_location}</p>
+                      <p className="text-xs text-muted-foreground">→ {b.drop_location}</p>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {b.travel_date ? format(new Date(b.travel_date), 'dd MMM') : 'TBD'}
+                    </TableCell>
+                    <TableCell className="text-xs">{b.cab_type || 'Any'}</TableCell>
+                    <TableCell className="text-xs">{b.driver_id ? <span className="text-emerald-600 font-medium">Assigned</span> : <span className="text-muted-foreground">Unassigned</span>}</TableCell>
+                    <TableCell className="font-semibold text-sm">₹{(b.fare_amount || 0).toLocaleString('en-IN')}</TableCell>
+                    <TableCell><TripStatusBadge status={b.trip_status} /></TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg"><MoreHorizontal className="h-4 w-4" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52">
+                          <DropdownMenuLabel className="text-xs">Trip Actions</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => setAssigningBooking(b)}>
+                            <UserPlus className="h-4 w-4 mr-2 text-blue-600" />
+                            {b.driver_id ? 'Reassign Driver' : 'Assign Driver'}
+                          </DropdownMenuItem>
+                          {b.traveller?.phone && (
+                            <>
+                              <DropdownMenuItem asChild>
+                                <a href={`tel:${b.traveller.phone}`}><Phone className="h-4 w-4 mr-2" />Call Traveller</a>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <a href={`https://wa.me/91${b.traveller.phone?.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">
+                                  <MessageCircle className="h-4 w-4 mr-2 text-emerald-600" />WhatsApp Traveller
+                                </a>
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          <DropdownMenuSeparator />
+                          {['Awaiting Assignment', 'Driver Assigned'].includes(b.trip_status || '') && (
+                            <DropdownMenuItem onClick={() => updateTrip.mutate({ id: b.booking_id, updates: { trip_status: 'En Route' } })}>
+                              <Navigation className="h-4 w-4 mr-2 text-purple-600" />Mark En Route
+                            </DropdownMenuItem>
+                          )}
+                          {b.trip_status === 'En Route' && (
+                            <DropdownMenuItem onClick={() => updateTrip.mutate({ id: b.booking_id, updates: { trip_status: 'Trip Started' } })}>
+                              <Car className="h-4 w-4 mr-2 text-teal-600" />Mark Trip Started
+                            </DropdownMenuItem>
+                          )}
+                          {b.trip_status === 'Trip Started' && (
+                            <DropdownMenuItem onClick={() => updateTrip.mutate({ id: b.booking_id, updates: { trip_status: 'Trip Completed', booking_status: 'Completed' } })}>
+                              <CheckCircle className="h-4 w-4 mr-2 text-emerald-600" />Mark Completed
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem>
+                            <FileText className="h-4 w-4 mr-2" />Generate Invoice
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Download className="h-4 w-4 mr-2" />Download Report
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+
+      {/* Driver Assignment Modal */}
+      <Dialog open={!!assigningBooking} onOpenChange={() => { setAssigningBooking(null); setSelectedDriverId(''); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" />
+              {assigningBooking?.driver_id ? 'Reassign Driver' : 'Assign Driver'}
+            </DialogTitle>
+          </DialogHeader>
+          {assigningBooking && (
+            <div className="space-y-4 py-2">
+              <div className="p-3 bg-muted/50 rounded-xl text-sm">
+                <p className="font-semibold">{assigningBooking.traveller?.full_name}</p>
+                <p className="text-muted-foreground text-xs mt-0.5">{assigningBooking.pickup_location} → {assigningBooking.drop_location}</p>
+              </div>
+              <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Select a driver..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {(drivers || []).map((d: any) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{d.driver_name}</span>
+                        <span className="text-muted-foreground text-xs">· {d.mobile}</span>
+                        {d.rating && <span className="text-amber-500 text-xs">★{d.rating}</span>}
+                      </div>
+                    </SelectItem>
+                  ))}
+                  {drivers?.length === 0 && <SelectItem value="none" disabled>No active drivers available</SelectItem>}
+                </SelectContent>
+              </Select>
+              <Button
+                className="w-full rounded-xl"
+                onClick={doAssignDriver}
+                disabled={!selectedDriverId || updateTrip.isPending}
+              >
+                {updateTrip.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UserPlus className="h-4 w-4 mr-2" />}
+                Assign Driver
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

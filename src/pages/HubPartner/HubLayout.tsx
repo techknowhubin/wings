@@ -8,18 +8,23 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { DynamicLogo } from '@/components/DynamicLogo';
 import {
-  LayoutDashboard, Users, Building, CalendarCheck, MapPin, Navigation, Car,
-  LifeBuoy, BarChart3, Settings, User, LogOut, Menu, X, Bell, Search, Mail, Building2, Map
+  LayoutDashboard, Users, Building, CalendarCheck, Car,
+  LifeBuoy, BarChart3, Settings, User, LogOut, Menu, X, Bell, Search,
+  Building2, PhoneIncoming, HeadphonesIcon, MapPin, Star,
+  ShoppingBag, Coins, FileText, ChevronDown, ChevronRight, Truck,
+  Navigation, Mail, Map
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
 
 type NavItem = {
   label: string;
   to: string;
   icon: React.ElementType;
+  badge?: string;
 };
 
 type NavSection = {
@@ -42,21 +47,21 @@ export default function HubLayout() {
     queryFn: async () => {
       const { data: hub, error: hubError } = await supabase
         .from('hubs')
-        .select('id, hub_name')
+        .select('id, hub_name, district, area')
         .eq('uuid', uuid)
         .single();
       if (hubError) throw hubError;
 
       let fullName = hub.hub_name;
       let hubState = 'N/A';
-      
+
       if (hub.id) {
         const { data: profile } = await supabase
           .from('profiles')
           .select('full_name, assigned_state')
           .eq('id', hub.id)
           .single();
-          
+
         if (profile) {
           if (profile.full_name) fullName = profile.full_name;
           if (profile.assigned_state) hubState = profile.assigned_state;
@@ -64,6 +69,21 @@ export default function HubLayout() {
       }
 
       return { ...hub, display_name: fullName, state: hubState };
+    }
+  });
+
+  // Fetch pending booking requests count for badge
+  const { data: pendingCount } = useQuery({
+    queryKey: ['hub-pending-count', uuid],
+    enabled: !!uuid,
+    refetchInterval: 60000,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('cab_bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('assigned_hub_uuid', uuid)
+        .in('booking_status', ['Pending', 'Awaiting Hub Partner Assignment']);
+      return count || 0;
     }
   });
 
@@ -88,17 +108,26 @@ export default function HubLayout() {
     {
       title: 'Operations',
       items: [
-        { label: 'Bookings', to: `${baseUrl}/bookings`, icon: CalendarCheck },
-        { label: 'Live Map', to: `${baseUrl}/map`, icon: Navigation },
-        { label: 'Travellers', to: `${baseUrl}/travellers`, icon: MapPin },
+        { label: 'Booking Requests', to: `${baseUrl}/booking-requests`, icon: CalendarCheck, badge: pendingCount && pendingCount > 0 ? String(pendingCount) : undefined },
+        { label: 'Outstation Cabs', to: `${baseUrl}/outstation-cabs`, icon: Car },
+        { label: 'Marketplace Bookings', to: `${baseUrl}/marketplace-bookings`, icon: ShoppingBag },
+        { label: 'Walk-In Enquiries', to: `${baseUrl}/walkin-enquiries`, icon: PhoneIncoming },
+        { label: 'Traveller Assistance', to: `${baseUrl}/traveller-assistance`, icon: HeadphonesIcon },
       ],
     },
     {
-      title: 'Resources',
+      title: 'Network',
       items: [
         { label: 'Hosts', to: `${baseUrl}/hosts`, icon: Users },
         { label: 'Listings', to: `${baseUrl}/listings`, icon: Building },
-        { label: 'Drivers & Vehicles', to: `${baseUrl}/drivers`, icon: Car },
+        { label: 'Drivers & Vehicles', to: `${baseUrl}/drivers`, icon: Truck },
+      ],
+    },
+    {
+      title: 'Customers',
+      items: [
+        { label: 'Travellers', to: `${baseUrl}/travellers`, icon: MapPin },
+        { label: 'Reviews', to: `${baseUrl}/reviews`, icon: Star },
       ],
     },
     {
@@ -111,12 +140,13 @@ export default function HubLayout() {
     {
       title: 'Finance',
       items: [
-        { label: 'Reports & Earnings', to: `${baseUrl}/reports`, icon: BarChart3 },
+        { label: 'Earnings & Settlements', to: `${baseUrl}/earnings`, icon: Coins },
       ],
     },
     {
       title: 'Platform',
       items: [
+        { label: 'Reports', to: `${baseUrl}/reports`, icon: BarChart3 },
         { label: 'Support', to: `${baseUrl}/support`, icon: LifeBuoy },
         { label: 'Profile', to: `${baseUrl}/profile`, icon: User },
         { label: 'Settings', to: `${baseUrl}/settings`, icon: Settings },
@@ -125,8 +155,8 @@ export default function HubLayout() {
   ];
 
   const renderNavGroup = (section: NavSection) => (
-    <div key={section.title} className="mb-2">
-      <p className="px-4 mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+    <div key={section.title} className="mb-1">
+      <p className="px-4 mb-1 mt-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
         {section.title}
       </p>
       <ul className="space-y-0.5">
@@ -139,14 +169,24 @@ export default function HubLayout() {
                 end={item.to === baseUrl}
                 onClick={() => setMobileMenuOpen(false)}
                 className={cn(
-                  'flex items-center gap-3 px-4 py-2.5 mx-2 rounded-xl text-sm transition-all duration-200 relative',
+                  'flex items-center gap-3 px-3 py-2.5 mx-2 rounded-xl text-sm transition-all duration-200 relative group',
                   isActive
-                    ? 'bg-primary text-primary-foreground font-medium shadow-md'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    ? 'bg-primary text-primary-foreground font-semibold shadow-md'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
                 )}
               >
-                <item.icon className="h-[18px] w-[18px] shrink-0" />
-                <span className="flex-1 truncate">{item.label}</span>
+                <item.icon className="h-[17px] w-[17px] shrink-0" />
+                <span className="flex-1 truncate text-[13px]">{item.label}</span>
+                {item.badge && (
+                  <span className={cn(
+                    'text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center',
+                    isActive
+                      ? 'bg-primary-foreground/20 text-primary-foreground'
+                      : 'bg-destructive text-destructive-foreground'
+                  )}>
+                    {item.badge}
+                  </span>
+                )}
               </NavLink>
             </li>
           );
@@ -158,29 +198,47 @@ export default function HubLayout() {
   const sidebarContent = (
     <div className="flex flex-col h-full">
       {/* Logo + Hub Badge */}
-      <div className="px-5 pt-6 pb-4">
+      <div className="px-5 pt-5 pb-3 border-b border-border/50">
         <NavLink to="/" className="flex items-center gap-2.5">
           <DynamicLogo />
         </NavLink>
-        <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-          <Building2 className="h-3 w-3 text-emerald-600" />
-          <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Hub Partner</span>
+        <div className="mt-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+          <Building2 className="h-3 w-3 text-emerald-600 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest leading-none">Hub Partner</p>
+            {hubDetails?.hub_name && (
+              <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 truncate mt-0.5 leading-none">
+                {hubDetails.hub_name}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-2">
+      <nav className="flex-1 overflow-y-auto py-2 px-1">
         {sections.map((section) => renderNavGroup(section))}
       </nav>
 
-      {/* Sign Out */}
-      <div className="p-3 mx-2 mb-3">
+      {/* User info + Sign Out */}
+      <div className="border-t border-border/50 p-3">
+        <div className="flex items-center gap-2.5 px-2 py-2 mb-1">
+          <Avatar className="h-8 w-8 shrink-0">
+            <AvatarFallback className="bg-emerald-600 text-white text-xs font-bold">
+              {(hubDetails?.display_name)?.charAt(0)?.toUpperCase() || 'H'}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold truncate text-foreground">{hubDetails?.display_name || 'Hub Partner'}</p>
+            <p className="text-[10px] text-muted-foreground truncate">{hubDetails?.state || 'N/A'}</p>
+          </div>
+        </div>
         <Button
           variant="ghost"
-          className="w-full justify-start rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 text-sm h-11"
+          className="w-full justify-start rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 text-xs h-9"
           onClick={handleSignOut}
         >
-          <LogOut className="h-[18px] w-[18px] mr-3" />
+          <LogOut className="h-4 w-4 mr-2.5" />
           Sign Out
         </Button>
       </div>
@@ -205,10 +263,13 @@ export default function HubLayout() {
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" className="relative rounded-xl">
             <Bell className="h-5 w-5" />
+            {pendingCount && pendingCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-destructive rounded-full" />
+            )}
           </Button>
           <Avatar className="h-8 w-8">
-            <AvatarFallback className="bg-emerald-600 text-white text-sm font-medium">
-              {(hubDetails?.display_name)?.charAt(0) || 'H'}
+            <AvatarFallback className="bg-emerald-600 text-white text-sm font-bold">
+              {(hubDetails?.display_name)?.charAt(0)?.toUpperCase() || 'H'}
             </AvatarFallback>
           </Avatar>
         </div>
@@ -226,9 +287,9 @@ export default function HubLayout() {
               onClick={() => setMobileMenuOpen(false)}
             />
             <motion.aside
-              initial={{ x: -240 }}
+              initial={{ x: -260 }}
               animate={{ x: 0 }}
-              exit={{ x: -240 }}
+              exit={{ x: -260 }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="lg:hidden fixed left-0 top-0 h-full w-[240px] bg-card border-r border-border z-50 shadow-2xl"
             >
@@ -246,42 +307,42 @@ export default function HubLayout() {
       {/* Main Content */}
       <main className="flex-1 min-h-screen pt-14 lg:pt-0 lg:ml-[240px]">
         {/* Desktop Top Bar */}
-        <div className="hidden lg:flex items-center justify-between h-16 px-8 bg-card border-b border-border sticky top-0 z-30">
-          <div className="relative w-72">
+        <div className="hidden lg:flex items-center justify-between h-14 px-6 bg-card border-b border-border sticky top-0 z-30">
+          <div className="relative w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search bookings, hosts..."
-              className="pl-10 h-10 bg-muted/40 border-border rounded-xl text-sm"
+              placeholder="Search bookings, hosts, travellers..."
+              className="pl-10 h-9 bg-muted/40 border-border rounded-xl text-sm"
             />
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="rounded-xl relative h-10 w-10">
-              <Mail className="h-[18px] w-[18px] text-muted-foreground" />
-            </Button>
-            <Button variant="ghost" size="icon" className="rounded-xl relative h-10 w-10">
-              <Bell className="h-[18px] w-[18px] text-muted-foreground" />
-            </Button>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span>Hub Operational</span>
             </div>
-            <div className="w-px h-8 bg-border mx-1" />
-            <div className="flex items-center gap-3 pl-1">
-              <Avatar className="h-9 w-9 border-2 border-border">
-                <AvatarFallback className="bg-emerald-600 text-white text-sm font-medium">
-                  {(hubDetails?.display_name)?.charAt(0) || 'H'}
+            <div className="w-px h-6 bg-border mx-1" />
+            <Button variant="ghost" size="icon" className="rounded-xl relative h-9 w-9">
+              <Bell className="h-4 w-4 text-muted-foreground" />
+              {pendingCount && pendingCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-destructive rounded-full" />
+              )}
+            </Button>
+            <div className="flex items-center gap-2 pl-1">
+              <Avatar className="h-8 w-8 border-2 border-border">
+                <AvatarFallback className="bg-emerald-600 text-white text-xs font-bold">
+                  {(hubDetails?.display_name)?.charAt(0)?.toUpperCase() || 'H'}
                 </AvatarFallback>
               </Avatar>
               <div className="hidden xl:block">
-                <p className="text-sm font-semibold text-foreground leading-tight">{hubDetails?.display_name || 'Hub Partner'}</p>
-                <p className="text-xs text-muted-foreground leading-tight">State: {hubDetails?.state || 'N/A'}</p>
+                <p className="text-xs font-semibold text-foreground leading-tight">{hubDetails?.display_name || 'Hub Partner'}</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">{hubDetails?.state || 'N/A'}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Page Content */}
-        <div className="p-4 lg:p-8">
+        <div className="p-4 lg:p-6">
           <DashboardPageTransition routeKey={location.pathname}>
             <Outlet />
           </DashboardPageTransition>

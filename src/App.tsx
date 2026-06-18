@@ -91,6 +91,11 @@ import HubOverview from "./pages/HubPartner/HubOverview";
 import HubHosts from "./pages/HubPartner/HubHosts";
 import HubListings from "./pages/HubPartner/HubListings";
 import HubBookings from "./pages/HubPartner/HubBookings";
+import HubBookingRequests from "./pages/HubPartner/HubBookingRequests";
+import HubMarketplaceBookings from "./pages/HubPartner/HubMarketplaceBookings";
+import HubWalkInEnquiries from "./pages/HubPartner/HubWalkInEnquiries";
+import HubTravellerAssistance from "./pages/HubPartner/HubTravellerAssistance";
+import HubReviews from "./pages/HubPartner/HubReviews";
 import HubTravellers from "./pages/HubPartner/HubTravellers";
 import HubDrivers from "./pages/HubPartner/HubDrivers";
 import HubMap from "./pages/HubPartner/HubMap";
@@ -263,12 +268,24 @@ const App = () =>
               }
             >
               <Route index element={<HubOverview />} />
+              {/* Operations */}
+              <Route path="booking-requests" element={<HubBookingRequests />} />
+              <Route path="outstation-cabs" element={<HubBookings />} />
+              <Route path="marketplace-bookings" element={<HubMarketplaceBookings />} />
+              <Route path="walkin-enquiries" element={<HubWalkInEnquiries />} />
+              <Route path="traveller-assistance" element={<HubTravellerAssistance />} />
+              {/* Network */}
               <Route path="hosts" element={<HubHosts />} />
               <Route path="listings" element={<HubListings />} />
-              <Route path="bookings" element={<HubBookings />} />
-              <Route path="travellers" element={<HubTravellers />} />
               <Route path="drivers" element={<HubDrivers />} />
-              <Route path="vehicles" element={<HubDrivers />} /> {/* Placeholder if separate page needed later */}
+              <Route path="vehicles" element={<HubDrivers />} />
+              {/* Customers */}
+              <Route path="travellers" element={<HubTravellers />} />
+              <Route path="reviews" element={<HubReviews />} />
+              {/* Finance */}
+              <Route path="earnings" element={<HubReports />} />
+              {/* Platform */}
+              <Route path="bookings" element={<HubBookingRequests />} /> {/* backwards compat */}
               <Route path="map" element={<HubMap />} />
               <Route path="support" element={<HubSupport />} />
               <Route path="reports" element={<HubReports />} />

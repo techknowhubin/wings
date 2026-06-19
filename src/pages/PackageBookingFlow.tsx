@@ -176,6 +176,7 @@ export default function PackageBookingFlow() {
           total_amount:   grandTotal,
           payment_status: "pending",
           booking_status: "pending",
+          booking_details: selectedPackages,
         })
         .select()
         .single();
@@ -204,6 +205,7 @@ export default function PackageBookingFlow() {
             razorpay_signature:  `sig_mock_${Date.now()}`,
             booking_id:          booking.id,
             used_wing_credits:   wingCreditsDiscountAmount,
+            amount_paid:         finalPayable,
           },
         });
         if (freeErr) throw new Error(freeErr.message || "Failed to confirm booking");
@@ -258,6 +260,7 @@ export default function PackageBookingFlow() {
                 razorpay_signature:  response.razorpay_signature,
                 booking_id:          booking.id,
                 used_wing_credits:   wingCreditsDiscountAmount,
+                amount_paid:         finalPayable,
               },
             });
             if (verifyErr) throw new Error(verifyErr.message || "Payment verification failed");

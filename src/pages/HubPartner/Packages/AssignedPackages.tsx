@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useParams } from 'react-router-dom';
 import { HubPackageDetailsModal } from './components/HubPackageDetailsModal';
+import { PackageBookingsSheet } from './components/PackageBookingsSheet';
 import { TourPackage } from '@/types/tour-packages';
 
 export default function AssignedPackages() {
@@ -18,6 +19,8 @@ export default function AssignedPackages() {
   const [selectedPkg, setSelectedPkg] = useState<TourPackage | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const [bookingsAst, setBookingsAst] = useState<any>(null);
 
   useEffect(() => {
     fetchAssignments();
@@ -129,13 +132,20 @@ export default function AssignedPackages() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => openDetails(ast)}
                           >
                             View Details
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBookingsAst(ast)}
+                          >
+                            Bookings
                           </Button>
                           <Button
                             variant={ast.status === 'published' ? "outline" : "default"}
@@ -155,12 +165,20 @@ export default function AssignedPackages() {
         </CardContent>
       </Card>
 
-      <HubPackageDetailsModal 
-        pkg={selectedPkg} 
-        assignment={selectedAssignment} 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <HubPackageDetailsModal
+        pkg={selectedPkg}
+        assignment={selectedAssignment}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         onTogglePublish={togglePublish}
+      />
+
+      <PackageBookingsSheet
+        open={!!bookingsAst}
+        onClose={() => setBookingsAst(null)}
+        packageId={bookingsAst?.tour_packages?.id ?? null}
+        packageName={bookingsAst?.tour_packages?.name ?? ''}
+        hubId={hubId ?? ''}
       />
     </div>
   );

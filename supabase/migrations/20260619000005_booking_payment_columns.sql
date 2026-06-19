@@ -1,0 +1,3 @@
+ALTER TABLE public.package_bookings
+  ADD COLUMN IF NOT EXISTS amount_paid      NUMERIC(12,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS wing_credits_used NUMERIC(12,2) NOT NULL DEFAULT 0;

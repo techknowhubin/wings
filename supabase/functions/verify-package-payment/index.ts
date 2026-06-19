@@ -38,6 +38,7 @@ Deno.serve(async (req) => {
       razorpay_signature,
       booking_id,
       used_wing_credits,
+      amount_paid,
     } = await req.json();
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !booking_id) {
@@ -94,9 +95,11 @@ Deno.serve(async (req) => {
     const { data: updated, error: updateErr } = await admin
       .from("package_bookings")
       .update({
-        payment_status: "completed",
-        booking_status: "confirmed",
-        payment_id:     razorpay_payment_id,
+        payment_status:    "completed",
+        booking_status:    "confirmed",
+        payment_id:        razorpay_payment_id,
+        amount_paid:       amount_paid ?? 0,
+        wing_credits_used: used_wing_credits ?? 0,
       })
       .eq("id", booking_id)
       .select()

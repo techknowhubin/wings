@@ -3,10 +3,26 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, MapPin, Calendar, Users, Clock, Check, X as XIcon, FileText, Plus, Minus } from "lucide-react";
+import { Loader2, MapPin, Calendar, Users, Clock, Check, X as XIcon, FileText, Plus, Minus, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { PdfViewer } from "@/components/PdfViewer";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+
+function GalleryThumb({ img, index, onClick, className }: { img: any; index: number; onClick: (i: number) => void; className?: string }) {
+  return (
+    <button
+      onClick={() => onClick(index)}
+      className={`relative rounded-xl overflow-hidden bg-muted block w-full focus:outline-none focus:ring-2 focus:ring-primary group ${className ?? ''}`}
+    >
+      <img
+        src={img.image_url}
+        alt={img.caption || `Photo ${index + 1}`}
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+      />
+    </button>
+  );
+}
 
 export default function TourPackageDetail() {
   const { id } = useParams();
@@ -15,6 +31,7 @@ export default function TourPackageDetail() {
   const [loading, setLoading] = useState(true);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [bookedSeats, setBookedSeats] = useState<number>(0);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchPackage = async () => {
@@ -23,6 +40,7 @@ export default function TourPackageDetail() {
         .from('tour_packages')
         .select(`
           *,
+          package_gallery(*),
           package_itineraries(*),
           package_itinerary_days(*)
         `)
@@ -141,6 +159,7 @@ export default function TourPackageDetail() {
 
   const itineraryDays = pkg?.package_itinerary_days?.sort((a: any, b: any) => a.day_number - b.day_number) || [];
   const documents = pkg?.package_itineraries || [];
+  const galleryImages = (pkg?.package_gallery || []).filter((g: any) => !g.is_cover && !g.is_banner);
   const isPdfDoc = (d: any) =>
     d.file_type === 'application/pdf' ||
     d.file_type === 'pdf' ||
@@ -192,6 +211,65 @@ export default function TourPackageDetail() {
                 Departing from {pkg.departure_city}, this {pkg.category.toLowerCase()} offers an unforgettable journey.
               </p>
             </section>
+
+            {galleryImages.length > 0 && (
+              <section>
+                <h2 className="text-2xl font-bold mb-4">Photos</h2>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {galleryImages.map((img: any, i: number) => (
+                    <GalleryThumb key={img.id || i} img={img} index={i} onClick={setLightboxIndex} className="aspect-square" />
+                  ))}
+                </div>
+
+                {/* Lightbox */}
+                <Dialog open={lightboxIndex !== null} onOpenChange={(o) => !o && setLightboxIndex(null)}>
+                  <DialogContent className="max-w-4xl w-full p-0 bg-black border-0 overflow-hidden">
+                    {lightboxIndex !== null && (
+                      <div className="relative flex items-center justify-center min-h-[60vh]">
+                        <img
+                          src={galleryImages[lightboxIndex]?.image_url}
+                          alt={galleryImages[lightboxIndex]?.caption || `Photo ${lightboxIndex + 1}`}
+                          className="max-h-[80vh] max-w-full object-contain"
+                        />
+
+                        {galleryImages.length > 1 && (
+                          <>
+                            <button
+                              onClick={() => setLightboxIndex((lightboxIndex - 1 + galleryImages.length) % galleryImages.length)}
+                              className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white rounded-full p-2 transition-colors"
+                            >
+                              <ChevronLeft className="h-6 w-6" />
+                            </button>
+                            <button
+                              onClick={() => setLightboxIndex((lightboxIndex + 1) % galleryImages.length)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white rounded-full p-2 transition-colors"
+                            >
+                              <ChevronRight className="h-6 w-6" />
+                            </button>
+                            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                              {galleryImages.map((_: any, i: number) => (
+                                <button
+                                  key={i}
+                                  onClick={() => setLightboxIndex(i)}
+                                  className={`h-1.5 rounded-full transition-all ${i === lightboxIndex ? 'w-4 bg-white' : 'w-1.5 bg-white/40'}`}
+                                />
+                              ))}
+                            </div>
+                          </>
+                        )}
+
+                        {galleryImages[lightboxIndex]?.caption && (
+                          <p className="absolute bottom-8 left-0 right-0 text-center text-white/80 text-sm px-6">
+                            {galleryImages[lightboxIndex].caption}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
+              </section>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-card border rounded-2xl p-8">
               <section>

@@ -26,8 +26,8 @@ export default function HubBookings() {
     const { data, error } = await supabase
       .from('package_bookings')
       .select(`
-        id, booking_ref, total_amount, payment_status, booking_status, created_at, payment_id,
-        tour_packages(name, max_capacity, booked_seats),
+        id, booking_ref, total_amount, amount_paid, wing_credits_used, payment_status, booking_status, created_at, payment_id, booking_details,
+        tour_packages(name, max_capacity, booked_seats, adult_price, child_price, single_sharing_price, twin_sharing_price),
         package_travellers(id, name, email, mobile, age, gender)
       `)
       .eq('hub_id', hubData.id)
@@ -45,6 +45,36 @@ export default function HubBookings() {
       failed:    'bg-red-100 text-red-800',
     };
     return map[s?.toLowerCase()] ?? 'bg-gray-100 text-gray-700';
+  };
+
+  // Derive package type breakdown for old bookings without booking_details
+  const deriveTypes = (booking: any): any[] => {
+    const pkg = booking.tour_packages;
+    if (!pkg) return [];
+    const travellers: any[] = booking.package_travellers || [];
+    const n = travellers.length;
+    if (n === 0) return [];
+    const total = Number(booking.total_amount);
+    const options = [
+      { type: 'Adult Package',   price: Number(pkg.adult_price) },
+      { type: 'Child Package',   price: Number(pkg.child_price) },
+      { type: 'Single Sharing',  price: Number(pkg.single_sharing_price) },
+      { type: 'Twin Sharing',    price: Number(pkg.twin_sharing_price) },
+    ].filter(o => o.price > 0);
+
+    // Try all-same-type first (covers most real cases)
+    for (const opt of options) {
+      if (Math.round(opt.price * n) === Math.round(total)) {
+        return [{ type: opt.type, quantity: n, price: opt.price }];
+      }
+    }
+    // Try each single type for qty=1
+    for (const opt of options) {
+      if (Math.round(opt.price) === Math.round(total)) {
+        return [{ type: opt.type, quantity: 1, price: opt.price }];
+      }
+    }
+    return [];
   };
 
   const statusBadge = (s: string) => {
@@ -143,8 +173,24 @@ export default function HubBookings() {
           </SheetHeader>
           {selected && (() => {
             const travellers: any[] = selected.package_travellers || [];
+            const details: any[] = Array.isArray(selected.booking_details) && selected.booking_details.length > 0
+              ? selected.booking_details
+              : deriveTypes(selected);
+
+            const total       = Number(selected.total_amount || 0);
+            const wingCredits = Number(selected.wing_credits_used || 0);
+            // amount_paid = what was actually charged to Razorpay (already excludes wing credits)
+            // For old bookings without stored amount_paid, derive: 20% booking fee minus any wing credits
+            const bookingFee   = Math.round(total * 0.20 * 100) / 100;
+            const razorpayPaid = Number(selected.amount_paid) > 0
+              ? Number(selected.amount_paid)
+              : Math.max(bookingFee - wingCredits, 0);
+            const totalPaid   = razorpayPaid + wingCredits;
+            const remaining   = Math.max(total - totalPaid, 0);
             return (
-              <div className="mt-6 space-y-6 text-sm">
+              <div className="mt-6 space-y-5 text-sm">
+
+                {/* Booking ref + status */}
                 <div className="p-4 rounded-xl border bg-muted/20 space-y-2">
                   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Booking</p>
                   <p className="font-mono text-sm font-semibold">{selected.booking_ref}</p>
@@ -157,25 +203,76 @@ export default function HubBookings() {
                   )}
                 </div>
 
-                <div className="p-4 rounded-xl border bg-muted/20 space-y-2">
+                {/* Package name + amount */}
+                <div className="p-4 rounded-xl border bg-muted/20 space-y-1">
                   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Package</p>
-                  <p className="font-semibold">{selected.tour_packages?.name}</p>
-                  <div className="flex gap-4 text-xs text-muted-foreground mt-1">
-                    <span>Capacity: {selected.tour_packages?.max_capacity ?? '—'}</span>
-                    <span>Booked: {selected.tour_packages?.booked_seats ?? '—'}</span>
-                  </div>
-                  <p className="text-base font-bold text-foreground mt-1">₹{Number(selected.total_amount).toLocaleString('en-IN')}</p>
+                  <p className="font-semibold text-base">{selected.tour_packages?.name}</p>
+                  <p className="text-lg font-bold text-foreground">₹{Number(selected.total_amount).toLocaleString('en-IN')}</p>
                 </div>
 
+                {/* Package type breakdown — dedicated section */}
+                <div className="p-4 rounded-xl border bg-muted/20 space-y-3">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Package Types Selected</p>
+                  {details.length > 0 ? (
+                    details.map((d: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between rounded-lg bg-background border px-3 py-2">
+                        <div>
+                          <p className="font-semibold text-sm">{d.type}</p>
+                          <p className="text-xs text-muted-foreground">₹{Number(d.price).toLocaleString('en-IN')} / person</p>
+                        </div>
+                        <span className="text-base font-bold text-foreground">× {d.quantity}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {travellers.length} traveller{travellers.length !== 1 ? 's' : ''} — type breakdown not recorded for this booking.
+                    </p>
+                  )}
+                </div>
+
+                {/* Payment breakdown */}
+                <div className="p-4 rounded-xl border bg-muted/20 space-y-3">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Payment Breakdown</p>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Total Package Price</span>
+                      <span className="font-semibold">₹{total.toLocaleString('en-IN')}</span>
+                    </div>
+
+                    <div className="border-t border-border pt-2 space-y-1.5">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Paid Upfront</p>
+                      {wingCredits > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Wing Credits used</span>
+                          <span className="font-semibold text-green-600">₹{wingCredits.toLocaleString('en-IN')}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Paid via Razorpay</span>
+                        <span className="font-semibold">₹{razorpayPaid.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-semibold border-t border-dashed border-border pt-1">
+                        <span>Total Paid</span>
+                        <span>₹{totalPaid.toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between border-t border-border pt-2">
+                      <span className="font-semibold text-amber-700">Remaining Balance</span>
+                      <span className="font-bold text-amber-700">₹{remaining.toLocaleString('en-IN')}</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">To be collected at tour departure.</p>
+                  </div>
+                </div>
+
+                {/* Traveller details */}
                 <div className="space-y-3">
                   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Travellers ({travellers.length})</p>
                   {travellers.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No traveller details available.</p>
                   ) : travellers.map((t, i) => (
                     <div key={t.id} className="p-4 rounded-xl border bg-card space-y-2">
-                      <p className="font-semibold text-sm">
-                        {i === 0 ? '👤 Primary Contact' : `Traveller ${i + 1}`}
-                      </p>
+                      <p className="font-semibold text-sm">{i === 0 ? '👤 Primary Contact' : `Traveller ${i + 1}`}</p>
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div><span className="text-muted-foreground">Name</span><p className="font-medium">{t.name}</p></div>
                         <div><span className="text-muted-foreground">Age</span><p className="font-medium">{t.age ?? '—'}</p></div>
@@ -188,6 +285,7 @@ export default function HubBookings() {
                     </div>
                   ))}
                 </div>
+
               </div>
             );
           })()}

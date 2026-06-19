@@ -777,15 +777,31 @@ export function useAdminBookings(filters?: { status?: string; paymentStatus?: st
       if (error) throw error;
       const bookings = data ?? [];
 
-      // Resolve traveler and host names
+      // Fetch cab_bookings for these bookings
+      const bookingIds = bookings.map((b: any) => b.id);
+      let cabBookingsMap = new Map();
+      if (bookingIds.length > 0) {
+        const { data: cabData } = await supabase
+          .from('cab_bookings')
+          .select('*')
+          .in('booking_id', bookingIds);
+        (cabData ?? []).forEach((cb: any) => cabBookingsMap.set(cb.booking_id, cb));
+      }
+
+      // Resolve traveler, host, and hub partner names
       const allIds = [...new Set([
         ...bookings.map((b: any) => b.user_id),
         ...bookings.map((b: any) => b.host_id),
+        ...Array.from(cabBookingsMap.values()).map((cb: any) => cb.hub_partner_id)
       ].filter(Boolean))];
       const names = await resolveProfileNames(allIds);
 
       return bookings.map((b: any) => {
         const { totalAmount } = calculateHostBookingAmounts(b);
+        const cabData = cabBookingsMap.get(b.id) ?? null;
+        if (cabData && cabData.hub_partner_id) {
+          cabData.hubPartnerName = names.get(cabData.hub_partner_id)?.full_name ?? '—';
+        }
         return {
           ...b,
           // Normalize to names expected by AdminBookings page
@@ -794,6 +810,7 @@ export function useAdminBookings(filters?: { status?: string; paymentStatus?: st
           guests: b.guests_count,
           traveler: names.get(b.user_id) ?? { full_name: '—', phone: null },
           host: names.get(b.host_id) ?? { full_name: '—' },
+          cabDetails: cabData,
         };
       });
     },

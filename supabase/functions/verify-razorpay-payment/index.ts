@@ -59,6 +59,7 @@ Deno.serve(async (req) => {
       coupon_id,
       referral_code,
       referral_partner_id,
+      used_wing_credits,
     } = await req.json();
 
     // ── Input validation ──────────────────────────────────────
@@ -238,6 +239,22 @@ Deno.serve(async (req) => {
         }
       } catch (couponErr) {
         console.error("[Coupon] Non-fatal error:", couponErr);
+      }
+    }
+
+    // ── Wing Credits Deduction (non-fatal) ────────────────────
+    if (used_wing_credits && used_wing_credits > 0 && updatedBooking) {
+      try {
+        const { error: creditErr } = await admin.rpc("process_wallet_transaction", {
+          p_user_id: updatedBooking.user_id,
+          p_type: "booking_redemption",
+          p_amount: -Math.abs(used_wing_credits),
+          p_source: "booking_checkout",
+          p_reference_id: booking_id,
+        });
+        if (creditErr) throw creditErr;
+      } catch (err) {
+        console.error("[Wing Credits] Failed to deduct credits:", err);
       }
     }
 

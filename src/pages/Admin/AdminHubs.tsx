@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,24 +13,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import {
   Building2, Plus, Search, Pencil, Trash2,
-  ToggleLeft, ToggleRight, Users, MapPin, Eye, EyeOff, Copy,
+  ToggleLeft, ToggleRight, Users, MapPin, Eye, EyeOff, Copy, ExternalLink,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import indiaLocationsData from '@/constants/indiaLocations.json';
 
-const INDIAN_STATES = [
-  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
-  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
-  'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
-  'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
-  'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
-  'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
-  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
-  'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
-];
+const indianStatesData = indiaLocationsData as { states: { state: string, districts: string[] }[] };
+const INDIAN_STATES = indianStatesData.states.map(s => s.state);
 
-// ─── Hooks ─────────────────────────────────────────────────────────────────────
+// --- Hooks ---
 
-function useHubPartnerProfiles(search?: string) {
+function useHubPartnerProfiles(search: string) {
   return useQuery({
     queryKey: ['admin', 'hub-partner-profiles', search],
     queryFn: async () => {
@@ -46,12 +39,31 @@ function useHubPartnerProfiles(search?: string) {
       // 2. Fetch their profiles
       const { data: profiles, error: pErr } = await supabase
         .from('profiles')
-        .select('id, full_name, phone, state, assigned_state, account_status, role, created_at')
+        .select('id, full_name, phone, state, assigned_state, assigned_district, assigned_area, account_status, role, created_at')
         .in('id', hubIds)
         .order('created_at', { ascending: false });
       if (pErr) throw pErr;
 
-      let results = profiles ?? [];
+      // 3. Fetch their hub UUIDs and emails
+      const { data: hubsData, error: hubsErr } = await supabase
+        .from('hubs')
+        .select('id, uuid, email')
+        .in('id', hubIds);
+      
+      if (hubsErr) throw hubsErr;
+
+      const hubMap = (hubsData || []).reduce((acc: Record<string, any>, curr: any) => {
+        acc[curr.id] = { uuid: curr.uuid, email: curr.email };
+        return acc;
+      }, {});
+
+      let results = (profiles ?? []).map(p => ({
+        ...p,
+        uuid: hubMap[p.id]?.uuid || null,
+        email: hubMap[p.id]?.email || null,
+        total_assigned_bookings: 0
+      }));
+
       if (search) {
         const s = search.toLowerCase();
         results = results.filter((p: any) =>
@@ -74,43 +86,34 @@ function useCreateHubPartnerAccount() {
       phone: string;
       password: string;
       assigned_state: string;
+      assigned_district?: string;
+      assigned_area?: string;
     }) => {
-      // 1. Sign up a new user account via Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: form.email,
-        password: form.password,
-        options: {
-          data: {
-            full_name: form.full_name,
-            phone: form.phone,
-            role: 'hub_partner',
-          },
-        },
+      const { data, error } = await supabase.functions.invoke('admin-actions', {
+        body: {
+          action: 'create_hub_partner',
+          ...form
+        }
       });
-      if (authError) throw authError;
-      const userId = authData.user?.id;
-      if (!userId) throw new Error('Failed to create user account.');
+      
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      // 2. Upsert profile with assigned_state & role
-      const { error: profileErr } = await supabase
-        .from('profiles')
-        .upsert({
-          id: userId,
-          full_name: form.full_name,
-          phone: form.phone,
-          role: 'hub_partner',
-          assigned_state: form.assigned_state,
-          account_status: 'active',
-        }, { onConflict: 'id' });
-      if (profileErr) throw profileErr;
+      // Create the hub record in the new hubs table
+      const { error: hubError } = await supabase.from('hubs').insert({
+        id: data.userId,
+        hub_name: `${form.full_name} Hub`,
+        owner_name: form.full_name,
+        email: form.email,
+        mobile: form.phone,
+        district: form.assigned_district || '',
+        area: form.assigned_area || '',
+        status: 'active'
+      });
 
-      // 3. Upsert into user_roles
-      const { error: roleErr } = await supabase
-        .from('user_roles')
-        .upsert({ user_id: userId, role: 'hub_partner' }, { onConflict: 'user_id' } as any);
-      if (roleErr) throw roleErr;
+      if (hubError) throw hubError;
 
-      return { userId, email: form.email };
+      return { userId: data.userId, email: form.email };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'hub-partner-profiles'] });
@@ -121,12 +124,18 @@ function useCreateHubPartnerAccount() {
 function useUpdateHubPartnerProfile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...fields }: { id: string; full_name?: string; phone?: string; assigned_state?: string }) => {
+    mutationFn: async ({ id, ...fields }: { id: string; full_name?: string; phone?: string; assigned_state?: string; assigned_district?: string; assigned_area?: string }) => {
       const { error } = await supabase
         .from('profiles')
         .update({ ...fields, updated_at: new Date().toISOString() })
         .eq('id', id);
       if (error) throw error;
+      if (fields.full_name) {
+        await supabase
+          .from('hubs')
+          .update({ hub_name: fields.full_name, owner_name: fields.full_name })
+          .eq('id', id);
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'hub-partner-profiles'] });
@@ -178,8 +187,13 @@ export default function AdminHubs() {
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
+  // Custom input states for 'Other' selections
+  const [isOtherAddDistrict, setIsOtherAddDistrict] = useState(false);
+  const [isOtherEditDistrict, setIsOtherEditDistrict] = useState(false);
+
   const [form, setForm] = useState({
-    full_name: '', email: '', phone: '', password: '', assigned_state: '',
+    full_name: '', email: '', phone: '', password: '', assigned_state: '', assigned_district: '', assigned_area: '',
   });
 
   const [editHub, setEditHub] = useState<any>(null);
@@ -198,12 +212,25 @@ export default function AdminHubs() {
       full_name: h.full_name ?? '',
       phone: h.phone ?? '',
       assigned_state: h.assigned_state ?? '',
+      assigned_district: h.assigned_district ?? '',
+      assigned_area: h.assigned_area ?? '',
     });
+    
+    // Check if the current district/area is in our standard lists, if not, activate 'Other' mode
+    const stateData = indianStatesData.states.find(s => s.state === h.assigned_state);
+    const standardDistricts = stateData ? stateData.districts : [];
+    if (h.assigned_district && !standardDistricts.includes(h.assigned_district)) {
+      setIsOtherEditDistrict(true);
+    } else {
+      setIsOtherEditDistrict(false);
+    }
+
+    const matchingHubs = hubs?.filter((hub: any) => hub.assigned_district === h.assigned_district && hub.assigned_area) || [];
   };
 
   const handleCreate = async () => {
-    if (!form.full_name || !form.email || !form.password || !form.assigned_state) {
-      toast.error('Please fill in all required fields.');
+    if (!form.full_name || !form.email || !form.password || !form.phone || !form.assigned_state || !form.assigned_district || !form.assigned_area) {
+      toast.error('Please fill in all required fields including Mobile, District, and Area.');
       return;
     }
     if (form.password.length < 6) {
@@ -214,7 +241,8 @@ export default function AdminHubs() {
       const result = await createMut.mutateAsync(form);
       toast.success(`Hub Partner created! Email: ${result.email}`);
       setAddOpen(false);
-      setForm({ full_name: '', email: '', phone: '', password: '', assigned_state: '' });
+      setForm({ full_name: '', email: '', phone: '', password: '', assigned_state: '', assigned_district: '', assigned_area: '' });
+      setIsOtherAddDistrict(false);
     } catch (err: any) {
       toast.error(err.message ?? 'Failed to create hub partner.');
     }
@@ -222,8 +250,8 @@ export default function AdminHubs() {
 
   const handleUpdate = async () => {
     if (!editHub) return;
-    if (!editForm.full_name || !editForm.assigned_state) {
-      toast.error('Name and Assigned State are required.');
+    if (!editForm.full_name || !editForm.phone || !editForm.assigned_state || !editForm.assigned_district || !editForm.assigned_area) {
+      toast.error('Name, Mobile, State, District, and Area are required.');
       return;
     }
     try {
@@ -245,6 +273,10 @@ export default function AdminHubs() {
       toast.error(err.message ?? 'Failed to delete.');
     }
   };
+
+  // Helper selectors
+  const addAvailableDistricts = indianStatesData.states.find(s => s.state === form.assigned_state)?.districts || [];
+  const editAvailableDistricts = indianStatesData.states.find(s => s.state === editForm.assigned_state)?.districts || [];
 
   return (
     <div className="space-y-6">
@@ -315,18 +347,21 @@ export default function AdminHubs() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Partner</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Assigned State</TableHead>
+                  <TableHead>Hub Partner Name</TableHead>
+                  <TableHead>Mobile Number</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>District</TableHead>
+                  <TableHead>Area</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
+                  <TableHead>Created Date</TableHead>
+                  <TableHead>Total Assigned Bookings</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {(hubs ?? []).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
                       No hub partners yet. Click "Create Hub Partner" to get started.
                     </TableCell>
                   </TableRow>
@@ -346,16 +381,17 @@ export default function AdminHubs() {
                       </div>
                     </TableCell>
 
-                    {/* Contact */}
+                    {/* Mobile Number */}
                     <TableCell className="text-sm">{h.phone || '—'}</TableCell>
 
-                    {/* Assigned State */}
-                    <TableCell>
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
-                        <MapPin className="h-3 w-3 mr-1" />
-                        {h.assigned_state || 'Unassigned'}
-                      </Badge>
-                    </TableCell>
+                    {/* Email */}
+                    <TableCell className="text-sm">{h.email || '—'}</TableCell>
+
+                    {/* District */}
+                    <TableCell className="text-sm">{h.assigned_district || '—'}</TableCell>
+
+                    {/* Area */}
+                    <TableCell className="text-sm">{h.assigned_area || '—'}</TableCell>
 
                     {/* Status */}
                     <TableCell>
@@ -371,9 +407,14 @@ export default function AdminHubs() {
                       </Badge>
                     </TableCell>
 
-                    {/* Created */}
+                    {/* Created Date */}
                     <TableCell className="text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(h.created_at), { addSuffix: true })}
+                    </TableCell>
+
+                    {/* Total Assigned Bookings */}
+                    <TableCell className="text-sm text-center font-medium">
+                      {h.total_assigned_bookings || 0}
                     </TableCell>
 
                     {/* Actions */}
@@ -390,17 +431,7 @@ export default function AdminHubs() {
                         >
                           {h.account_status === 'active' ? <ToggleRight className="h-3.5 w-3.5" /> : <ToggleLeft className="h-3.5 w-3.5" />}
                         </Button>
-                        <Button
-                          size="icon" variant="ghost"
-                          className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          title="Copy Dashboard URL"
-                          onClick={() => {
-                            navigator.clipboard.writeText(`${window.location.origin}/hubpartner`);
-                            toast.success('Hub Partner dashboard link copied!');
-                          }}
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                        </Button>
+
                         <Button
                           size="icon" variant="ghost"
                           className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50"
@@ -425,7 +456,7 @@ export default function AdminHubs() {
           <DialogHeader>
             <DialogTitle>Create Hub Partner Account</DialogTitle>
             <DialogDescription>
-              This will create a new user account with the <strong>hub_partner</strong> role. Share the credentials with the partner so they can log in at <code>/hubpartner</code>.
+              This will create a new user account with the <strong>hub_partner</strong> role. Share the credentials with the partner so they can log in at their personalized dashboard URL.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -439,8 +470,8 @@ export default function AdminHubs() {
                 <Input type="email" placeholder="partner@example.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
               </div>
               <div className="space-y-1">
-                <Label>Phone</Label>
-                <Input placeholder="+91 98765 43210" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+                <Label>Mobile *</Label>
+                <Input type="tel" placeholder="+91 9876543210" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
               </div>
               <div className="col-span-2 space-y-1">
                 <Label>Password *</Label>
@@ -462,7 +493,10 @@ export default function AdminHubs() {
               </div>
               <div className="col-span-2 space-y-1">
                 <Label>Assigned State *</Label>
-                <Select value={form.assigned_state} onValueChange={(v) => setForm((f) => ({ ...f, assigned_state: v }))}>
+                <Select value={form.assigned_state} onValueChange={(v) => {
+                  setForm((f) => ({ ...f, assigned_state: v, assigned_district: '', assigned_area: '' }));
+                  setIsOtherAddDistrict(false);
+                }}>
                   <SelectTrigger><SelectValue placeholder="Select a state" /></SelectTrigger>
                   <SelectContent>
                     {INDIAN_STATES.map((s) => (
@@ -471,12 +505,38 @@ export default function AdminHubs() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1">
+                <Label>District *</Label>
+                {!isOtherAddDistrict ? (
+                  <Select value={form.assigned_district} onValueChange={(v) => {
+                    if (v === 'other') setIsOtherAddDistrict(true);
+                    else setForm((f) => ({ ...f, assigned_district: v, assigned_area: '' }));
+                  }} disabled={!form.assigned_state}>
+                    <SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger>
+                    <SelectContent>
+                      {addAvailableDistricts.map((d) => (
+                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                      ))}
+                      <SelectItem value="other">Other (Type manually)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Input autoFocus placeholder="Type district" value={form.assigned_district} onChange={e => setForm(f => ({ ...f, assigned_district: e.target.value }))} />
+                    <Button variant="ghost" size="sm" onClick={() => { setIsOtherAddDistrict(false); setForm(f => ({ ...f, assigned_district: '' })); }}>Cancel</Button>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1">
+                <Label>Area *</Label>
+                <Input placeholder="Type area" value={form.assigned_area} onChange={e => setForm(f => ({ ...f, assigned_area: e.target.value }))} />
+              </div>
             </div>
             <div className="p-3 rounded-xl bg-muted/40 text-xs text-muted-foreground space-y-1">
               <p className="font-semibold text-foreground">What happens next:</p>
               <p>• A new user account is created with the <strong>hub_partner</strong> role.</p>
               <p>• The partner's dashboard is auto-filtered to show only data from their assigned state.</p>
-              <p>• Share the email + password with the partner. They log in at <code>/hubpartner</code>.</p>
+              <p>• Share the email + password with the partner. They log in and will be redirected to their dashboard.</p>
             </div>
           </div>
           <DialogFooter>
@@ -498,13 +558,16 @@ export default function AdminHubs() {
                 <Label>Full Name *</Label>
                 <Input value={editForm.full_name ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, full_name: e.target.value }))} />
               </div>
-              <div className="col-span-2 space-y-1">
-                <Label>Phone</Label>
-                <Input value={editForm.phone ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} />
+              <div className="space-y-1">
+                <Label>Mobile *</Label>
+                <Input type="tel" value={editForm.phone ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} />
               </div>
               <div className="col-span-2 space-y-1">
                 <Label>Assigned State *</Label>
-                <Select value={editForm.assigned_state ?? ''} onValueChange={(v) => setEditForm((f) => ({ ...f, assigned_state: v }))}>
+                <Select value={editForm.assigned_state ?? ''} onValueChange={(v) => {
+                  setEditForm((f) => ({ ...f, assigned_state: v, assigned_district: '', assigned_area: '' }));
+                  setIsOtherEditDistrict(false);
+                }}>
                   <SelectTrigger><SelectValue placeholder="Select a state" /></SelectTrigger>
                   <SelectContent>
                     {INDIAN_STATES.map((s) => (
@@ -512,6 +575,35 @@ export default function AdminHubs() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>District *</Label>
+                {!isOtherEditDistrict ? (
+                  <Select value={editForm.assigned_district ?? ''} onValueChange={(v) => {
+                    if (v === 'other') setIsOtherEditDistrict(true);
+                    else setEditForm((f) => ({ ...f, assigned_district: v, assigned_area: '' }));
+                  }} disabled={!editForm.assigned_state}>
+                    <SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger>
+                    <SelectContent>
+                      {editAvailableDistricts.map((d) => (
+                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                      ))}
+                      {editForm.assigned_district && !editAvailableDistricts.includes(editForm.assigned_district) && (
+                        <SelectItem value={editForm.assigned_district}>{editForm.assigned_district}</SelectItem>
+                      )}
+                      <SelectItem value="other">Other (Type manually)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Input autoFocus value={editForm.assigned_district ?? ''} onChange={e => setEditForm(f => ({ ...f, assigned_district: e.target.value }))} />
+                    <Button variant="ghost" size="sm" onClick={() => { setIsOtherEditDistrict(false); setEditForm(f => ({ ...f, assigned_district: '' })); }}>Cancel</Button>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1">
+                <Label>Area *</Label>
+                <Input value={editForm.assigned_area ?? ''} onChange={e => setEditForm(f => ({ ...f, assigned_area: e.target.value }))} />
               </div>
             </div>
           </div>

@@ -10,7 +10,7 @@ import { DynamicLogo } from '@/components/DynamicLogo';
 import {
   LayoutDashboard, ShieldCheck, CheckSquare, Store, Users,
   CalendarCheck, Building2, Wallet, BarChart3, Settings,
-  LogOut, FileText, Menu, X, Bell, Search, Mail, Lock, QrCode,
+  LogOut, FileText, Menu, X, Bell, Search, Mail, Lock, QrCode, Map,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,17 +38,6 @@ export default function AdminLayout() {
   const { data: profile } = useProfile(user?.id);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleSignOut = async () => {
-    await signOut();
-    toast({ title: 'Signed out', description: 'You have been signed out of the admin panel.' });
-    navigate('/auth');
-  };
-
-  const isActivePath = (path: string) => {
-    if (path === '/admin') return location.pathname === '/admin';
-    return location.pathname.startsWith(path);
-  };
-
   const sections: NavSection[] = [
     {
       title: 'Overview',
@@ -74,9 +63,19 @@ export default function AdminLayout() {
       ],
     },
     {
+      title: 'Experiences',
+      items: [
+        { label: 'Create Package', to: '/admin/experiences/create', icon: Map },
+        { label: 'All Packages', to: '/admin/experiences', icon: Map },
+        { label: 'Assignments', to: '/admin/experiences/assignments', icon: Map },
+        { label: 'Departures', to: '/admin/experiences/departures', icon: Map },
+      ],
+    },
+    {
       title: 'Finance',
       items: [
         { label: 'Payouts', to: '/admin/payouts', icon: Wallet },
+        { label: 'Wing Credits', to: '/admin/wing-credits', icon: Store },
         { label: 'Revenue Analytics', to: '/admin/analytics', icon: BarChart3 },
       ],
     },
@@ -94,6 +93,24 @@ export default function AdminLayout() {
       ],
     },
   ];
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast({ title: 'Signed out', description: 'You have been signed out of the admin panel.' });
+    navigate('/auth');
+  };
+
+  const isActivePath = (path: string) => {
+    if (path === '/admin') return location.pathname === '/admin';
+    if (location.pathname === path) return true;
+    
+    const allPaths = sections.flatMap(s => s.items.map(i => i.to));
+    if (allPaths.includes(location.pathname)) {
+        return false;
+    }
+    
+    return location.pathname.startsWith(path + '/');
+  };
 
   const renderNavGroup = (section: NavSection) => (
     <div key={section.title} className="mb-2">

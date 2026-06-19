@@ -23,7 +23,7 @@ export const DynamicLogo = ({
 }: LogoProps) => {
   const { theme: globalTheme } = useTheme();
   const theme = forceTheme || globalTheme;
-  const isDark = theme === "dark";
+  const isDark = theme === "dark" || theme === "dark-green";
 
   return (
     <div className={cn("relative flex items-center", className)}>

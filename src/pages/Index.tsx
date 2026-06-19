@@ -125,7 +125,7 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const [categoryPage, setCategoryPage] = useState(0);
   const [heroSlide, setHeroSlide] = useState(0);
-  const heroImages = [heroImage, heroXplorwing, heroTajmahal, heroOutstationCabs, heroAirportCabs];
+  const heroImages = [heroImage, heroXplorwing, heroTajmahal];
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
 

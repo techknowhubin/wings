@@ -97,8 +97,9 @@ export default function AdminBookings() {
                 <TableRow>
                   <TableHead>Booking ID</TableHead>
                   <TableHead>Traveler</TableHead>
-                  <TableHead>Provider</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>Distance</TableHead>
+                  <TableHead>Hub Partner</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Payment</TableHead>
@@ -114,8 +115,18 @@ export default function AdminBookings() {
                   <TableRow key={b.id}>
                     <TableCell><code className="text-xs font-mono text-muted-foreground">{b.id?.slice(0, 8)}</code></TableCell>
                     <TableCell className="text-xs font-medium">{b.traveler?.full_name ?? '—'}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{b.host?.full_name ?? '—'}</TableCell>
                     <TableCell><Badge variant="outline" className="text-[10px] capitalize">{b.listing_type}</Badge></TableCell>
+                    <TableCell className="text-xs">{b.cabDetails?.distance_km ? `${b.cabDetails.distance_km} KM` : '—'}</TableCell>
+                    <TableCell>
+                      {b.cabDetails?.hubPartnerName ? (
+                        <div className="flex flex-col">
+                          <span className="text-xs font-medium">{b.cabDetails.hubPartnerName}</span>
+                          <span className="text-[10px] text-muted-foreground">{b.cabDetails.assignment_status || 'Assigned'}</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{b.listing_type === 'car' || b.listing_type === 'bike' ? (b.cabDetails?.assignment_status || 'Unassigned') : '—'}</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs font-semibold">₹{Number(b.total_amount).toLocaleString('en-IN')}</TableCell>
                     <TableCell><Badge variant="outline" className={`text-[10px] capitalize ${STATUS_COLORS[b.status]}`}>{b.status}</Badge></TableCell>
                     <TableCell><Badge variant="outline" className={`text-[10px] capitalize ${PAYMENT_COLORS[b.payment_status]}`}>{b.payment_status}</Badge></TableCell>
@@ -156,6 +167,34 @@ export default function AdminBookings() {
                 {selected.start_date && <div><p className="text-xs text-muted-foreground">Check-in</p><p className="font-semibold">{format(new Date(selected.start_date), 'dd MMM yyyy')}</p></div>}
                 {selected.end_date && <div><p className="text-xs text-muted-foreground">Check-out</p><p className="font-semibold">{format(new Date(selected.end_date), 'dd MMM yyyy')}</p></div>}
               </div>
+
+              {selected.cabDetails && (
+                <div className="p-4 rounded-xl border bg-muted/10 space-y-3">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Cab Details</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><p className="text-xs text-muted-foreground">Pickup Location</p><p className="font-semibold">{selected.cabDetails.pickup_location}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Drop Location</p><p className="font-semibold">{selected.cabDetails.drop_location}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Vehicle</p><p className="font-semibold">{selected.cabDetails.cab_type}</p></div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Pickup Date & Time</p>
+                      <p className="font-semibold">{format(new Date(selected.cabDetails.travel_date), 'dd MMM yyyy HH:mm')}</p>
+                    </div>
+                    {selected.cabDetails.return_date && (
+                      <div><p className="text-xs text-muted-foreground">Return Date</p><p className="font-semibold">{format(new Date(selected.cabDetails.return_date), 'dd MMM yyyy')}</p></div>
+                    )}
+                  </div>
+                  
+                  <Separator className="my-2" />
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><p className="text-xs text-muted-foreground">Distance</p><p className="font-semibold">{selected.cabDetails.distance_km ? `${selected.cabDetails.distance_km} KM` : '—'}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Assigned Hub Partner</p><p className="font-semibold">{selected.cabDetails.hubPartnerName || '—'}</p></div>
+                    <div><p className="text-xs text-muted-foreground">District</p><p className="font-semibold">{selected.cabDetails.assigned_district || '—'}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Area</p><p className="font-semibold">{selected.cabDetails.assigned_area || '—'}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Assignment Status</p><p className="font-semibold">{selected.cabDetails.assignment_status || '—'}</p></div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </SheetContent>

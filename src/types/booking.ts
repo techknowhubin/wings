@@ -8,6 +8,7 @@ export interface BookingDetails {
   hostId?: string;
   listingTitle: string;
   listingImage?: string;
+  packageType?: string;
   currencySymbol: string;
   unitLabel: string;
   unitPrice: number;
@@ -25,6 +26,8 @@ export interface BookingDetails {
     pickup_location: string;
     drop_location: string;
     travel_date: string;
+    pickup_time?: string;
+    return_date?: string;
     cab_type: string;
     fare_amount: number;
     state: string;

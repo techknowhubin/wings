@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "light" | "dark";
+type Theme = "light" | "dark" | "dark-green";
 
 type ThemeProviderProps = {
   children: React.ReactNode;
@@ -20,6 +20,8 @@ const initialState: ThemeProviderState = {
   toggleTheme: () => null,
 };
 
+const THEME_CYCLE: Theme[] = ["light", "dark", "dark-green"];
+
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
 export function ThemeProvider({
@@ -34,20 +36,24 @@ export function ThemeProvider({
 
   useEffect(() => {
     const root = window.document.documentElement;
-    root.classList.remove("light", "dark");
-    root.classList.add(theme);
+    root.classList.remove("light", "dark", "dark-green");
+    if (theme === "dark-green") {
+      root.classList.add("dark", "dark-green");
+    } else {
+      root.classList.add(theme);
+    }
   }, [theme]);
 
   const value = {
     theme,
-    setTheme: (theme: Theme) => {
-      localStorage.setItem(storageKey, theme);
-      setTheme(theme);
+    setTheme: (t: Theme) => {
+      localStorage.setItem(storageKey, t);
+      setTheme(t);
     },
     toggleTheme: () => {
-      const newTheme = theme === "light" ? "dark" : "light";
-      localStorage.setItem(storageKey, newTheme);
-      setTheme(newTheme);
+      const next = THEME_CYCLE[(THEME_CYCLE.indexOf(theme) + 1) % THEME_CYCLE.length];
+      localStorage.setItem(storageKey, next);
+      setTheme(next);
     },
   };
 

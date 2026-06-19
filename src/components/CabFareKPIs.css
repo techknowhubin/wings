@@ -106,22 +106,32 @@
 .kpi-card.dark .kpi-divider { border-color: rgba(255,255,255,0.1); }
 .kpi-card.lime-card .kpi-divider { border-color: rgba(26,60,52,0.12); }
 
-.dual-row { display: flex; gap: 1.2rem; margin-top: 0.15rem; }
+.dual-row { display: flex; gap: 0.5rem; margin-top: 0.15rem; flex-wrap: nowrap; align-items: flex-end; }
+.dual-item { flex: 1; min-width: 0; }
 .dual-item .d-label {
-  font-size: 0.56rem;
-  font-weight: 500;
+  font-size: 0.52rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: rgba(255,255,255,0.45);
-  margin-bottom: 1px;
+  margin-bottom: 2px;
+  white-space: nowrap;
 }
 .dual-item .d-val {
-  font-size: 1.05rem;
+  font-size: clamp(0.9rem, 2vw, 1.6rem);
   font-weight: 800;
   color: var(--lime);
   letter-spacing: -0.02em;
+  line-height: 1;
+  white-space: nowrap;
 }
-.dual-item .d-unit { font-size: 0.58rem; font-weight: 400; opacity: 0.7; }
+.dual-item .d-unit { font-size: 0.55rem; font-weight: 400; opacity: 0.7; }
+
+@media (max-width: 480px) {
+  .dual-item .d-val { font-size: 0.95rem; }
+  .dual-row { gap: 0.4rem; }
+  .dual-item .d-label { font-size: 0.48rem; }
+}
 
 .section-divider {
   font-size: 0.6rem;

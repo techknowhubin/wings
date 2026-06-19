@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { initiateRazorpayPayment } from "@/lib/razorpay";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { CalendarDays, CreditCard, MapPin, Plus, Receipt, ShieldCheck, Trash2, UserPlus, UserRound, X } from "lucide-react";
+import { CalendarDays, CreditCard, MapPin, Plus, Receipt, ShieldCheck, Trash2, UserPlus, UserRound, X, Wallet } from "lucide-react";
 import type { BookingDetails } from "@/types/booking";
 import type { CouponOffer } from "@/lib/discounts";
 import { getReferralCode, clearReferral } from "@/lib/referral";
@@ -48,13 +48,27 @@ const ConfirmAndPay = () => {
   const { state } = useLocation();
 
   const [booking, setBooking] = useState<BookingDetails | null>(() => {
-    if (state?.booking) return state.booking;
+    if (state?.booking) {
+      // Fresh booking from navigation — clear any stale localStorage cache
+      localStorage.removeItem("pending_booking");
+      return state.booking;
+    }
     const saved = localStorage.getItem("pending_booking");
-    return saved ? JSON.parse(saved) : null;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // support both new format with timestamp and old format
+        return parsed.booking || parsed;
+      } catch {
+        return null;
+      }
+    }
+    return null;
   });
 
   useEffect(() => {
     if (state?.booking) {
+      localStorage.removeItem("pending_booking");
       setBooking(state.booking);
     }
   }, [state]);
@@ -62,7 +76,7 @@ const ConfirmAndPay = () => {
   useEffect(() => {
     if (!authLoading && !user) {
       if (booking) {
-        localStorage.setItem("pending_booking", JSON.stringify(booking));
+        localStorage.setItem("pending_booking", JSON.stringify({ booking, timestamp: Date.now() }));
       }
       toast.info("Please sign up or sign in to complete your booking.");
       navigate("/auth");
@@ -73,6 +87,9 @@ const ConfirmAndPay = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [pickupAddress, setPickupAddress] = useState("");
+  const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapLoading, setMapLoading] = useState(false);
 
   // Additional guests
   const [extraGuests, setExtraGuests] = useState<ExtraGuest[]>([]);
@@ -88,8 +105,13 @@ const ConfirmAndPay = () => {
   const [referralPartner, setReferralPartner] = useState<{ id: string; business_name: string; commission_rate: number } | null>(null);
   const [referralValidating, setReferralValidating] = useState(false);
 
+  // Wing Credits
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [maxRedemptionPercentage, setMaxRedemptionPercentage] = useState(10);
+  const [useWingCredits, setUseWingCredits] = useState(false);
+
   useEffect(() => {
-    async function fetchPlatformCommission() {
+    async function fetchPlatformCommissionAndWallet() {
       if (!booking) return;
       const { data, error } = await supabase.from('platform_settings').select('marketplace_commission_pct, linkinbio_commission_pct').maybeSingle();
       if (!error && data) {
@@ -99,9 +121,18 @@ const ConfirmAndPay = () => {
           setBookingFeeRate(Number(data.marketplace_commission_pct));
         }
       }
+
+      if (user) {
+        const [walletRes, settingsRes] = await Promise.all([
+          supabase.from('wallets').select('balance').eq('user_id', user.id).maybeSingle(),
+          supabase.from('wallet_settings').select('max_redemption_percentage').maybeSingle()
+        ]);
+        if (walletRes.data) setWalletBalance(Number(walletRes.data.balance || 0));
+        if (settingsRes.data) setMaxRedemptionPercentage(Number(settingsRes.data.max_redemption_percentage || 10));
+      }
     }
-    fetchPlatformCommission();
-  }, [booking?.bookingChannel]);
+    fetchPlatformCommissionAndWallet();
+  }, [booking?.bookingChannel, user]);
 
   useEffect(() => {
     const prefillFromProfile = async () => {
@@ -225,7 +256,7 @@ const ConfirmAndPay = () => {
     if (referralCode && !referralPartner) {
       void handleValidateReferral();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const stayDates = useMemo(() => {
@@ -296,11 +327,19 @@ const ConfirmAndPay = () => {
     return (normalBookingFee * appliedCoupon.value) / 100;
   }, [appliedCoupon, booking, normalBookingFee]);
 
+  const maxRedeemableCredits = useMemo(() => {
+    if (!booking) return 0;
+    const rawMax = (baseTotal * maxRedemptionPercentage) / 100;
+    return Math.min(rawMax, walletBalance);
+  }, [baseTotal, maxRedemptionPercentage, walletBalance, booking]);
+
+  const wingCreditsDiscountAmount = useWingCredits ? maxRedeemableCredits : 0;
+
   const totalPayable = useMemo(() => {
-    const raw = normalBookingFee - couponDiscountAmount;
+    const raw = normalBookingFee - couponDiscountAmount - wingCreditsDiscountAmount;
     if (raw <= 0) return 0;
     return Math.max(raw, 1.00);
-  }, [normalBookingFee, couponDiscountAmount]);
+  }, [normalBookingFee, couponDiscountAmount, wingCreditsDiscountAmount]);
 
   const formatAmount = (val: number) => val.toFixed(2);
 
@@ -341,7 +380,7 @@ const ConfirmAndPay = () => {
       toast.error("Please accept the privacy and cancellation policy to continue.");
       return;
     }
-    if (!booking.hostId) {
+    if (!booking.hostId && !booking.cabDetails) {
       toast.error("Booking host details are missing. Please go back and book again.");
       return;
     }
@@ -384,11 +423,9 @@ const ConfirmAndPay = () => {
 
     let pendingBookingId = "";
     try {
-      const bookingData = {
+      const bookingData: any = {
         user_id: user.id,
-        listing_id: booking.listingId || "00000000-0000-0000-0000-000000000001",
         listing_type: dbListingType,
-        host_id: booking.hostId,
         start_date: new Date(booking.startDate).toISOString(),
         end_date: new Date(booking.endDate).toISOString(),
         total_price: Number(totalPayable.toFixed(2)),
@@ -401,6 +438,14 @@ const ConfirmAndPay = () => {
         commission_amount: Number(normalBookingFee.toFixed(2)),
         notes: JSON.stringify(notesPayload),
       };
+
+      const finalListingId = booking.listingId || "00000000-0000-0000-0000-000000000001";
+      if (finalListingId && finalListingId !== "00000000-0000-0000-0000-000000000001") {
+        bookingData.listing_id = finalListingId;
+      }
+      if (booking.hostId && booking.hostId !== "00000000-0000-0000-0000-000000000000") {
+        bookingData.host_id = booking.hostId;
+      }
 
       const { data: newBooking, error: bookingError } = await supabase
         .from("bookings")
@@ -428,20 +473,76 @@ const ConfirmAndPay = () => {
 
       if (booking.cabDetails) {
         try {
+          let finalTravelDate = new Date(booking.cabDetails.travel_date);
+          if (booking.cabDetails.pickup_time) {
+            const timeMatch = booking.cabDetails.pickup_time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+            if (timeMatch) {
+              let hours = parseInt(timeMatch[1], 10);
+              const mins = parseInt(timeMatch[2], 10);
+              const ampm = timeMatch[3].toUpperCase();
+              if (ampm === "PM" && hours < 12) hours += 12;
+              if (ampm === "AM" && hours === 12) hours = 0;
+              finalTravelDate.setHours(hours, mins, 0, 0);
+            }
+          }
+
+          // Auto-routing logic for Hub Partner
+          let matchedHubPartnerId: string | null = null;
+          let assignmentStatus = "Awaiting Hub Partner Assignment";
+
+          try {
+            const { data: partners } = await supabase
+              .from("profiles")
+              .select("id, assigned_district, assigned_area, assigned_state")
+              .eq("role", "hub_partner");
+
+            if (partners && partners.length > 0) {
+              const pickupLower = booking.cabDetails.pickup_location.toLowerCase();
+              const matched = partners.find((p: any) =>
+                (p.assigned_district && p.assigned_district.toLowerCase() === pickupLower) ||
+                (p.assigned_area && p.assigned_area.toLowerCase() === pickupLower) ||
+                (p.assigned_state && p.assigned_state.toLowerCase() === pickupLower)
+              );
+              if (matched) {
+                matchedHubPartnerId = matched.id;
+                assignmentStatus = "Assigned";
+              }
+            }
+          } catch (e) {
+            console.error("Failed to route to hub partner:", e);
+          }
+
           const { error: cabError } = await supabase.from('cab_bookings').insert({
             booking_id: newBooking.id,
             traveller_id: user.id,
             host_id: booking.hostId,
+            hub_partner_id: matchedHubPartnerId,
+            assignment_status: assignmentStatus,
+            distance_km: booking.cabDetails.distance_km,
             state: booking.cabDetails.state,
             pickup_location: booking.cabDetails.pickup_location,
             drop_location: booking.cabDetails.drop_location,
-            travel_date: new Date(booking.cabDetails.travel_date).toISOString(),
+            travel_date: finalTravelDate.toISOString(),
+            return_date: booking.cabDetails.return_date ? new Date(booking.cabDetails.return_date).toISOString() : null,
             cab_type: booking.cabDetails.cab_type,
             fare_amount: booking.cabDetails.fare_amount,
             payment_status: 'pending',
             booking_status: 'pending'
           });
           if (cabError) console.error("Cab booking insert error:", cabError);
+
+          // Notify the matched Hub Partner
+          if (matchedHubPartnerId) {
+            await createNotification({
+              user_id: matchedHubPartnerId,
+              title: "New Assigned Cab Booking!",
+              message: `${name} has booked a cab from ${booking.cabDetails.pickup_location} to ${booking.cabDetails.drop_location}. Distance: ${booking.cabDetails.distance_km || "Unknown"} KM.`,
+              type: "bookings",
+              link: "/hub/bookings",
+              reference_id: newBooking.id,
+              reference_type: "booking",
+            });
+          }
         } catch (err) {
           console.error("Cab booking insert exception:", err);
         }
@@ -482,6 +583,7 @@ const ConfirmAndPay = () => {
               coupon_id: appliedCoupon?.id,
               referral_code: referralPartner ? referralCode.trim().toUpperCase() : undefined,
               referral_partner_id: referralPartner?.id ?? undefined,
+              used_wing_credits: wingCreditsDiscountAmount,
             }
           });
 
@@ -554,29 +656,51 @@ const ConfirmAndPay = () => {
 
             {/* Listing Summary */}
             <div className="rounded-2xl border border-border bg-background p-4 mb-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="h-24 w-28 rounded-xl overflow-hidden border border-border bg-secondary/40 shrink-0">
-                    {booking.listingImage ? (
-                      <img src={booking.listingImage} alt={booking.listingTitle} className="h-full w-full object-cover" />
-                    ) : null}
-                  </div>
-                  <div>
-                    <p className="text-lg font-semibold text-foreground">{booking.listingTitle}</p>
-                    <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
-                      <CalendarDays className="h-4 w-4 text-accent" />
+              <div className="flex items-start gap-3">
+                {/* Car image */}
+                <div className="h-20 w-28 sm:h-28 sm:w-36 rounded-xl overflow-hidden border border-border bg-white shrink-0 flex items-center justify-center">
+                  {booking.listingImage ? (
+                    <img
+                      src={booking.listingImage}
+                      alt={booking.listingTitle}
+                      className="h-full w-full object-contain mix-blend-multiply"
+                    />
+                  ) : null}
+                </div>
+
+                {/* Details */}
+                <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm sm:text-lg font-semibold text-foreground leading-snug">{booking.listingTitle}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                      <CalendarDays className="h-3.5 w-3.5 text-accent shrink-0" />
                       {stayDates}
                     </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {booking.quantity} {booking.unitLabel} • {booking.currencySymbol}{booking.unitPrice} each
+                    {booking.cabDetails && (
+                      <>
+                        <p className="text-xs sm:text-sm font-medium text-foreground mt-1">
+                          📍 {booking.cabDetails.pickup_location} → {booking.cabDetails.drop_location}
+                        </p>
+                        {booking.cabDetails.pickup_time && (
+                          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 flex items-center gap-1">
+                            🕐 Pickup at {booking.cabDetails.pickup_time}
+                          </p>
+                        )}
+                      </>
+                    )}
+                    {/* Total — shown below on mobile only */}
+                    <p className="sm:hidden text-sm font-bold text-foreground mt-2">
+                      Total — {booking.currencySymbol}{formatAmount(booking.total)}
                     </p>
                   </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Total</p>
-                  <p className="text-3xl font-bold text-foreground">
-                    {booking.currencySymbol}{formatAmount(booking.total)}
-                  </p>
+
+                  {/* Total — shown on the right on desktop only */}
+                  <div className="hidden sm:block text-right shrink-0">
+                    <p className="text-xs text-muted-foreground">Total</p>
+                    <p className="text-2xl font-bold text-foreground whitespace-nowrap">
+                      {booking.currencySymbol}{formatAmount(booking.total)}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -648,6 +772,160 @@ const ConfirmAndPay = () => {
                     required
                   />
                 </div>
+                {booking.cabDetails && (
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pickup-address">Pickup Address *</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="pickup-address"
+                          className="h-11 rounded-xl bg-white dark:bg-background flex-1"
+                          value={pickupAddress}
+                          onChange={(e) => { setPickupAddress(e.target.value); setPickupCoords(null); }}
+                          placeholder="Enter your exact pickup address"
+                          required
+                        />
+                        <button
+                          type="button"
+                          disabled={!pickupAddress.trim() || mapLoading}
+                          onClick={async () => {
+                            if (!pickupAddress.trim()) return;
+                            setMapLoading(true);
+                            try {
+                              const res = await fetch(
+                                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(pickupAddress)}&format=json&addressdetails=1&limit=1`,
+                                { headers: { "Accept-Language": "en" } }
+                              );
+                              const data = await res.json();
+                              if (data && data[0]) {
+                                setPickupCoords({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) });
+                                toast.success("Address found on map.");
+                              } else {
+                                // Fallback: open Google Maps search directly
+                                window.open(`https://www.google.com/maps/search/${encodeURIComponent(pickupAddress)}`, "_blank");
+                              }
+                            } catch {
+                              window.open(`https://www.google.com/maps/search/${encodeURIComponent(pickupAddress)}`, "_blank");
+                            } finally {
+                              setMapLoading(false);
+                            }
+                          }}
+                          className="h-11 px-3 rounded-xl border border-border bg-white hover:bg-muted/50 transition-colors text-xs font-semibold text-[#064e3b] whitespace-nowrap shrink-0 disabled:opacity-40"
+                        >
+                          {mapLoading ? (
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                            </svg>
+                          ) : "🗺️ Show on Map"}
+                        </button>
+                      </div>
+                    </div>
+                    {/* Select on Maps */}
+                    <div className="space-y-1.5">
+                      <Label>Or select on map</Label>
+                      <button
+                        type="button"
+                        disabled={mapLoading}
+                        onClick={async () => {
+                          if (!navigator.geolocation) {
+                            toast.error("Geolocation is not supported by your browser.");
+                            return;
+                          }
+                          setMapLoading(true);
+                          navigator.geolocation.getCurrentPosition(
+                            async (pos) => {
+                              const { latitude, longitude } = pos.coords;
+                              try {
+                                const res = await fetch(
+                                  `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1&zoom=18`,
+                                  { headers: { "Accept-Language": "en" } }
+                                );
+                                const data = await res.json();
+                                const a = data.address || {};
+                                // Build precise address: building → house no → road → suburb → city → state → pincode
+                                const parts = [
+                                  a.building || a.amenity || a.shop || a.office || a.tourism,
+                                  a.house_number ? `No. ${a.house_number}` : null,
+                                  a.road || a.pedestrian || a.footway,
+                                  a.neighbourhood || a.suburb || a.quarter,
+                                  a.city || a.town || a.village || a.county,
+                                  a.state,
+                                  a.postcode,
+                                ].filter(Boolean).join(", ");
+                                setPickupAddress(parts || data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+                                setPickupCoords({ lat: latitude, lng: longitude });
+                                toast.success("Location detected successfully.");
+                              } catch {
+                                setPickupAddress(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+                              } finally {
+                                setMapLoading(false);
+                              }
+                            },
+                            (err) => {
+                              setMapLoading(false);
+                              toast.error("Could not get your location. Please allow location access.");
+                            },
+                            { enableHighAccuracy: true, timeout: 10000 }
+                          );
+                        }}
+                        className="flex items-center gap-2 w-full h-11 px-4 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary/60 transition-all text-sm font-medium text-[#064e3b] disabled:opacity-60"
+                      >
+                        {mapLoading ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                            </svg>
+                            Detecting your location…
+                          </>
+                        ) : (
+                          <>
+                            <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="12" r="3" />
+                              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+                              <path d="M12 8a4 4 0 100 8 4 4 0 000-8z" fill="currentColor" opacity=".15" />
+                            </svg>
+                            📍 Use My Current Location (via GPS)
+                          </>
+                        )}
+                      </button>
+                      <p className="text-[10px] text-muted-foreground">
+                        Allows browser to detect your precise location and auto-fill the address above.
+                      </p>
+
+                      {/* Coordinates display — shown after detection */}
+                      {pickupCoords && (
+                        <div className="mt-2 rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-foreground">📌 GPS Coordinates</span>
+                            <a
+                              href={`https://www.google.com/maps?q=${pickupCoords.lat},${pickupCoords.lng}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] font-semibold text-[#064e3b] underline underline-offset-2 hover:opacity-80"
+                            >
+                              Open in Google Maps ↗
+                            </a>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-lg border bg-white px-3 py-2">
+                              <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Latitude</p>
+                              <p className="text-sm font-mono font-semibold text-foreground">{pickupCoords.lat.toFixed(6)}</p>
+                            </div>
+                            <div className="rounded-lg border bg-white px-3 py-2">
+                              <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Longitude</p>
+                              <p className="text-sm font-mono font-semibold text-foreground">{pickupCoords.lng.toFixed(6)}</p>
+                            </div>
+                          </div>
+                          <p className="text-[9px] text-muted-foreground">
+                            Share these coordinates with your cab driver to navigate directly to your location.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </form>
             </div>
 
@@ -766,6 +1044,38 @@ const ConfirmAndPay = () => {
           <Card className="rounded-2xl border-border shadow-sm bg-white dark:bg-card p-6 h-fit">
             <h2 className="text-xl font-semibold text-foreground mb-4">Checkout Summary</h2>
 
+            {/* Wing Credits */}
+            {walletBalance > 0 && (
+              <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-semibold text-foreground flex items-center gap-2">
+                      <Wallet className="h-4 w-4 text-primary" />
+                      Wing Credits
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Available: <span className="font-semibold text-foreground">{booking?.currencySymbol}{formatAmount(walletBalance)}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      You can use up to <span className="font-semibold">{booking?.currencySymbol}{formatAmount(maxRedeemableCredits)}</span> for this booking.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="checkbox" 
+                      id="use-wing-credits"
+                      checked={useWingCredits}
+                      onChange={(e) => setUseWingCredits(e.target.checked)}
+                      className="h-4 w-4 rounded border-primary/30 accent-primary"
+                    />
+                    <Label htmlFor="use-wing-credits" className="text-xs font-semibold cursor-pointer">
+                      Apply
+                    </Label>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Promo Code */}
             <div className="flex gap-2 mb-4">
               <Input
@@ -807,7 +1117,7 @@ const ConfirmAndPay = () => {
               </div>
               {referralPartner && (
                 <p className="text-xs text-green-600 font-medium mt-1.5 flex items-center gap-1">
-                  <span>✓</span> Referred by {referralPartner.business_name} ({referralPartner.commission_rate}% commission to partner)
+                  <span>✓</span> Referred by {referralPartner.business_name}
                 </p>
               )}
             </div>
@@ -838,6 +1148,14 @@ const ConfirmAndPay = () => {
                     Coupon discount ({appliedCoupon.type === "flat" ? `₹${appliedCoupon.value} flat` : `${appliedCoupon.value}%`})
                   </span>
                   <span className="font-medium text-accent">-{booking.currencySymbol}{formatAmount(couponDiscountAmount)}</span>
+                </div>
+              ) : null}
+              {useWingCredits && wingCreditsDiscountAmount > 0 ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground font-semibold text-accent">
+                    Wing Credits Used
+                  </span>
+                  <span className="font-medium text-accent">-{booking.currencySymbol}{formatAmount(wingCreditsDiscountAmount)}</span>
                 </div>
               ) : null}
               {extraGuests.filter(g => g.name.trim()).length > 0 && (

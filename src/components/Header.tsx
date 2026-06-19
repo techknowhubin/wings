@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Moon, Sun, Menu, User, Heart, X, Home, Car, Bike, Compass, MapPin, ChevronRight, Building, Palmtree, LogOut, LayoutDashboard, Settings } from "lucide-react";
+import { Moon, Sun, Leaf, Menu, User, Heart, X, Home, Car, Bike, Compass, MapPin, ChevronRight, Building, Palmtree, LogOut, LayoutDashboard, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/ThemeProvider";
 import { motion, AnimatePresence } from "framer-motion";
@@ -79,74 +79,79 @@ const Header = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-2">
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="transition-all duration-300"
-              >
-                <DynamicLogo />
-              </motion.div>
-            </Link>
+            <div className="flex-1 flex justify-start min-w-[150px] shrink-0">
+              <Link to="/" className="flex items-center gap-2">
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="transition-all duration-300"
+                >
+                  <DynamicLogo />
+                </motion.div>
+              </Link>
+            </div>
 
             {/* Navigation */}
-            <nav className="hidden md:flex items-center gap-2">
+            <nav className="hidden xl:flex flex-none items-center justify-center gap-1">
               <MegaMenu />
               <Link
                 to="/stays"
-                className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-3 py-2 rounded-lg nav-link-hover"
+                className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-2 2xl:px-3 py-2 rounded-lg nav-link-hover whitespace-nowrap"
               >
                 Home Stays
               </Link>
               <Link
                 to="/hotels"
-                className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-3 py-2 rounded-lg nav-link-hover"
+                className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-2 2xl:px-3 py-2 rounded-lg nav-link-hover whitespace-nowrap"
               >
                 Hotels
               </Link>
               <Link
                 to="/resorts"
-                className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-3 py-2 rounded-lg nav-link-hover"
+                className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-2 2xl:px-3 py-2 rounded-lg nav-link-hover whitespace-nowrap"
               >
                 Resorts
               </Link>
               <Link
                 to="/bikes"
-                className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-3 py-2 rounded-lg nav-link-hover"
+                className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-2 2xl:px-3 py-2 rounded-lg nav-link-hover whitespace-nowrap"
               >
                 Bike Rentals
               </Link>
               <Link
                 to="/cars"
-                className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-3 py-2 rounded-lg nav-link-hover"
+                className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-2 2xl:px-3 py-2 rounded-lg nav-link-hover whitespace-nowrap"
               >
                 Car Rentals
               </Link>
               <Link
                 to="/outstation-cabs"
-                className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-3 py-2 rounded-lg nav-link-hover"
+                className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-2 2xl:px-3 py-2 rounded-lg nav-link-hover whitespace-nowrap"
               >
                 Outstation Cabs
               </Link>
               <Link
                 to="/experiences"
-                className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-3 py-2 rounded-lg nav-link-hover"
+                className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-2 xl:px-3 py-2 rounded-lg nav-link-hover whitespace-nowrap"
               >
-                Packages/Experiences
+                Experiences
               </Link>
             </nav>
 
             {/* Right Side Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex-1 flex items-center justify-end gap-2 shrink-0">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={toggleTheme}
                 className="rounded-full"
-                aria-label="Toggle theme"
+                aria-label={theme === "light" ? "Switch to Dark" : theme === "dark" ? "Switch to Dark Green" : "Switch to Light"}
+                title={theme === "light" ? "Switch to Dark" : theme === "dark" ? "Switch to Dark Green" : "Switch to Light"}
               >
                 {theme === "light" ? (
                   <Moon className="h-5 w-5" />
+                ) : theme === "dark" ? (
+                  <Leaf className="h-5 w-5 text-emerald-400" />
                 ) : (
                   <Sun className="h-5 w-5" />
                 )}

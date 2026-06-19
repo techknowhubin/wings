@@ -71,13 +71,46 @@ const BookingConfirmation = () => {
               </div>
             </div>
             <div className="text-left bg-secondary/40 rounded-2xl p-5 space-y-3 text-sm mb-6 border border-border">
-              <p className="flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-accent" />
-                <span className="text-muted-foreground">Dates:</span>
-                <span className="text-foreground font-medium">
-                  {format(new Date(booking.startDate), "MMM dd, yyyy")} - {format(new Date(booking.endDate), "MMM dd, yyyy")}
-                </span>
-              </p>
+              {booking.cabDetails ? (
+                <>
+                  <p className="flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4 text-accent" />
+                    <span className="text-muted-foreground">Pickup Date:</span>
+                    <span className="text-foreground font-medium">
+                      {format(new Date(booking.cabDetails.travel_date), "MMM dd, yyyy")}
+                    </span>
+                  </p>
+                  {booking.cabDetails.pickup_time && (
+                    <p className="flex items-center gap-2 pl-6 text-sm text-muted-foreground mt-[-4px]">
+                      Time: {booking.cabDetails.pickup_time}
+                    </p>
+                  )}
+                  {booking.cabDetails.distance_km && (
+                    <p className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-accent" />
+                      <span className="text-muted-foreground">Distance:</span>
+                      <span className="text-foreground font-medium">{booking.cabDetails.distance_km} KM</span>
+                    </p>
+                  )}
+                  {booking.cabDetails.return_date && (
+                    <p className="flex items-center gap-2">
+                      <CalendarDays className="h-4 w-4 text-accent" />
+                      <span className="text-muted-foreground">Return Date:</span>
+                      <span className="text-foreground font-medium">
+                        {format(new Date(booking.cabDetails.return_date), "MMM dd, yyyy")}
+                      </span>
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-accent" />
+                  <span className="text-muted-foreground">Dates:</span>
+                  <span className="text-foreground font-medium">
+                    {format(new Date(booking.startDate), "MMM dd, yyyy")} - {format(new Date(booking.endDate), "MMM dd, yyyy")}
+                  </span>
+                </p>
+              )}
               {paymentId ? (
                 <p className="flex items-center gap-2">
                   <Receipt className="h-4 w-4 text-accent" />

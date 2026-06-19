@@ -86,8 +86,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         }
 
-        // Close the popup window automatically after a successful login
-        if (newSession && typeof window !== 'undefined' && window.opener && window.opener !== window) {
+        // Close the popup window automatically after a successful login, but ONLY if we are on the /auth route
+        if (
+          newSession &&
+          typeof window !== 'undefined' &&
+          window.opener &&
+          window.opener !== window &&
+          window.location.pathname === '/auth'
+        ) {
           setTimeout(() => { window.close(); }, 500); // 500ms buffer to ensure localStorage is flushed
         }
       }
@@ -186,6 +192,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    // Clear all pending session data on logout
+    localStorage.removeItem("pending_booking");
+    localStorage.removeItem("intended_url");
+    localStorage.removeItem("pending_role");
+    localStorage.removeItem("google_auth_mode");
+    localStorage.removeItem("remember_me");
+
     const { error } = await supabase.auth.signOut();
     return { error };
   };

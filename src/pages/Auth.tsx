@@ -9,6 +9,7 @@ import { DynamicLogo } from "@/components/DynamicLogo";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { supabase } from "@/integrations/supabase/client";
 import { useRateLimit } from "@/hooks/useRateLimit";
+import { executeRoleBasedRedirect } from "@/lib/auth-routing";
 import {
   Dialog,
   DialogContent,
@@ -251,45 +252,7 @@ const Auth = () => {
   /* ─── routing ─── */
   const handleSuccessRoleRouting = async (currentUser = user) => {
     setLoading(true);
-    let r = await getUserRole();
-    const savedRole = localStorage.getItem("pending_role");
-
-    const pendingBooking = localStorage.getItem("pending_booking");
-    if (pendingBooking) {
-      console.log("[Auth] Found pending booking, redirecting to confirm-and-pay");
-      // Let the ConfirmAndPay component read from localStorage itself, or pass state:
-      navigate("/confirm-and-pay");
-      setLoading(false);
-      return;
-    }
-
-    if (r === "admin") {
-      navigate("/admin");
-    } else if (r === "host") {
-      // Check if they have finished onboarding by seeing if a host_profile exists
-      const { data: hostProfile } = await supabase.from('host_profiles').select('id').eq('id', currentUser?.id).maybeSingle();
-      if (hostProfile) {
-        navigate("/host");
-      } else {
-        navigate("/host/onboarding");
-      }
-    } else if (targetRole === "host" || savedRole === "host") {
-      // User specifically clicked "Become a host"
-      localStorage.removeItem("pending_role");
-      navigate("/host/onboarding");
-    } else {
-      // Regular user — check if onboarding is done
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', currentUser?.id)
-        .maybeSingle();
-      if (!profile?.full_name) {
-        navigate("/onboarding/user");
-      } else {
-        navigate("/");
-      }
-    }
+    await executeRoleBasedRedirect(currentUser, navigate, targetRole);
     setLoading(false);
   };
 
@@ -709,10 +672,25 @@ const Auth = () => {
         toast({ variant: "destructive", title: "Validation Error", description: zodError.message });
       } else {
         const msg: string = err.message || "Something went wrong";
-        const isConflict = msg.toLowerCase().includes("already registered") ||
-          msg.toLowerCase().includes("already exists") ||
-          msg.toLowerCase().includes("user already");
-        if (isConflict) {
+        const msgL = msg.toLowerCase();
+        const isEmailSendFail =
+          msgL.includes('error sending confirmation email') ||
+          msgL.includes('email sending') ||
+          msgL.includes('failed to send') ||
+          msgL.includes('smtp');
+        const isConflict = msgL.includes("already registered") ||
+          msgL.includes("already exists") ||
+          msgL.includes("user already");
+        if (isEmailSendFail) {
+          // Account was created but confirmation email couldn't be sent (SMTP issue).
+          // Show a helpful message so the user knows to contact support.
+          setVerificationPending(true);
+          toast({
+            variant: "destructive",
+            title: "Email delivery issue",
+            description: "Your account was created but the confirmation email couldn't be sent. Please contact support or try resending from the login page.",
+          });
+        } else if (isConflict) {
           toast({
             variant: "destructive",
             title: "User already exists",

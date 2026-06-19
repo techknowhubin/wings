@@ -95,10 +95,15 @@ ALTER TABLE vehicle_documents  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE hub_partner_drivers ENABLE ROW LEVEL SECURITY;
 
 -- Allow all operations for authenticated users
+DROP POLICY IF EXISTS "auth_all_drivers" ON drivers;
 CREATE POLICY "auth_all_drivers"             ON drivers             FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "auth_all_driver_documents" ON driver_documents;
 CREATE POLICY "auth_all_driver_documents"    ON driver_documents    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "auth_all_vehicles" ON vehicles;
 CREATE POLICY "auth_all_vehicles"            ON vehicles            FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "auth_all_vehicle_documents" ON vehicle_documents;
 CREATE POLICY "auth_all_vehicle_documents"   ON vehicle_documents   FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "auth_all_hub_partner_drivers" ON hub_partner_drivers;
 CREATE POLICY "auth_all_hub_partner_drivers" ON hub_partner_drivers FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- Refresh PostgREST schema cache

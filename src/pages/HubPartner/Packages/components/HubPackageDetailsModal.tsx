@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Eye, Share2, Megaphone, Check, X, MapPin, Calendar, Clock, Users, IndianRupee, FileText, Download } from 'lucide-react';
 import { TourPackage } from '@/types/tour-packages';
+import { PdfViewer } from '@/components/PdfViewer';
 
 interface HubPackageDetailsModalProps {
   pkg: any | null; // using any to bypass strict type since we have nested data now
@@ -118,21 +119,49 @@ export function HubPackageDetailsModal({ pkg, assignment, isOpen, onClose, onTog
             <div className="space-y-6">
               <h3 className="font-bold text-xl border-b pb-2">Itinerary</h3>
               
-              {/* Documents */}
+              {/* Documents — show PDF/image inline */}
               {itineraries.length > 0 && (
-                <div className="grid gap-3">
-                  <h4 className="font-semibold text-sm text-muted-foreground">Attached Documents</h4>
-                  {itineraries.map((doc: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-blue-500" />
-                        <span className="text-sm font-medium">{doc.file_type.toUpperCase()} Document</span>
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-sm text-muted-foreground">Itinerary Documents</h4>
+                  {itineraries.map((doc: any, i: number) => {
+                    const isPdf   = doc.file_type === 'application/pdf' || doc.file_url?.toLowerCase().endsWith('.pdf');
+                    const isImage = doc.file_type?.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif)$/i.test(doc.file_url ?? '');
+                    return (
+                      <div key={i} className="border rounded-xl overflow-hidden bg-muted/10">
+                        {/* Header bar */}
+                        <div className="flex items-center justify-between px-4 py-3 bg-muted/20 border-b">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-blue-500" />
+                            <span className="text-sm font-medium">
+                              {isPdf ? 'PDF Itinerary' : isImage ? 'Itinerary Image' : 'Itinerary Document'}
+                            </span>
+                          </div>
+                          <Button variant="outline" size="sm" asChild>
+                            <a href={doc.file_url} download target="_blank" rel="noopener noreferrer">
+                              <Download className="h-4 w-4 mr-1.5" /> Download
+                            </a>
+                          </Button>
+                        </div>
+
+                        {/* Inline viewer */}
+                        {isPdf && (
+                          <PdfViewer url={doc.file_url} maxHeight={600} />
+                        )}
+                        {isImage && (
+                          <img
+                            src={doc.file_url}
+                            alt="Itinerary"
+                            className="w-full h-auto object-contain max-h-[600px]"
+                          />
+                        )}
+                        {!isPdf && !isImage && (
+                          <div className="p-6 text-center text-sm text-muted-foreground">
+                            Preview not available for this file type. Use the Download button above.
+                          </div>
+                        )}
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => window.open(doc.file_url, '_blank')}>
-                        <Download className="h-4 w-4 mr-2" /> Download
-                      </Button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 

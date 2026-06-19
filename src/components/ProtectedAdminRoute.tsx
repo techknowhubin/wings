@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useIsAdmin } from '@/hooks/useListings';
+import { useRole } from '@/hooks/useRole';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Shield } from 'lucide-react';
 
@@ -10,34 +11,24 @@ interface ProtectedAdminRouteProps {
 
 export function ProtectedAdminRoute({ children }: ProtectedAdminRouteProps) {
   const { user, loading: authLoading } = useAuth();
+  const { data: isAdminUser, isLoading: roleLoading } = useIsAdmin(user?.id);
+  // useRole gives us the correct dashboard URL for non-admin logged-in roles
+  const { dashboard: fallbackDashboard, isLoading: roleInfoLoading } = useRole();
 
-  const {
-    data: isAdminUser,
-    isLoading: roleLoading,
-  } = useIsAdmin(user?.id);
+  if (authLoading) return <AdminLoadingScreen />;
 
-  // 1. Still resolving the auth session
-  if (authLoading) {
-    return <AdminLoadingScreen />;
-  }
-
-  // 2. Auth resolved — no session → go to login
   if (!user) {
     localStorage.setItem('intended_url', window.location.pathname + window.location.search);
     return <Navigate to="/auth" replace />;
   }
 
-  // 3. User exists but role query is loading
-  if (roleLoading) {
-    return <AdminLoadingScreen />;
-  }
+  if (roleLoading || roleInfoLoading) return <AdminLoadingScreen />;
 
-  // 4. Role resolved — not an admin → go home
   if (!isAdminUser) {
-    return <Navigate to="/" replace />;
+    // Send non-admin users to their own dashboard, not to the traveler home
+    return <Navigate to={fallbackDashboard} replace />;
   }
 
-  // 5. Confirmed admin — render
   return <>{children}</>;
 }
 

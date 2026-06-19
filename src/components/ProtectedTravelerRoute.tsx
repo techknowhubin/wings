@@ -1,12 +1,21 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useRole, isNonTravelerRole } from '@/hooks/useRole';
 import { Loader2 } from 'lucide-react';
 
+/**
+ * Guards traveler-only pages (/profile, /profile/:section, etc.).
+ *
+ * - Not logged in            → /auth  (saves intended_url for deep-link)
+ * - Admin / Host / Hub Partner → their own dashboard (RBAC enforcement)
+ * - Traveler                 → renders children
+ */
 export function ProtectedTravelerRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { role, dashboard, isLoading: roleLoading } = useRole();
   const location = useLocation();
 
-  if (loading) {
+  if (authLoading || (user && roleLoading)) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -15,13 +24,14 @@ export function ProtectedTravelerRoute({ children }: { children: React.ReactNode
   }
 
   if (!user) {
-    // Save the intended URL to redirect back after login
     localStorage.setItem('intended_url', location.pathname + location.search);
     return <Navigate to="/auth" replace />;
   }
 
-  // Allow all logged-in users to access traveler dashboard, 
-  // or restrict it strictly to 'user' role if needed.
-  // For now, any authenticated user can view their traveler profile.
+  // Admin / Host / Hub Partner must NOT see traveler pages
+  if (isNonTravelerRole(role)) {
+    return <Navigate to={dashboard} replace />;
+  }
+
   return <>{children}</>;
 }

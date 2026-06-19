@@ -69,6 +69,7 @@ export default function AdminLayout() {
         { label: 'All Packages', to: '/admin/experiences', icon: Map },
         { label: 'Assignments', to: '/admin/experiences/assignments', icon: Map },
         { label: 'Departures', to: '/admin/experiences/departures', icon: Map },
+        { label: 'Package Bookings', to: '/admin/package-bookings', icon: CalendarCheck },
       ],
     },
     {

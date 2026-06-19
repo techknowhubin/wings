@@ -116,26 +116,35 @@ export default function AssignedPackages() {
                   </TableRow>
                 ) : (
                   assignments.map((ast) => (
-                    <TableRow key={ast.id} className="cursor-pointer hover:bg-muted/50" onClick={() => openDetails(ast)}>
+                    <TableRow key={ast.id}>
                       <TableCell className="font-medium">{ast.tour_packages?.name}</TableCell>
                       <TableCell>{ast.tour_packages?.destination}</TableCell>
                       <TableCell>₹{ast.tour_packages?.adult_price}</TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          ast.status === 'published' ? 'bg-emerald-100 text-emerald-800' : 
+                          ast.status === 'published' ? 'bg-emerald-100 text-emerald-800' :
                           'bg-amber-100 text-amber-800'
                         }`}>
                           {ast.status}
                         </span>
                       </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Button 
-                          variant={ast.status === 'published' ? "outline" : "default"} 
-                          size="sm"
-                          onClick={() => togglePublish(ast.id, ast.status)}
-                        >
-                          {ast.status === 'published' ? 'Unpublish' : 'Publish'}
-                        </Button>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openDetails(ast)}
+                          >
+                            View Details
+                          </Button>
+                          <Button
+                            variant={ast.status === 'published' ? "outline" : "default"}
+                            size="sm"
+                            onClick={() => togglePublish(ast.id, ast.status)}
+                          >
+                            {ast.status === 'published' ? 'Unpublish' : 'Publish'}
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

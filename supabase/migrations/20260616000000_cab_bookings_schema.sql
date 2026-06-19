@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS public.cab_bookings (
   booking_id UUID PRIMARY KEY REFERENCES public.bookings(id) ON DELETE CASCADE,
   traveller_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   host_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  hub_partner_id UUID REFERENCES public.hub_partners(id) ON DELETE SET NULL,
+  hub_partner_id UUID REFERENCES public.hubs(id) ON DELETE SET NULL,
   state TEXT,
   pickup_location TEXT,
   drop_location TEXT,
@@ -27,15 +27,10 @@ CREATE POLICY "Admins can read cab bookings" ON public.cab_bookings
     )
   );
 
--- Hub partners can read cab bookings in their state
+-- Hub partners can read cab bookings (hub_partner_id = their user id)
 CREATE POLICY "Hub partners can read cab bookings in assigned state" ON public.cab_bookings
   FOR SELECT TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM hub_partners 
-      WHERE user_id = auth.uid() AND state = public.cab_bookings.state
-    )
-  );
+  USING (hub_partner_id = auth.uid());
 
 -- Host can read their own cab bookings
 CREATE POLICY "Hosts can read own cab bookings" ON public.cab_bookings

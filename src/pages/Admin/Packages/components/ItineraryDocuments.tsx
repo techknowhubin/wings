@@ -18,7 +18,7 @@ export function ItineraryDocuments({ documents, onChange }: ItineraryDocumentsPr
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newDocs = acceptedFiles.map(file => ({
       file,
-      type: file.name.split('.').pop() || 'unknown'
+      type: file.type || file.name.split('.').pop() || 'unknown'
     }));
     onChange([...documents, ...newDocs]);
   }, [documents, onChange]);

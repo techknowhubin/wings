@@ -1,6 +1,7 @@
 -- Add RLS policy to allow Hub Partners to view tour packages that have been assigned to them
 -- regardless of the global package status (e.g., if it's still 'draft')
 
+DROP POLICY IF EXISTS "Hubs can view their assigned packages" ON public.tour_packages;
 CREATE POLICY "Hubs can view their assigned packages" ON public.tour_packages FOR SELECT USING (
     EXISTS (
         SELECT 1 FROM public.package_assignments

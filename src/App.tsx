@@ -56,6 +56,7 @@ import WhatsAppButton from "./components/WhatsAppButton";
 import PartnerDashboard from "./pages/PartnerDashboard";
 
 import { ProtectedTravelerRoute } from "./components/ProtectedTravelerRoute";
+import { RoleGuard } from "./components/RoleGuard";
 
 // Host Dashboard
 import HostLayout from "./pages/HostLayout";
@@ -84,6 +85,7 @@ import EditPackage from "./pages/Admin/Packages/EditPackage";
 import PackageList from "./pages/Admin/Packages/PackageList";
 import PackageAssignments from "./pages/Admin/Packages/PackageAssignments";
 import Departures from "./pages/Admin/Packages/Departures";
+import AdminPackageBookings from "./pages/Admin/AdminPackageBookings";
 
 // Hub Partner Dashboard
 import { ProtectedHubRoute } from "./components/ProtectedHubRoute";
@@ -149,7 +151,7 @@ const App = () =>
           <ReferralCapture />
           <AuthRedirectHandler />
           <Routes>
-            <Route path="/" element={<OutstationCabs />} />
+            <Route path="/" element={<RoleGuard><OutstationCabs /></RoleGuard>} />
             <Route path="/landing-page" element={<LandingPage />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/host/signup" element={<Auth />} />
@@ -259,6 +261,7 @@ const App = () =>
               <Route path="experiences/edit/:id" element={<EditPackage />} />
               <Route path="experiences/assignments" element={<PackageAssignments />} />
               <Route path="experiences/departures" element={<Departures />} />
+              <Route path="package-bookings" element={<AdminPackageBookings />} />
             </Route>
 
             {/* Hub Partner Dashboard */}

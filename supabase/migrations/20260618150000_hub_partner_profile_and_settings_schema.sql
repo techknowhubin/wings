@@ -13,9 +13,11 @@ CREATE TABLE IF NOT EXISTS public.hub_profiles (
 
 ALTER TABLE public.hub_profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage own hub profile" ON public.hub_profiles;
 CREATE POLICY "Users can manage own hub profile" ON public.hub_profiles
   FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Admins can manage all hub profiles" ON public.hub_profiles;
 CREATE POLICY "Admins can manage all hub profiles" ON public.hub_profiles
   FOR ALL USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin'));
 
@@ -34,9 +36,11 @@ CREATE TABLE IF NOT EXISTS public.bank_details (
 
 ALTER TABLE public.bank_details ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage own bank details" ON public.bank_details;
 CREATE POLICY "Users can manage own bank details" ON public.bank_details
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins can manage all bank details" ON public.bank_details;
 CREATE POLICY "Admins can manage all bank details" ON public.bank_details
   FOR ALL USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin'));
 
@@ -53,9 +57,11 @@ CREATE TABLE IF NOT EXISTS public.documents (
 
 ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage own documents" ON public.documents;
 CREATE POLICY "Users can manage own documents" ON public.documents
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins can manage all documents" ON public.documents;
 CREATE POLICY "Admins can manage all documents" ON public.documents
   FOR ALL USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin'));
 
@@ -74,9 +80,11 @@ CREATE TABLE IF NOT EXISTS public.hub_settings (
 
 ALTER TABLE public.hub_settings ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage own settings" ON public.hub_settings;
 CREATE POLICY "Users can manage own settings" ON public.hub_settings
   FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Admins can manage all settings" ON public.hub_settings;
 CREATE POLICY "Admins can manage all settings" ON public.hub_settings
   FOR ALL USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin'));
 
@@ -96,8 +104,10 @@ CREATE TABLE IF NOT EXISTS public.hub_team_members (
 
 ALTER TABLE public.hub_team_members ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Hub partners manage their team members" ON public.hub_team_members;
 CREATE POLICY "Hub partners manage their team members" ON public.hub_team_members
   FOR ALL USING (hub_partner_id = auth.uid()) WITH CHECK (hub_partner_id = auth.uid());
 
+DROP POLICY IF EXISTS "Admins can manage all team members" ON public.hub_team_members;
 CREATE POLICY "Admins can manage all team members" ON public.hub_team_members
   FOR ALL USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin'));

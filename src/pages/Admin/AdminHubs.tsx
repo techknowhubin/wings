@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import {
   Building2, Plus, Search, Pencil, Trash2,
-  ToggleLeft, ToggleRight, Users, MapPin, Eye, EyeOff, Copy, ExternalLink,
+  ToggleLeft, ToggleRight, Users, MapPin, Eye, EyeOff, Copy, Mail,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import indiaLocationsData from '@/constants/indiaLocations.json';
@@ -57,10 +57,22 @@ function useHubPartnerProfiles(search: string) {
         return acc;
       }, {});
 
+      // Fetch auth emails for partners whose hubs row has no email (pre-migration accounts)
+      const missingEmailIds = hubIds.filter((id: string) => !hubMap[id]?.email);
+      let authEmailMap: Record<string, string> = {};
+      if (missingEmailIds.length > 0) {
+        try {
+          const { data: emailData } = await supabase.functions.invoke('admin-actions', {
+            body: { action: 'get_hub_partner_emails', userIds: missingEmailIds }
+          });
+          authEmailMap = emailData?.emails ?? {};
+        } catch (_) { /* best-effort */ }
+      }
+
       let results = (profiles ?? []).map(p => ({
         ...p,
         uuid: hubMap[p.id]?.uuid || null,
-        email: hubMap[p.id]?.email || null,
+        email: hubMap[p.id]?.email || authEmailMap[p.id] || null,
         total_assigned_bookings: 0
       }));
 
@@ -98,20 +110,6 @@ function useCreateHubPartnerAccount() {
       
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-
-      // Create the hub record in the new hubs table
-      const { error: hubError } = await supabase.from('hubs').insert({
-        id: data.userId,
-        hub_name: `${form.full_name} Hub`,
-        owner_name: form.full_name,
-        email: form.email,
-        mobile: form.phone,
-        district: form.assigned_district || '',
-        area: form.assigned_area || '',
-        status: 'active'
-      });
-
-      if (hubError) throw hubError;
 
       return { userId: data.userId, email: form.email };
     },
@@ -181,6 +179,19 @@ function useDeleteHubPartnerAccount() {
   });
 }
 
+function useSendHubCredentials() {
+  return useMutation({
+    mutationFn: async ({ hubId, password }: { hubId: string; password: string }) => {
+      const { data, error } = await supabase.functions.invoke('admin-actions', {
+        body: { action: 'send_hub_credentials', hubId, password }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+  });
+}
+
 // ─── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminHubs() {
@@ -199,12 +210,16 @@ export default function AdminHubs() {
   const [editHub, setEditHub] = useState<any>(null);
   const [editForm, setEditForm] = useState<Record<string, any>>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [sendCredsHub, setSendCredsHub] = useState<any>(null);
+  const [sendCredsPassword, setSendCredsPassword] = useState('');
+  const [showSendPassword, setShowSendPassword] = useState(false);
 
   const { data: hubs, isLoading } = useHubPartnerProfiles(search);
   const createMut = useCreateHubPartnerAccount();
   const updateMut = useUpdateHubPartnerProfile();
   const toggleMut = useToggleHubPartnerStatus();
   const deleteMut = useDeleteHubPartnerAccount();
+  const sendCredsMut = useSendHubCredentials();
 
   const openEdit = (h: any) => {
     setEditHub(h);
@@ -271,6 +286,23 @@ export default function AdminHubs() {
       setDeleteConfirmId(null);
     } catch (err: any) {
       toast.error(err.message ?? 'Failed to delete.');
+    }
+  };
+
+  const handleSendCreds = async () => {
+    if (!sendCredsHub) return;
+    if (!sendCredsPassword) {
+      toast.error('Please enter the password to include in the credentials email.');
+      return;
+    }
+    try {
+      await sendCredsMut.mutateAsync({ hubId: sendCredsHub.id, password: sendCredsPassword });
+      toast.success(`Credentials sent to ${sendCredsHub.email}`);
+      setSendCredsHub(null);
+      setSendCredsPassword('');
+      setShowSendPassword(false);
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to send credentials email.');
     }
   };
 
@@ -422,6 +454,15 @@ export default function AdminHubs() {
                       <div className="flex items-center gap-1">
                         <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit" onClick={() => openEdit(h)}>
                           <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon" variant="ghost"
+                          className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          title="Send Credentials via Email"
+                          disabled={!h.email}
+                          onClick={() => { setSendCredsHub(h); setSendCredsPassword(''); setShowSendPassword(false); }}
+                        >
+                          <Mail className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           size="icon" variant="ghost"
@@ -611,6 +652,52 @@ export default function AdminHubs() {
             <Button variant="outline" onClick={() => setEditHub(null)}>Cancel</Button>
             <Button onClick={handleUpdate} disabled={updateMut.isPending} className="bg-[#013220] text-white hover:bg-[#013220]/90">
               {updateMut.isPending ? 'Saving…' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Send Credentials Dialog ───────────────────────────────────────────── */}
+      <Dialog open={!!sendCredsHub} onOpenChange={(o) => { if (!o) { setSendCredsHub(null); setSendCredsPassword(''); setShowSendPassword(false); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Credentials via Email</DialogTitle>
+            <DialogDescription>
+              An email will be sent to <strong>{sendCredsHub?.email}</strong> with their login credentials.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label>Email (recipient)</Label>
+              <Input value={sendCredsHub?.email || ''} readOnly tabIndex={-1} className="bg-muted/50 focus-visible:ring-0 focus-visible:ring-offset-0" />
+            </div>
+            <div className="space-y-1">
+              <Label>Password to include in email *</Label>
+              <div className="relative">
+                <Input
+                  autoFocus
+                  type={showSendPassword ? 'text' : 'password'}
+                  placeholder="Enter the partner's current password"
+                  value={sendCredsPassword}
+                  onChange={(e) => setSendCredsPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowSendPassword(!showSendPassword)}
+                >
+                  {showSendPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This will send a branded welcome email containing the email address and password above. Advise the partner to change their password after first login.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setSendCredsHub(null); setSendCredsPassword(''); setShowSendPassword(false); }}>Cancel</Button>
+            <Button onClick={handleSendCreds} disabled={sendCredsMut.isPending} className="bg-[#013220] text-white hover:bg-[#013220]/90">
+              {sendCredsMut.isPending ? 'Sending…' : 'Send Email'}
             </Button>
           </DialogFooter>
         </DialogContent>

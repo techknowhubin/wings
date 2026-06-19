@@ -1,5 +1,5 @@
 -- 1. Create wallet settings
-CREATE TABLE wallet_settings (
+CREATE TABLE IF NOT EXISTS wallet_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   signup_bonus NUMERIC(10, 2) DEFAULT 1000.00,
   referral_bonus NUMERIC(10, 2) DEFAULT 500.00,
@@ -11,7 +11,7 @@ CREATE TABLE wallet_settings (
 );
 
 -- Ensure only one row exists for settings
-CREATE UNIQUE INDEX wallet_settings_single_row ON wallet_settings ((1));
+CREATE UNIQUE INDEX IF NOT EXISTS wallet_settings_single_row ON wallet_settings ((1));
 
 -- Insert default settings
 INSERT INTO wallet_settings (signup_bonus, referral_bonus, expiry_days, max_redemption_percentage, program_enabled)
@@ -19,7 +19,7 @@ VALUES (1000.00, 500.00, 90, 10.00, true)
 ON CONFLICT DO NOTHING;
 
 -- 2. Create wallets table
-CREATE TABLE wallets (
+CREATE TABLE IF NOT EXISTS wallets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
   balance NUMERIC(10, 2) DEFAULT 0.00 CHECK (balance >= 0),
@@ -30,24 +30,16 @@ CREATE TABLE wallets (
 );
 
 -- 3. Create wallet_transactions table
-CREATE TYPE wallet_transaction_type AS ENUM (
-  'signup_bonus', 
-  'referral_reward', 
-  'admin_credit', 
-  'admin_deduction', 
-  'booking_redemption', 
-  'expired_credits', 
-  'promotional_credits'
-);
+DO $$ BEGIN CREATE TYPE wallet_transaction_type AS ENUM (
+  'signup_bonus', 'referral_reward', 'admin_credit', 'admin_deduction',
+  'booking_redemption', 'expired_credits', 'promotional_credits'
+); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE wallet_transaction_status AS ENUM (
-  'pending',
-  'completed',
-  'failed',
-  'cancelled'
-);
+DO $$ BEGIN CREATE TYPE wallet_transaction_status AS ENUM (
+  'pending', 'completed', 'failed', 'cancelled'
+); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TABLE wallet_transactions (
+CREATE TABLE IF NOT EXISTS wallet_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   wallet_id UUID NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
   type wallet_transaction_type NOT NULL,
@@ -60,9 +52,10 @@ CREATE TABLE wallet_transactions (
 );
 
 -- 4. Create referrals table
-CREATE TYPE referral_status AS ENUM ('pending', 'completed');
+DO $$ BEGIN CREATE TYPE referral_status AS ENUM ('pending', 'completed');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TABLE referrals (
+CREATE TABLE IF NOT EXISTS referrals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   referrer_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   referred_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -206,29 +199,37 @@ ALTER TABLE referrals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wallet_settings ENABLE ROW LEVEL SECURITY;
 
 -- Wallets: Users can read their own, Admins can read all, update all
+DROP POLICY IF EXISTS "Users can view own wallet" ON wallets;
 CREATE POLICY "Users can view own wallet" ON wallets FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Admins can manage wallets" ON wallets;
 CREATE POLICY "Admins can manage wallets" ON wallets TO authenticated USING (
   EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
 );
 
 -- Transactions: Users can read their own
+DROP POLICY IF EXISTS "Users can view own transactions" ON wallet_transactions;
 CREATE POLICY "Users can view own transactions" ON wallet_transactions FOR SELECT USING (
   EXISTS (SELECT 1 FROM wallets WHERE wallets.id = wallet_transactions.wallet_id AND wallets.user_id = auth.uid())
 );
+DROP POLICY IF EXISTS "Admins can view all transactions" ON wallet_transactions;
 CREATE POLICY "Admins can view all transactions" ON wallet_transactions FOR SELECT TO authenticated USING (
   EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
 );
 
 -- Referrals: Users can view their own referrals
+DROP POLICY IF EXISTS "Users can view own referrals" ON referrals;
 CREATE POLICY "Users can view own referrals" ON referrals FOR SELECT USING (
   referrer_id = auth.uid() OR referred_user_id = auth.uid()
 );
+DROP POLICY IF EXISTS "Admins can view all referrals" ON referrals;
 CREATE POLICY "Admins can view all referrals" ON referrals FOR SELECT TO authenticated USING (
   EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
 );
 
 -- Wallet settings: Anyone can read, admins can update
+DROP POLICY IF EXISTS "Anyone can read wallet settings" ON wallet_settings;
 CREATE POLICY "Anyone can read wallet settings" ON wallet_settings FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admins can update wallet settings" ON wallet_settings;
 CREATE POLICY "Admins can update wallet settings" ON wallet_settings FOR UPDATE TO authenticated USING (
   EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
 );

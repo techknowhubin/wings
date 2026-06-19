@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, MapPin, Calendar, Users, Clock, Check, X as XIcon, FileText, Plus, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { PdfViewer } from "@/components/PdfViewer";
 
 export default function TourPackageDetail() {
   const { id } = useParams();
@@ -31,12 +32,12 @@ export default function TourPackageDetail() {
       if (!error && data) {
         setPkg(data);
         
-        // Fetch current bookings to calculate available seats
+        // Only count confirmed/completed bookings — pending (unpaid) do not consume seats
         const { data: bookings } = await supabase
           .from('package_bookings')
           .select('id')
           .eq('package_id', id)
-          .not('booking_status', 'eq', 'Cancelled');
+          .in('booking_status', ['confirmed', 'completed']);
 
         if (bookings && bookings.length > 0) {
           const bookingIds = bookings.map(b => b.id);
@@ -99,7 +100,7 @@ export default function TourPackageDetail() {
   const grandTotal = packageOptions.reduce((acc, opt) => acc + (opt.price * (quantities[opt.type] || 0)), 0);
   const availableSeats = (pkg?.max_capacity || 0) - bookedSeats;
 
-  const handleBooking = (e: React.MouseEvent) => {
+  const handleBooking = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (totalTravellers === 0) {
       toast.error('Please select at least one traveler before continuing.');
@@ -118,6 +119,21 @@ export default function TourPackageDetail() {
         price: opt.price
       }));
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      // Save booking state so it survives the auth redirect
+      localStorage.setItem('pkg_booking_state', JSON.stringify({
+        packageId: pkg.id,
+        selectedPackages,
+        totalTravellers,
+        grandTotal,
+        ts: Date.now()
+      }));
+      localStorage.setItem('intended_url', `/experiences/${pkg.id}/book`);
+      navigate('/auth');
+      return;
+    }
+
     navigate(`/experiences/${pkg.id}/book`, {
       state: { selectedPackages, totalTravellers, grandTotal }
     });
@@ -125,8 +141,16 @@ export default function TourPackageDetail() {
 
   const itineraryDays = pkg?.package_itinerary_days?.sort((a: any, b: any) => a.day_number - b.day_number) || [];
   const documents = pkg?.package_itineraries || [];
-  const pdfItinerary = documents.find((d: any) => d.file_type === 'application/pdf');
-  const imageItineraries = documents.filter((d: any) => d.file_type?.startsWith('image/'));
+  const isPdfDoc = (d: any) =>
+    d.file_type === 'application/pdf' ||
+    d.file_type === 'pdf' ||
+    d.file_url?.toLowerCase().endsWith('.pdf');
+  const isImageDoc = (d: any) =>
+    d.file_type?.startsWith('image/') ||
+    ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(d.file_type?.toLowerCase());
+
+  const pdfItinerary = documents.find(isPdfDoc);
+  const imageItineraries = documents.filter(isImageDoc);
 
   return (
     <div className="min-h-screen flex flex-col bg-muted/20">
@@ -207,23 +231,7 @@ export default function TourPackageDetail() {
                 <div className="space-y-8">
                   
                   {pdfItinerary && (
-                     <div className="mb-6 p-4 border border-border rounded-xl bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                       <div className="flex items-center gap-3">
-                         <FileText className="h-8 w-8 text-red-500 shrink-0" />
-                         <div>
-                           <p className="font-bold text-base md:text-lg">Day-wise Tour Plan (PDF)</p>
-                           <p className="text-sm text-muted-foreground">Official Itinerary Document</p>
-                         </div>
-                       </div>
-                       <div className="flex items-center gap-2">
-                         <Button variant="outline" asChild>
-                           <a href={pdfItinerary.file_url} target="_blank" rel="noopener noreferrer">View PDF</a>
-                         </Button>
-                         <Button asChild>
-                           <a href={pdfItinerary.file_url} download>Download</a>
-                         </Button>
-                       </div>
-                     </div>
+                    <PdfViewer url={pdfItinerary.file_url} />
                   )}
 
                   {imageItineraries.length > 0 && (

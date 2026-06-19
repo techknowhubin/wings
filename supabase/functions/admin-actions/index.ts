@@ -179,9 +179,9 @@ Deno.serve(async (req) => {
         }
 
         // 3. Insert into user_roles
-        const { error: roleErr } = await admin.from('user_roles').upsert({ 
-          user_id: newUserId, 
-          role: 'hub_partner' 
+        const { error: roleErr } = await admin.from('user_roles').upsert({
+          user_id: newUserId,
+          role: 'hub_partner'
         });
 
         if (roleErr) {
@@ -189,6 +189,18 @@ Deno.serve(async (req) => {
            await admin.auth.admin.deleteUser(newUserId);
            return jsonResponse({ error: roleErr.message }, 400);
         }
+
+        // 4. Insert into hubs table (atomic — done server-side to guarantee email is stored)
+        await admin.from('hubs').upsert({
+          id: newUserId,
+          hub_name: `${full_name} Hub`,
+          owner_name: full_name,
+          email,
+          mobile: phone || '',
+          district: assigned_district || '',
+          area: assigned_area || '',
+          status: 'active'
+        });
 
         await admin.from("audit_logs").insert({
           user_id:    newUserId,
@@ -201,6 +213,161 @@ Deno.serve(async (req) => {
         });
 
         return jsonResponse({ success: true, userId: newUserId, email });
+      }
+
+      case "get_hub_partner_emails": {
+        if (!ctx.isAdmin) throw new ForbiddenError("Unauthorized: admin only");
+
+        const { userIds } = body;
+        if (!Array.isArray(userIds) || userIds.length === 0) {
+          return jsonResponse({ emails: {} });
+        }
+
+        const emails: Record<string, string> = {};
+        await Promise.all(
+          userIds.map(async (uid: string) => {
+            try {
+              const { data } = await admin.auth.admin.getUserById(uid);
+              if (data?.user?.email) emails[uid] = data.user.email;
+            } catch (_) { /* skip failed lookups */ }
+          })
+        );
+
+        return jsonResponse({ emails });
+      }
+
+      case "send_hub_credentials": {
+        if (!ctx.isAdmin) throw new ForbiddenError("Unauthorized: admin only");
+
+        const { hubId, password: credPassword } = body;
+        if (!hubId) return jsonResponse({ success: false, error: "hubId is required" });
+        if (!credPassword) return jsonResponse({ success: false, error: "password is required" });
+
+        // Step 1: resolve email + name — hubs table first, then auth.users fallback
+        const { data: hubRow } = await admin
+          .from('hubs')
+          .select('email, owner_name, district, area')
+          .eq('id', hubId)
+          .maybeSingle();
+
+        let partnerEmail: string | null = hubRow?.email ?? null;
+        let partnerName: string | null = hubRow?.owner_name ?? null;
+
+        if (!partnerEmail || !partnerName) {
+          const { data: authUserData, error: authErr } = await admin.auth.admin.getUserById(hubId);
+          if (authErr) console.error('[send_hub_credentials] getUserById error:', authErr.message);
+          if (!partnerEmail) partnerEmail = authUserData?.user?.email ?? null;
+
+          if (!partnerName) {
+            const { data: prof } = await admin
+              .from('profiles').select('full_name').eq('id', hubId).maybeSingle();
+            partnerName = prof?.full_name
+              ?? authUserData?.user?.user_metadata?.full_name
+              ?? 'Hub Partner';
+          }
+        }
+
+        console.log('[send_hub_credentials] hubId:', hubId, 'email:', partnerEmail, 'name:', partnerName);
+
+        if (!partnerEmail) {
+          return jsonResponse({ success: false, error: "Could not find email address for this hub partner" });
+        }
+
+        // Step 2: backfill hubs row if missing
+        if (!hubRow) {
+          const { error: upsertErr } = await admin.from('hubs').upsert({
+            id: hubId,
+            hub_name: `${partnerName} Hub`,
+            owner_name: partnerName,
+            email: partnerEmail,
+            mobile: '',
+            district: '',
+            area: '',
+            status: 'active',
+          });
+          if (upsertErr) console.error('[send_hub_credentials] hubs upsert error:', upsertErr.message);
+        }
+
+        // Step 3: send email via ZeptoMail
+        const zeptoKey = Deno.env.get("ZEPTO_MAIL_API_KEY");
+        if (!zeptoKey) {
+          console.error('[send_hub_credentials] ZEPTO_MAIL_API_KEY not set');
+          return jsonResponse({ success: false, error: "Email service not configured — ZEPTO_MAIL_API_KEY secret missing" });
+        }
+
+        const loginUrl = "https://xplorwing.com/auth";
+
+        const emailHtml = `
+          <div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:auto;background:#f9fafb;border-radius:12px;overflow:hidden;">
+            <div style="background:#013220;padding:32px 40px;text-align:center;">
+              <h1 style="color:#fff;margin:0;font-size:24px;font-weight:700;">Xplorwing</h1>
+              <p style="color:#86efac;margin:8px 0 0;font-size:14px;">Hub Partner Platform</p>
+            </div>
+            <div style="padding:40px;background:#fff;">
+              <h2 style="color:#013220;font-size:20px;margin:0 0 8px;">Welcome, ${partnerName}!</h2>
+              <p style="color:#6b7280;font-size:14px;margin:0 0 28px;">Your Hub Partner account has been set up by the Xplorwing admin team. Use the credentials below to log in.</p>
+              <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px 24px;margin-bottom:24px;">
+                <p style="margin:0 0 12px;font-size:13px;font-weight:600;color:#166534;text-transform:uppercase;letter-spacing:0.5px;">Your Login Credentials</p>
+                <table style="width:100%;border-collapse:collapse;">
+                  <tr>
+                    <td style="padding:6px 0;font-size:13px;color:#6b7280;width:80px;">Email</td>
+                    <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;">${partnerEmail}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0;font-size:13px;color:#6b7280;">Password</td>
+                    <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;font-family:monospace;">${credPassword}</td>
+                  </tr>
+                </table>
+              </div>
+              <div style="text-align:center;margin-bottom:28px;">
+                <a href="${loginUrl}" style="display:inline-block;background:#013220;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600;font-size:15px;">Log In to Dashboard →</a>
+              </div>
+              <p style="font-size:13px;color:#9ca3af;">We recommend changing your password after your first login.</p>
+            </div>
+            <div style="padding:20px 40px;background:#f9fafb;text-align:center;border-top:1px solid #e5e7eb;">
+              <p style="font-size:12px;color:#9ca3af;margin:0;">© 2026 Xplorwing. All rights reserved.</p>
+            </div>
+          </div>`;
+
+        let mailOk = false;
+        let mailErrMsg = '';
+        try {
+          const mailRes = await fetch("https://api.zeptomail.in/v1.1/email", {
+            method: "POST",
+            headers: {
+              "accept": "application/json",
+              "content-type": "application/json",
+              "Authorization": `Zoho-enczpt ${zeptoKey}`,
+            },
+            body: JSON.stringify({
+              from: { address: "hello@xplorwing.com", name: "Xplorwing" },
+              to: [{ email_address: { address: partnerEmail, name: partnerName } }],
+              subject: "Your Hub Partner Login Credentials – Xplorwing",
+              htmlbody: emailHtml,
+            }),
+          });
+
+          const mailResult = await mailRes.json().catch(() => ({}));
+          console.log('[send_hub_credentials] ZeptoMail status:', mailRes.status, 'body:', JSON.stringify(mailResult));
+
+          if (mailRes.ok) {
+            mailOk = true;
+          } else {
+            mailErrMsg = mailResult?.error?.message
+              || mailResult?.message
+              || mailResult?.data?.message
+              || `ZeptoMail error ${mailRes.status}`;
+          }
+        } catch (fetchErr: any) {
+          mailErrMsg = `Network error: ${fetchErr.message}`;
+          console.error('[send_hub_credentials] fetch error:', fetchErr.message);
+        }
+
+        if (!mailOk) {
+          return jsonResponse({ success: false, error: `Failed to send email: ${mailErrMsg}` });
+        }
+
+        return jsonResponse({ success: true });
       }
 
       case "decrypt": {

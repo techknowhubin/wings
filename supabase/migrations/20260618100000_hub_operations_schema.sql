@@ -25,10 +25,12 @@ CREATE TABLE IF NOT EXISTS public.walkin_enquiries (
 
 ALTER TABLE public.walkin_enquiries ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can manage all walkin_enquiries" ON public.walkin_enquiries;
 CREATE POLICY "Admins can manage all walkin_enquiries" ON public.walkin_enquiries
   FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin'));
 
+DROP POLICY IF EXISTS "Hub partners manage their hub walkin_enquiries" ON public.walkin_enquiries;
 CREATE POLICY "Hub partners manage their hub walkin_enquiries" ON public.walkin_enquiries
   FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM public.hubs WHERE uuid = hub_uuid AND id = auth.uid()))
@@ -53,10 +55,12 @@ CREATE TABLE IF NOT EXISTS public.hub_support_tickets (
 
 ALTER TABLE public.hub_support_tickets ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can manage all hub_support_tickets" ON public.hub_support_tickets;
 CREATE POLICY "Admins can manage all hub_support_tickets" ON public.hub_support_tickets
   FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin'));
 
+DROP POLICY IF EXISTS "Hub partners manage their hub tickets" ON public.hub_support_tickets;
 CREATE POLICY "Hub partners manage their hub tickets" ON public.hub_support_tickets
   FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM public.hubs WHERE uuid = hub_uuid AND id = auth.uid()))
@@ -80,10 +84,12 @@ CREATE TABLE IF NOT EXISTS public.hub_earnings (
 
 ALTER TABLE public.hub_earnings ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can manage all hub_earnings" ON public.hub_earnings;
 CREATE POLICY "Admins can manage all hub_earnings" ON public.hub_earnings
   FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin'));
 
+DROP POLICY IF EXISTS "Hub partners view their earnings" ON public.hub_earnings;
 CREATE POLICY "Hub partners view their earnings" ON public.hub_earnings
   FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.hubs WHERE uuid = hub_uuid AND id = auth.uid()));

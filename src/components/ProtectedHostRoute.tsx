@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useIsHost } from '@/hooks/useListings';
+import { useRole } from '@/hooks/useRole';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Shield } from 'lucide-react';
 
@@ -10,34 +11,23 @@ interface ProtectedHostRouteProps {
 
 export function ProtectedHostRoute({ children }: ProtectedHostRouteProps) {
   const { user, loading: authLoading } = useAuth();
+  const { data: isHostUser, isLoading: roleLoading } = useIsHost(user?.id);
+  const { dashboard: fallbackDashboard, isLoading: roleInfoLoading } = useRole();
 
-  const {
-    data: isHostUser,
-    isLoading: roleLoading,
-  } = useIsHost(user?.id);
+  if (authLoading) return <HostLoadingScreen />;
 
-  // 1. Still resolving the auth session
-  if (authLoading) {
-    return <HostLoadingScreen />;
-  }
-
-  // 2. Auth resolved — no session → go to login
   if (!user) {
     localStorage.setItem('intended_url', window.location.pathname + window.location.search);
     return <Navigate to="/auth" replace />;
   }
 
-  // 3. User exists but role query is loading
-  if (roleLoading) {
-    return <HostLoadingScreen />;
-  }
+  if (roleLoading || roleInfoLoading) return <HostLoadingScreen />;
 
-  // 4. Role resolved — not a host → go home (or show "no host dashboard")
   if (!isHostUser) {
-    return <Navigate to="/" replace />;
+    // Send non-host users to their own dashboard, not to the traveler home
+    return <Navigate to={fallbackDashboard} replace />;
   }
 
-  // 5. Confirmed host — render
   return <>{children}</>;
 }
 

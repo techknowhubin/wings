@@ -26,10 +26,12 @@ CREATE TABLE IF NOT EXISTS public.drivers (
 
 ALTER TABLE public.drivers ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can access all drivers" ON public.drivers;
 CREATE POLICY "Admins can access all drivers" ON public.drivers FOR ALL USING (
   EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin')
 );
 
+DROP POLICY IF EXISTS "Hub partners manage their own drivers" ON public.drivers;
 CREATE POLICY "Hub partners manage their own drivers" ON public.drivers FOR ALL USING (
   hub_partner_id = auth.uid()
 ) WITH CHECK (
@@ -49,10 +51,12 @@ CREATE TABLE IF NOT EXISTS public.driver_documents (
 
 ALTER TABLE public.driver_documents ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can access all driver_documents" ON public.driver_documents;
 CREATE POLICY "Admins can access all driver_documents" ON public.driver_documents FOR ALL USING (
   EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin')
 );
 
+DROP POLICY IF EXISTS "Hub partners manage driver_documents of their drivers" ON public.driver_documents;
 CREATE POLICY "Hub partners manage driver_documents of their drivers" ON public.driver_documents FOR ALL USING (
   EXISTS (SELECT 1 FROM public.drivers d WHERE d.id = driver_id AND d.hub_partner_id = auth.uid())
 ) WITH CHECK (
@@ -76,10 +80,12 @@ CREATE TABLE IF NOT EXISTS public.vehicles (
 
 ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can access all vehicles" ON public.vehicles;
 CREATE POLICY "Admins can access all vehicles" ON public.vehicles FOR ALL USING (
   EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin')
 );
 
+DROP POLICY IF EXISTS "Hub partners manage their own vehicles" ON public.vehicles;
 CREATE POLICY "Hub partners manage their own vehicles" ON public.vehicles FOR ALL USING (
   hub_partner_id = auth.uid()
 ) WITH CHECK (
@@ -102,10 +108,12 @@ CREATE TABLE IF NOT EXISTS public.vehicle_documents (
 
 ALTER TABLE public.vehicle_documents ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can access all vehicle_documents" ON public.vehicle_documents;
 CREATE POLICY "Admins can access all vehicle_documents" ON public.vehicle_documents FOR ALL USING (
   EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin')
 );
 
+DROP POLICY IF EXISTS "Hub partners manage vehicle_documents of their vehicles" ON public.vehicle_documents;
 CREATE POLICY "Hub partners manage vehicle_documents of their vehicles" ON public.vehicle_documents FOR ALL USING (
   EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = vehicle_id AND v.hub_partner_id = auth.uid())
 ) WITH CHECK (
@@ -126,10 +134,12 @@ CREATE TABLE IF NOT EXISTS public.hub_partner_drivers (
 
 ALTER TABLE public.hub_partner_drivers ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can access all hub_partner_drivers" ON public.hub_partner_drivers;
 CREATE POLICY "Admins can access all hub_partner_drivers" ON public.hub_partner_drivers FOR ALL USING (
   EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin')
 );
 
+DROP POLICY IF EXISTS "Hub partners manage their hub_partner_drivers" ON public.hub_partner_drivers;
 CREATE POLICY "Hub partners manage their hub_partner_drivers" ON public.hub_partner_drivers FOR ALL USING (
   hub_partner_id = auth.uid()
 ) WITH CHECK (
@@ -152,10 +162,12 @@ CREATE TABLE IF NOT EXISTS public.fleet_import_history (
 
 ALTER TABLE public.fleet_import_history ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can access all fleet_import_history" ON public.fleet_import_history;
 CREATE POLICY "Admins can access all fleet_import_history" ON public.fleet_import_history FOR ALL USING (
   EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin')
 );
 
+DROP POLICY IF EXISTS "Hub partners manage their fleet_import_history" ON public.fleet_import_history;
 CREATE POLICY "Hub partners manage their fleet_import_history" ON public.fleet_import_history FOR ALL USING (
   hub_partner_id = auth.uid()
 ) WITH CHECK (

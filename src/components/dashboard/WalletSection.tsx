@@ -79,7 +79,7 @@ export function WalletSection() {
   const shareLink = `${window.location.origin}/signup?ref=${referralCode}`;
 
   const handleShareWhatsApp = () => {
-    const text = encodeURIComponent(`Sign up for Wings using my referral code ${referralCode} and get ₹1000 Wing Credits! ${shareLink}`);
+    const text = encodeURIComponent(`Sign up for Xplorwing Platform using my referral code ${referralCode} and get ₹1000 Wing Credits! ${shareLink}`);
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 

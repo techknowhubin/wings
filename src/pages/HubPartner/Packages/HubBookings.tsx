@@ -5,14 +5,16 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Users } from 'lucide-react';
+import { Loader2, Users, Search, X } from 'lucide-react';
 import { useParams } from 'react-router-dom';
+import { Input } from '@/components/ui/input';
 
 export default function HubBookings() {
   const { uuid } = useParams();
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any>(null);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     fetchBookings();
@@ -87,12 +89,46 @@ export default function HubBookings() {
     return map[s?.toLowerCase()] ?? 'bg-gray-100 text-gray-700';
   };
 
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? bookings.filter((b) => {
+        const primary = b.package_travellers?.[0];
+        return (
+          b.booking_ref?.toLowerCase().includes(q) ||
+          b.tour_packages?.name?.toLowerCase().includes(q) ||
+          primary?.name?.toLowerCase().includes(q) ||
+          primary?.email?.toLowerCase().includes(q) ||
+          primary?.mobile?.includes(q) ||
+          b.booking_status?.toLowerCase().includes(q) ||
+          b.payment_status?.toLowerCase().includes(q)
+        );
+      })
+    : bookings;
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight">Package Bookings</h1>
 
       <Card>
-        <CardHeader><CardTitle>Recent Bookings</CardTitle></CardHeader>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <CardTitle className="shrink-0">Recent Bookings</CardTitle>
+            <div className="relative w-full sm:max-w-xs ml-auto">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Search ref, name, package…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="pl-9 pr-8 h-9 text-sm"
+              />
+              {query && (
+                <button onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
@@ -112,13 +148,13 @@ export default function HubBookings() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {bookings.length === 0 ? (
+                {filtered.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                      No bookings found for your hub.
+                      {q ? `No bookings match "${query}".` : 'No bookings found for your hub.'}
                     </TableCell>
                   </TableRow>
-                ) : bookings.map((b) => {
+                ) : filtered.map((b) => {
                   const travellers: any[] = b.package_travellers || [];
                   const primary = travellers[0];
                   return (
@@ -194,6 +230,11 @@ export default function HubBookings() {
                 <div className="p-4 rounded-xl border bg-muted/20 space-y-2">
                   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Booking</p>
                   <p className="font-mono text-sm font-semibold">{selected.booking_ref}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(selected.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {' · '}
+                    {new Date(selected.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                  </p>
                   <div className="flex gap-2 mt-1">
                     <Badge variant="outline" className={`text-[10px] capitalize ${paymentBadge(selected.payment_status)}`}>{selected.payment_status}</Badge>
                     <Badge variant="outline" className={`text-[10px] capitalize ${statusBadge(selected.booking_status)}`}>{selected.booking_status}</Badge>

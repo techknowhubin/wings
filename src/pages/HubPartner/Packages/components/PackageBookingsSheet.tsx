@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Users, IndianRupee } from 'lucide-react';
+import { Loader2, Users, IndianRupee, Search, X } from 'lucide-react';
 
 interface PackageBookingsSheetProps {
   packageId: string | null;
@@ -15,6 +16,7 @@ interface PackageBookingsSheetProps {
 export function PackageBookingsSheet({ packageId, packageName, hubId, open, onClose }: PackageBookingsSheetProps) {
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     if (!open || !packageId || !hubId) return;
@@ -36,6 +38,21 @@ export function PackageBookingsSheet({ packageId, packageName, hubId, open, onCl
         setLoading(false);
       });
   }, [open, packageId, hubId]);
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? bookings.filter((b) => {
+        const primary = b.package_travellers?.[0];
+        return (
+          b.booking_ref?.toLowerCase().includes(q) ||
+          primary?.name?.toLowerCase().includes(q) ||
+          primary?.email?.toLowerCase().includes(q) ||
+          primary?.mobile?.includes(q) ||
+          b.booking_status?.toLowerCase().includes(q) ||
+          b.payment_status?.toLowerCase().includes(q)
+        );
+      })
+    : bookings;
 
   const totalTravellers = bookings.reduce((sum, b) => sum + (b.package_travellers?.length || 0), 0);
   const confirmedRevenue = bookings
@@ -60,6 +77,22 @@ export function PackageBookingsSheet({ packageId, packageName, hubId, open, onCl
           <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin" /></div>
         ) : (
           <div className="mt-6 space-y-5">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Search ref, name, mobile…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="pl-9 pr-8 h-9 text-sm"
+              />
+              {query && (
+                <button onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
             {/* Summary strip */}
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-xl border bg-muted/20 p-3 text-center">
@@ -76,10 +109,12 @@ export function PackageBookingsSheet({ packageId, packageName, hubId, open, onCl
               </div>
             </div>
 
-            {bookings.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-10">No bookings for this package yet.</p>
+            {filtered.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-10">
+                {q ? `No bookings match "${query}".` : 'No bookings for this package yet.'}
+              </p>
             ) : (
-              bookings.map((b) => {
+              filtered.map((b) => {
                 const travellers: any[] = b.package_travellers || [];
                 const primary = travellers[0];
                 const details: any[] = Array.isArray(b.booking_details) ? b.booking_details : [];
@@ -92,6 +127,8 @@ export function PackageBookingsSheet({ packageId, packageName, hubId, open, onCl
                         <p className="font-mono text-xs font-semibold">{b.booking_ref}</p>
                         <p className="text-[11px] text-muted-foreground mt-0.5">
                           {new Date(b.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {' · '}
+                          {new Date(b.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
                         </p>
                       </div>
                       <div className="flex items-center gap-1.5">

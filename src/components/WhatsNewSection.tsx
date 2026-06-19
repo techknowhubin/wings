@@ -122,7 +122,7 @@ const WhatsNewSection = ({ variant = "default" }: WhatsNewSectionProps) => {
 
   return (
     <section
-      className={isOutstationVariant ? "py-12 md:py-16 bg-white" : "container mx-auto px-4 py-12 md:py-16"}
+      className={isOutstationVariant ? "py-12 md:py-16 bg-background" : "container mx-auto px-4 py-12 md:py-16"}
     >
       <div className={isOutstationVariant ? "container mx-auto px-4" : undefined}>
       <motion.div 
@@ -134,7 +134,7 @@ const WhatsNewSection = ({ variant = "default" }: WhatsNewSectionProps) => {
         <h2
           className={
             isOutstationVariant
-              ? "text-[26px] font-medium text-[#1a2e1a] mb-6 tracking-[-0.4px]"
+              ? "text-[26px] font-medium text-foreground mb-6 tracking-[-0.4px]"
               : "text-3xl font-bold text-foreground mb-8"
           }
         >
@@ -152,7 +152,7 @@ const WhatsNewSection = ({ variant = "default" }: WhatsNewSectionProps) => {
               className={
                 isOutstationVariant
                   ? `group flex flex-col justify-between min-h-[172px] border rounded-[18px] p-[20px_18px_18px] cursor-pointer transition-all duration-300 relative overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.05)] ${theme.card}`
-                  : "group flex flex-col justify-between min-h-[220px] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-5 cursor-pointer transition-all duration-300 relative overflow-hidden"
+                  : "group flex flex-col justify-between min-h-[220px] bg-card dark:bg-card border border-border rounded-3xl p-5 cursor-pointer transition-all duration-300 relative overflow-hidden"
               }
             >
               {isOutstationVariant && (
@@ -219,13 +219,13 @@ const WhatsNewSection = ({ variant = "default" }: WhatsNewSectionProps) => {
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative w-full max-w-md overflow-hidden bg-white rounded-3xl p-6 shadow-2xl dark:bg-slate-900 border border-slate-100 dark:border-slate-800"
+              className="relative w-full max-w-md overflow-hidden bg-white rounded-3xl p-6 shadow-2xl dark:bg-card border border-border"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Close button */}
               <button 
                 onClick={() => setSelectedFeature(null)}
-                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all duration-200"
+                className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-all duration-200"
                 aria-label="Close modal"
               >
                 <X className="w-5 h-5" />
@@ -237,18 +237,18 @@ const WhatsNewSection = ({ variant = "default" }: WhatsNewSectionProps) => {
                 </div>
                 <div>
                   <span className="text-[10px] font-bold text-accent dark:text-primary tracking-widest uppercase">Xplorwing Feature</span>
-                  <h3 className="text-lg font-bold text-slate-850 dark:text-white leading-tight">
+                  <h3 className="text-lg font-bold text-foreground leading-tight">
                     {selectedFeature.title}
                   </h3>
                 </div>
               </div>
 
               <div className="mb-6">
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 leading-relaxed italic">
+                <p className="text-sm font-semibold text-muted-foreground mb-2 leading-relaxed italic">
                   "{selectedFeature.subtitle}"
                 </p>
-                <div className="h-px bg-slate-100 dark:bg-slate-800 my-4" />
-                <p className="text-xs text-slate-650 dark:text-slate-400 leading-relaxed">
+                <div className="h-px bg-border my-4" />
+                <p className="text-xs text-muted-foreground leading-relaxed">
                   {selectedFeature.details}
                 </p>
               </div>

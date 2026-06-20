@@ -9,6 +9,7 @@ import { z } from "zod";
 import heroImage from "@/assets/hero-travel.jpg";
 import { DynamicLogo } from "@/components/DynamicLogo";
 import { Link } from "react-router-dom";
+import { PasswordStrengthMeter } from "@/components/PasswordStrengthMeter";
 
 const resetPasswordSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
@@ -130,10 +131,7 @@ const ResetPassword = () => {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <label
-                htmlFor="password"
-                className="text-sm font-medium text-foreground"
-              >
+              <label htmlFor="password" className="text-sm font-medium text-foreground">
                 New Password
               </label>
               <div className="relative">
@@ -153,20 +151,14 @@ const ResetPassword = () => {
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   aria-label="Toggle password visibility"
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5" />
-                  ) : (
-                    <Eye className="h-5 w-5" />
-                  )}
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
+              <PasswordStrengthMeter password={password} confirmPassword={confirmPassword} />
             </div>
 
             <div className="space-y-2">
-              <label
-                htmlFor="confirmPassword"
-                className="text-sm font-medium text-foreground"
-              >
+              <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
                 Confirm New Password
               </label>
               <div className="relative">
@@ -186,11 +178,7 @@ const ResetPassword = () => {
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   aria-label="Toggle password visibility"
                 >
-                  {showConfirmPassword ? (
-                    <EyeOff className="h-5 w-5" />
-                  ) : (
-                    <Eye className="h-5 w-5" />
-                  )}
+                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
             </div>

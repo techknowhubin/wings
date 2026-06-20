@@ -34,6 +34,7 @@ import { createNotification } from "@/lib/supabase-helpers";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
+import { PasswordStrengthMeter } from "@/components/PasswordStrengthMeter";
 
 // ======================== Types ========================
 
@@ -79,28 +80,7 @@ function MaskedInput({
   );
 }
 
-// ======================== Password Strength ========================
-
-function PasswordStrength({ password }: { password: string }) {
-  let strength = 0;
-  if (password.length >= 8) strength++;
-  if (/[A-Z]/.test(password)) strength++;
-  if (/[0-9]/.test(password)) strength++;
-  if (/[^A-Za-z0-9]/.test(password)) strength++;
-  const labels = ["Weak", "Fair", "Good", "Strong"];
-  const colors = ["bg-destructive", "bg-orange-400", "bg-yellow-400", "bg-accent"];
-  if (!password) return null;
-  return (
-    <div className="space-y-1">
-      <div className="flex gap-1">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className={`h-1.5 flex-1 rounded-full ${i < strength ? colors[strength - 1] : "bg-muted"}`} />
-        ))}
-      </div>
-      <p className="text-xs text-muted-foreground">{labels[strength - 1] || "Too short"}</p>
-    </div>
-  );
-}
+// PasswordStrength is now provided by the shared PasswordStrengthMeter component.
 
 // ======================== DOB Picker ========================
 
@@ -1249,14 +1229,14 @@ export default function UserProfile() {
                     <div className="space-y-2">
                       <Label>New Password</Label>
                       <MaskedInput value={passwords.newPw} onChange={(v) => setPasswords({ ...passwords, newPw: v })} placeholder="Enter new password" />
-                      <PasswordStrength password={passwords.newPw} />
+                      <PasswordStrengthMeter
+                        password={passwords.newPw}
+                        confirmPassword={passwords.confirm}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Confirm New Password</Label>
                       <MaskedInput value={passwords.confirm} onChange={(v) => setPasswords({ ...passwords, confirm: v })} placeholder="Re-enter new password" />
-                      {passwords.confirm && passwords.newPw !== passwords.confirm && (
-                        <p className="text-xs text-destructive">Passwords don't match</p>
-                      )}
                     </div>
                     <Button onClick={handleChangePassword} disabled={!passwords.current || !passwords.newPw || !passwords.confirm}>
                       <Lock className="h-4 w-4 mr-2" /> Update Password

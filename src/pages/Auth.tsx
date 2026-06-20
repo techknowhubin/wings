@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { PasswordStrengthMeter } from "@/components/PasswordStrengthMeter";
 
 /* ─── validation ─── */
 const passwordRules = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
@@ -1204,6 +1205,7 @@ const Auth = () => {
                     </button>
                   </div>
                   {formErrors.password && <p className="text-[11px] text-red-500">{formErrors.password}</p>}
+                  <PasswordStrengthMeter password={password} confirmPassword={confirmPassword} onDark />
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
                     <input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="auth-input" style={{ paddingRight: "2.75rem" }} placeholder="Confirm Password" required />

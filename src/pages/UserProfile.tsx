@@ -6,7 +6,8 @@ import DocumentManagement from "@/components/profile/DocumentManagement";
 import {
   User, Calendar, ShieldCheck, Lock, Bell, HelpCircle, LogOut,
   Camera, Edit2, Save, Check, Clock, Upload, X, Eye, EyeOff,
-  FileText, ChevronRight, ExternalLink, MessageSquare, Loader2, Ticket, Wallet, FileBadge
+  FileText, ChevronRight, ExternalLink, MessageSquare, Loader2, Ticket, Wallet, FileBadge,
+  Gift, Copy, Share2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -36,7 +37,7 @@ import { CalendarIcon } from "lucide-react";
 
 // ======================== Types ========================
 
-type Section = "profile" | "bookings" | "documents" | "kyc" | "security" | "notifications" | "help" | "coupons" | "wallet";
+type Section = "profile" | "bookings" | "documents" | "kyc" | "security" | "notifications" | "help" | "coupons" | "wallet" | "referral";
 
 interface KYCDoc {
   name: string;
@@ -50,6 +51,7 @@ interface KYCDoc {
 const navItems: { icon: typeof User; label: string; section: Section }[] = [
   { icon: User, label: "My Profile", section: "profile" },
   { icon: Wallet, label: "Wing Credits", section: "wallet" },
+  { icon: Gift, label: "Refer & Earn", section: "referral" },
   { icon: Calendar, label: "Booking History", section: "bookings" },
   { icon: FileBadge, label: "Travel Documents", section: "documents" },
   { icon: Ticket, label: "My Coupons", section: "coupons" },
@@ -96,6 +98,108 @@ function PasswordStrength({ password }: { password: string }) {
         ))}
       </div>
       <p className="text-xs text-muted-foreground">{labels[strength - 1] || "Too short"}</p>
+    </div>
+  );
+}
+
+// ======================== DOB Picker ========================
+
+const MONTHS = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
+];
+
+function DOBPicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  disabled?: boolean;
+}) {
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: currentYear - 1939 }, (_, i) => currentYear - i);
+
+  // Parse initial value from parent
+  const parse = (v: string) => {
+    const p = v ? v.split("-") : [];
+    return {
+      y: p[0] ? Number(p[0]) : 0,
+      m: p[1] ? Number(p[1]) : 0,
+      d: p[2] ? Number(p[2]) : 0,
+    };
+  };
+
+  const [year,  setYear]  = useState(() => parse(value).y);
+  const [month, setMonth] = useState(() => parse(value).m);
+  const [day,   setDay]   = useState(() => parse(value).d);
+
+  // Sync when parent reloads an existing value (e.g. profile loads from DB)
+  useEffect(() => {
+    const { y, m, d } = parse(value);
+    setYear(y); setMonth(m); setDay(d);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const daysInMonth = year && month ? new Date(year, month, 0).getDate() : 31;
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  const emit = (y: number, m: number, d: number) => {
+    if (y && m && d)
+      onChange(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+  };
+
+  const onMonth = (m: number) => {
+    const max = year && m ? new Date(year, m, 0).getDate() : 31;
+    const safeDay = day > max ? max : day;
+    setMonth(m); setDay(safeDay);
+    emit(year, m, safeDay);
+  };
+
+  const onDay = (d: number) => {
+    setDay(d);
+    emit(year, month, d);
+  };
+
+  const onYear = (y: number) => {
+    const max = month && y ? new Date(y, month, 0).getDate() : 31;
+    const safeDay = day > max ? max : day;
+    setYear(y); setDay(safeDay);
+    emit(y, month, safeDay);
+  };
+
+  const sel = cn(
+    "h-10 rounded-md border border-input bg-background px-2 text-sm text-foreground",
+    "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+    "disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+  );
+
+  return (
+    <div className="flex gap-2">
+      <select aria-label="Year" value={year} disabled={disabled}
+        className={cn(sel, "w-[82px] shrink-0")} onChange={(e) => onYear(Number(e.target.value))}>
+        <option value={0}>Year</option>
+        {years.map((y) => (
+          <option key={y} value={y}>{y}</option>
+        ))}
+      </select>
+
+      <select aria-label="Month" value={month} disabled={disabled}
+        className={cn(sel, "flex-1")} onChange={(e) => onMonth(Number(e.target.value))}>
+        <option value={0}>Month</option>
+        {MONTHS.map((name, i) => (
+          <option key={i + 1} value={i + 1}>{name}</option>
+        ))}
+      </select>
+
+      <select aria-label="Day" value={day} disabled={disabled}
+        className={cn(sel, "w-[68px] shrink-0")} onChange={(e) => onDay(Number(e.target.value))}>
+        <option value={0}>Day</option>
+        {days.map((d) => (
+          <option key={d} value={d}>{d}</option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -168,6 +272,28 @@ export default function UserProfile() {
   // Password form
   const [passwords, setPasswords] = useState({ current: "", newPw: "", confirm: "" });
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
+
+  // Referral
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('referral_code').eq('id', user.id).maybeSingle()
+      .then(({ data }) => { if (data?.referral_code) setReferralCode(data.referral_code); });
+  }, [user?.id]);
+
+  const handleCopyReferral = () => {
+    if (!referralCode) return;
+    navigator.clipboard.writeText(referralCode);
+    toast.success('Referral code copied!');
+  };
+
+  const handleShareReferralWhatsApp = () => {
+    if (!referralCode) return;
+    const link = `${window.location.origin}/signup?ref=${referralCode}`;
+    const text = encodeURIComponent(`Sign up for Xplorwing using my referral code ${referralCode} and get Wing Credits! ${link}`);
+    window.open(`https://wa.me/?text=${text}`, '_blank', 'noreferrer');
+  };
   const [isModifyingDates, setIsModifyingDates] = useState(false);
   const [newStartDate, setNewStartDate] = useState<Date | undefined>(undefined);
   const [newEndDate, setNewEndDate] = useState<Date | undefined>(undefined);
@@ -348,6 +474,7 @@ export default function UserProfile() {
 
   const handleSaveProfile = async () => {
     if (!user) return;
+    setEditing(false); // close form immediately for instant feedback
     try {
       await updateProfile.mutateAsync({
         userId: user.id,
@@ -363,11 +490,11 @@ export default function UserProfile() {
           state: form.state
         } as any
       });
-      setEditing(false);
       toast.success("Profile updated successfully!");
     } catch (err: any) {
       console.error("Profile Update Error:", err);
       toast.error(err.message || "Failed to update profile");
+      setEditing(true); // reopen form on error so user can retry
     }
   };
 
@@ -429,9 +556,9 @@ export default function UserProfile() {
   const overallKycStatus = kycData?.overallStatus || "not_started";
 
   const statusColor: Record<string, string> = {
-    confirmed: "bg-accent/10 text-accent border-accent/20", // using active style
+    confirmed: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800",
     pending: "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-400 dark:border-yellow-800",
-    completed: "bg-primary/10 text-primary border-primary/20",
+    completed: "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800",
     cancelled: "bg-destructive/10 text-destructive border-destructive/20",
   };
 
@@ -597,40 +724,18 @@ export default function UserProfile() {
                           <p className="text-[10px] text-amber-600">{10 - form.phone.length} more digits needed</p>
                         )}
                       </div>
-                      <div className="space-y-2 flex flex-col">
+                      <div className="space-y-2">
                         <Label>Date of Birth</Label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              disabled={!editing}
-                              className={cn(
-                                "justify-start text-left font-normal h-10 px-3",
-                                !form.dob && "text-muted-foreground"
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
-                              {form.dob && isValid(parseISO(form.dob)) ? (
-                                format(parseISO(form.dob), "PPP")
-                              ) : (
-                                <span>Select your birth date</span>
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <CalendarPicker
-                              mode="single"
-                              selected={form.dob && isValid(parseISO(form.dob)) ? parseISO(form.dob) : undefined}
-                              onSelect={(date) => {
-                                if (date) {
-                                  setForm({ ...form, dob: format(date, "yyyy-MM-dd") });
-                                }
-                              }}
-                              disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
+                        <DOBPicker
+                          value={form.dob}
+                          onChange={(val) => setForm({ ...form, dob: val })}
+                          disabled={!editing}
+                        />
+                        {form.dob && isValid(parseISO(form.dob)) && !editing && (
+                          <p className="text-xs text-muted-foreground">
+                            {format(parseISO(form.dob), "MMMM d, yyyy")}
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>Gender</Label>
@@ -711,7 +816,7 @@ export default function UserProfile() {
                                     </span>
                                     <span className="font-semibold text-foreground">₹{booking.total_price.toLocaleString()}</span>
                                   </div>
-                                  <Button variant="ghost" size="sm" className="mt-2 text-xs h-8 text-primary" onClick={() => setSelectedBooking(booking)}>
+                                  <Button variant="outline" size="sm" className="mt-2 text-xs h-8" onClick={() => setSelectedBooking(booking)}>
                                     View Details <ChevronRight className="h-3 w-3 ml-1" />
                                   </Button>
                                 </div>
@@ -1291,10 +1396,10 @@ export default function UserProfile() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[
-                    { icon: HelpCircle, label: "FAQs", desc: "Find answers to common questions", link: "/help" },
-                    { icon: MessageSquare, label: "Contact Support", desc: "Get help from our team", link: "/help" },
-                    { icon: FileText, label: "Terms & Conditions", desc: "Read our terms of service", link: "/help" },
-                    { icon: Lock, label: "Privacy Policy", desc: "Your data & privacy", link: "/help" },
+                    { icon: HelpCircle, label: "FAQs", desc: "Find answers to common questions", link: "/help#faqs" },
+                    { icon: MessageSquare, label: "Contact Support", desc: "Get help from our team", link: "/help#contact-support" },
+                    { icon: FileText, label: "Terms & Conditions", desc: "Read our terms of service", link: "/terms" },
+                    { icon: Lock, label: "Privacy Policy", desc: "Your data & privacy", link: "/privacy" },
                   ].map((item) => (
                     <Card key={item.label} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(item.link)}>
                       <CardContent className="p-4 flex items-center gap-4">
@@ -1316,8 +1421,14 @@ export default function UserProfile() {
                     <MessageSquare className="h-10 w-10 mx-auto text-accent mb-3" />
                     <h3 className="font-semibold text-foreground mb-1">Need immediate help?</h3>
                     <p className="text-sm text-muted-foreground mb-4">Our support team is available 24/7</p>
-                    <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                      <MessageSquare className="h-4 w-4 mr-2" /> Start Chat
+                    <Button className="bg-[#25D366] hover:bg-[#128C7E] text-white" asChild>
+                      <a
+                        href="https://wa.me/919492986412?text=Hello%20Xplorwing%20Support%2C%20I%20need%20assistance."
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2" /> Start Chat on WhatsApp
+                      </a>
                     </Button>
                   </CardContent>
                 </Card>
@@ -1412,6 +1523,72 @@ export default function UserProfile() {
               transition={{ duration: 0.2 }}
             >
               <WalletSection />
+            </motion.div>
+          )}
+
+          {/* ====== Refer & Earn ====== */}
+          {activeSection === "referral" && (
+            <motion.div
+              key="referral"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="space-y-6">
+                <h1 className="text-2xl font-bold text-foreground">Refer &amp; Earn</h1>
+
+                <Card className="overflow-hidden border-primary/20">
+                  <div className="bg-primary/5 p-6 border-b border-primary/10">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <Gift className="h-5 w-5 text-primary" />
+                      Invite Friends &amp; Earn Wing Credits
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Earn ₹500 Wing Credits for every friend who signs up and verifies their account using your referral code!
+                    </p>
+                  </div>
+                  <CardContent className="p-6 space-y-4">
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">Your Referral Code</Label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Input
+                            value={referralCode || 'Loading...'}
+                            readOnly
+                            className="font-mono text-lg bg-muted/50 h-12 pr-12"
+                          />
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="absolute right-1 top-1 h-10 w-10 text-muted-foreground hover:text-foreground"
+                            onClick={handleCopyReferral}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <Button
+                          onClick={handleShareReferralWhatsApp}
+                          className="h-12 px-4 gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white shrink-0"
+                        >
+                          <Share2 className="h-4 w-4" />
+                          <span className="hidden sm:inline">Share on WhatsApp</span>
+                          <span className="sm:hidden">Share</span>
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl bg-muted/30 p-4 space-y-2">
+                      <p className="text-sm font-semibold text-foreground">How it works</p>
+                      <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                        <li>Share your unique referral code with friends</li>
+                        <li>Friend signs up on Xplorwing using your code</li>
+                        <li>Friend completes their account verification</li>
+                        <li>You earn ₹500 Wing Credits instantly!</li>
+                      </ol>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </motion.div>
           )}
 

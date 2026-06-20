@@ -115,6 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     role: 'user' | 'host' | 'admin',
   ) => {
     const redirectUrl = `${window.location.origin}/auth`;
+    const { getUserReferralCode } = await import('@/lib/referral');
+    const referredBy = getUserReferralCode();
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -124,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role,
           full_name: fullName,
           phone: mobileNumber ? `+91${mobileNumber.replace(/\D/g, '')}` : undefined,
+          ...(referredBy ? { referred_by: referredBy } : {}),
         },
       },
     });

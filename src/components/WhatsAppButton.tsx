@@ -6,8 +6,8 @@ const WhatsAppButton = () => {
   const { hasResponded } = useCookieConsent();
   const location = useLocation();
 
-  // Hide the Chat with us widget on all admin dashboard pages
-  if (location.pathname.startsWith("/admin")) {
+  // Hide the Chat with us widget on admin and traveller dashboard pages
+  if (location.pathname.startsWith("/admin") || location.pathname.startsWith("/profile")) {
     return null;
   }
 

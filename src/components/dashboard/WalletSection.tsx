@@ -1,14 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Wallet, Gift, ArrowDownLeft, ArrowUpRight, Copy, Share2, 
+import {
+  Wallet, Gift, ArrowDownLeft, ArrowUpRight,
   History, Clock, CheckCircle2, XCircle, AlertCircle, Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -18,7 +17,6 @@ import { useAuth } from '@/hooks/useAuth';
 
 export function WalletSection() {
   const { user } = useAuth();
-  const [referralCode, setReferralCode] = useState<string | null>(null);
 
   // Fetch Wallet Data
   const { data: wallet, isLoading: walletLoading } = useQuery({
@@ -37,22 +35,6 @@ export function WalletSection() {
     enabled: !!user,
   });
 
-  // Fetch Profile (for referral code)
-  useEffect(() => {
-    async function fetchProfile() {
-      if (!user) return;
-      const { data } = await supabase
-        .from('profiles')
-        .select('referral_code')
-        .eq('id', user.id)
-        .maybeSingle();
-      if (data?.referral_code) {
-        setReferralCode(data.referral_code);
-      }
-    }
-    fetchProfile();
-  }, [user]);
-
   // Fetch Transactions
   const { data: transactions = [], isLoading: txLoading } = useQuery({
     queryKey: ['wallet-transactions', wallet?.id],
@@ -69,19 +51,6 @@ export function WalletSection() {
     },
     enabled: !!wallet?.id,
   });
-
-  const handleCopyReferral = () => {
-    if (!referralCode) return;
-    navigator.clipboard.writeText(referralCode);
-    toast.success('Referral code copied to clipboard!');
-  };
-
-  const shareLink = `${window.location.origin}/signup?ref=${referralCode}`;
-
-  const handleShareWhatsApp = () => {
-    const text = encodeURIComponent(`Sign up for Xplorwing Platform using my referral code ${referralCode} and get ₹1000 Wing Credits! ${shareLink}`);
-    window.open(`https://wa.me/?text=${text}`, '_blank');
-  };
 
   const getTransactionIcon = (type: string, amount: number) => {
     if (amount > 0) return <ArrowDownLeft className="h-4 w-4 text-green-500" />;
@@ -185,42 +154,6 @@ export function WalletSection() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Referral Section */}
-      <Card className="overflow-hidden border-primary/20">
-        <div className="bg-primary/5 p-6 border-b border-primary/10">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Gift className="h-5 w-5 text-primary" />
-            Refer & Earn
-          </h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            Invite your friends to Wings and earn ₹500 Wing Credits when they sign up and verify their account!
-          </p>
-        </div>
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row items-center gap-4">
-            <div className="flex-1 w-full relative">
-              <Input 
-                value={referralCode || 'Loading...'} 
-                readOnly 
-                className="font-mono text-lg bg-muted/50 h-12 pr-12"
-              />
-              <Button 
-                size="icon" 
-                variant="ghost" 
-                className="absolute right-1 top-1 h-10 w-10 text-muted-foreground hover:text-foreground"
-                onClick={handleCopyReferral}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-            <Button onClick={handleShareWhatsApp} className="w-full md:w-auto h-12 gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white">
-              <Share2 className="h-4 w-4" />
-              Share on WhatsApp
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Transactions & Expiry */}
       <Tabs defaultValue="transactions">

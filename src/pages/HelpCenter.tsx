@@ -5,11 +5,13 @@ import { motion } from "framer-motion";
 import { Search, HelpCircle, MessageCircle, Phone, Mail } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 const HelpCenter = () => {
   const [supportPhone, setSupportPhone] = useState("+91 9422799420");
   const [supportEmail, setSupportEmail] = useState("support@xplorwing.com");
+  const location = useLocation();
 
   useEffect(() => {
     async function fetchSettings() {
@@ -21,6 +23,14 @@ const HelpCenter = () => {
     }
     fetchSettings();
   }, []);
+
+  useEffect(() => {
+    if (location.hash) {
+      const id = location.hash.slice(1);
+      const el = document.getElementById(id);
+      if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    }
+  }, [location.hash]);
 
   const faqs = [
     {
@@ -112,7 +122,7 @@ const HelpCenter = () => {
       </section>
 
       {/* Contact Methods */}
-      <section className="container mx-auto px-4 py-16">
+      <section id="contact-support" className="container mx-auto px-4 py-16">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
           {contactMethods.map((method, index) => (
             <motion.div
@@ -134,6 +144,7 @@ const HelpCenter = () => {
 
         {/* FAQs */}
         <motion.div
+          id="faqs"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.3 }}
@@ -159,6 +170,38 @@ const HelpCenter = () => {
               </AccordionItem>
             ))}
           </Accordion>
+        </motion.div>
+      </section>
+
+      {/* Terms & Conditions */}
+      <section id="terms" className="container mx-auto px-4 pb-16">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="max-w-4xl mx-auto glass-effect rounded-2xl p-8"
+        >
+          <h2 className="text-2xl font-bold text-foreground mb-4">Terms &amp; Conditions</h2>
+          <p className="text-muted-foreground text-sm mb-4">
+            By using Xplorwing, you agree to our terms of service. Please read the full document carefully before booking or listing services on our platform.
+          </p>
+          <a href="/terms" className="text-primary font-semibold text-sm hover:underline">Read Full Terms &amp; Conditions →</a>
+        </motion.div>
+      </section>
+
+      {/* Privacy Policy */}
+      <section id="privacy-policy" className="container mx-auto px-4 pb-20">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.5 }}
+          className="max-w-4xl mx-auto glass-effect rounded-2xl p-8"
+        >
+          <h2 className="text-2xl font-bold text-foreground mb-4">Privacy Policy</h2>
+          <p className="text-muted-foreground text-sm mb-4">
+            Your privacy matters to us. We are committed to protecting your personal data and being transparent about how we collect, use, and share information.
+          </p>
+          <a href="/privacy" className="text-primary font-semibold text-sm hover:underline">Read Full Privacy Policy →</a>
         </motion.div>
       </section>
 

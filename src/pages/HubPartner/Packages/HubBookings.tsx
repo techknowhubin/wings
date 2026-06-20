@@ -215,12 +215,7 @@ export default function HubBookings() {
 
             const total       = Number(selected.total_amount || 0);
             const wingCredits = Number(selected.wing_credits_used || 0);
-            // amount_paid = what was actually charged to Razorpay (already excludes wing credits)
-            // For old bookings without stored amount_paid, derive: 20% booking fee minus any wing credits
-            const bookingFee   = Math.round(total * 0.20 * 100) / 100;
-            const razorpayPaid = Number(selected.amount_paid) > 0
-              ? Number(selected.amount_paid)
-              : Math.max(bookingFee - wingCredits, 0);
+            const razorpayPaid = Number(selected.amount_paid || 0);
             const totalPaid   = razorpayPaid + wingCredits;
             const remaining   = Math.max(total - totalPaid, 0);
             return (
@@ -281,11 +276,10 @@ export default function HubBookings() {
                     </div>
 
                     <div className="border-t border-border pt-2 space-y-1.5">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Paid Upfront</p>
                       {wingCredits > 0 && (
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Wing Credits used</span>
-                          <span className="font-semibold text-green-600">₹{wingCredits.toLocaleString('en-IN')}</span>
+                          <span className="font-semibold text-green-600">-₹{wingCredits.toLocaleString('en-IN')}</span>
                         </div>
                       )}
                       <div className="flex justify-between text-sm">
@@ -298,11 +292,12 @@ export default function HubBookings() {
                       </div>
                     </div>
 
-                    <div className="flex justify-between border-t border-border pt-2">
-                      <span className="font-semibold text-amber-700">Remaining Balance</span>
-                      <span className="font-bold text-amber-700">₹{remaining.toLocaleString('en-IN')}</span>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">To be collected at tour departure.</p>
+                    {remaining > 0 && (
+                      <div className="flex justify-between border-t border-border pt-2">
+                        <span className="font-semibold text-amber-700">Remaining Balance</span>
+                        <span className="font-bold text-amber-700">₹{remaining.toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

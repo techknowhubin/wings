@@ -656,6 +656,10 @@ const Auth = () => {
         throw new Error("User already exists with this email");
       }
 
+      // Clear WING referral code now that it's been passed to signup metadata
+      const { clearUserReferral } = await import('@/lib/referral');
+      clearUserReferral();
+
       if (data.session) {
         toast({ title: "Account Created!", description: "Welcome to Xplorwing." });
       } else {

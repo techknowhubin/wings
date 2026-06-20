@@ -42,17 +42,16 @@ export default function PackageBookingFlow() {
   const [confirmedBookingRef, setConfirmedBookingRef] = useState('');
 
   const [walletBalance, setWalletBalance] = useState(0);
-  const [maxRedemptionPercentage, setMaxRedemptionPercentage] = useState(10);
   const [useWingCredits, setUseWingCredits] = useState(false);
 
   const selectedPackages = effectiveState?.selectedPackages || [];
   const totalTravellers  = effectiveState?.totalTravellers || 1;
   const grandTotal       = effectiveState?.grandTotal || 0;
 
-  const bookingFee              = grandTotal * 0.20;
-  const maxRedeemableCredits    = Math.min((grandTotal * maxRedemptionPercentage) / 100, walletBalance);
-  const wingCreditsDiscountAmount = useWingCredits ? maxRedeemableCredits : 0;
-  const finalPayable            = Math.max(bookingFee - wingCreditsDiscountAmount, 0);
+  // Credits: max 10% of available credit balance per booking
+  const allowedCredits          = Math.round(walletBalance * 0.10 * 100) / 100;
+  const wingCreditsDiscountAmount = useWingCredits ? Math.min(walletBalance, allowedCredits) : 0;
+  const finalPayable            = Math.max(grandTotal - wingCreditsDiscountAmount, 0);
 
   useEffect(() => {
     if (initialized.current) return;
@@ -106,12 +105,8 @@ export default function PackageBookingFlow() {
   }, [id]);
 
   const fetchWallet = async (userId: string) => {
-    const [walletRes, settingsRes] = await Promise.all([
-      supabase.from("wallets").select("balance").eq("user_id", userId).maybeSingle(),
-      supabase.from("wallet_settings").select("max_redemption_percentage").maybeSingle(),
-    ]);
-    if (walletRes.data)    setWalletBalance(Number(walletRes.data.balance || 0));
-    if (settingsRes.data)  setMaxRedemptionPercentage(Number(settingsRes.data.max_redemption_percentage || 10));
+    const { data } = await supabase.from("wallets").select("balance").eq("user_id", userId).maybeSingle();
+    if (data) setWalletBalance(Number(data.balance || 0));
   };
 
   const fetchPackage = async () => {
@@ -375,7 +370,7 @@ export default function PackageBookingFlow() {
                     <div>
                       <p className="font-bold text-[#0c3b2e] text-lg mb-1">Wing Credits</p>
                       <p className="text-sm text-[#4a6b5d] mb-0.5">Available: ₹{walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
-                      <p className="text-sm text-[#4a6b5d]">You can use up to ₹{maxRedeemableCredits.toLocaleString("en-IN", { minimumFractionDigits: 2 })} for this booking.</p>
+                      <p className="text-sm text-[#4a6b5d]">You can apply up to 10% of your credits — ₹{allowedCredits.toLocaleString("en-IN", { minimumFractionDigits: 2 })} on this booking.</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -401,17 +396,8 @@ export default function PackageBookingFlow() {
               {/* Receipt */}
               <div className="bg-white p-4 border-b border-t border-gray-100 space-y-3">
                 <div className="flex justify-between text-[#4a6b5d]">
-                  <span>Item total</span>
+                  <span>Booking Amount</span>
                   <span className="font-semibold text-foreground">₹{grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between text-[#4a6b5d]">
-                  <span>Service fee</span>
-                  <span className="font-semibold text-foreground">₹0.00</span>
-                </div>
-                <div className="border-t border-dashed border-gray-300 my-2" />
-                <div className="flex justify-between text-[#4a6b5d]">
-                  <span>Booking Fee (20%)</span>
-                  <span className="font-semibold text-foreground">₹{bookingFee.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                 </div>
                 {useWingCredits && wingCreditsDiscountAmount > 0 && (
                   <div className="flex justify-between text-[#115f10]">
@@ -421,7 +407,7 @@ export default function PackageBookingFlow() {
                 )}
                 <div className="border-t border-gray-200 my-2" />
                 <div className="flex justify-between items-center text-[#0c3b2e] pt-2">
-                  <span className="font-bold">Total payable now</span>
+                  <span className="font-bold">Amount to Pay</span>
                   <span className="text-2xl font-bold">₹{finalPayable.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
@@ -445,7 +431,7 @@ export default function PackageBookingFlow() {
               </div>
 
               <p className="text-xs text-center text-muted-foreground">
-                Payments are secured by Razorpay. The remaining balance is due at the time of travel.
+                Payments are secured by Razorpay.
               </p>
             </div>
           )}

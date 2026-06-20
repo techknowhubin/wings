@@ -106,31 +106,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── Deleted-account detection ─────────────────────────────────────────────────
-  // Periodically verify the signed-in user's profile still exists.
-  // When an admin deletes a user the auth token stays valid until it expires,
-  // so we need a client-side liveness check to force an immediate logout.
+  // Two-layer defence so admin-deleted accounts are immediately signed out:
+  //   Layer 1 — Supabase Realtime (instant): subscribes to DELETE events on the
+  //             user's own profiles row. Fires the moment the row is removed.
+  //   Layer 2 — Polling fallback (every 30 s + tab-focus): catches cases where
+  //             the Realtime channel is unavailable or slow to deliver.
   useEffect(() => {
     if (!user) return;
 
+    const forceLogout = async () => {
+      localStorage.setItem(
+        'account_deleted_msg',
+        'Your account has been removed. Please contact support for assistance.'
+      );
+      // Clear local session state without waiting for server round-trip
+      await supabase.auth.signOut({ scope: 'local' });
+      window.location.href = '/auth';
+    };
+
+    // Layer 1: Realtime — fires the instant the profiles row is deleted
+    const channel = supabase
+      .channel(`account-watchdog:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        forceLogout
+      )
+      .subscribe();
+
+    // Layer 2: Polling — safety net if Realtime misses the event
     const checkAlive = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return; // already signed out through normal flow
-
+      if (!session) return;
       const { data: profile } = await supabase
         .from('profiles')
         .select('id')
         .eq('id', user.id)
         .maybeSingle();
-
-      if (!profile) {
-        // Profile gone — admin deleted this account
-        localStorage.setItem(
-          'account_deleted_msg',
-          'Your account has been removed. Please contact support if you believe this is an error.'
-        );
-        await supabase.auth.signOut({ scope: 'local' });
-        window.location.href = '/auth';
-      }
+      if (!profile) await forceLogout();
     };
 
     const onVisibility = () => {
@@ -141,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const interval = setInterval(checkAlive, 30_000);
 
     return () => {
+      supabase.removeChannel(channel);
       document.removeEventListener('visibilitychange', onVisibility);
       clearInterval(interval);
     };

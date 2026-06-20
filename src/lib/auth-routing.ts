@@ -144,6 +144,6 @@ export async function executeRoleBasedRedirect(
   if (!profile?.full_name) {
     navigate("/onboarding/user");
   } else {
-    navigate("/profile/bookings"); // Default dashboard for traveler
+    navigate("/"); // Home page for travellers after login
   }
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff, User, PhoneCall } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, User, PhoneCall, Gift } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
@@ -228,9 +228,23 @@ const Auth = () => {
     targetRole === 'host' ? 'host' : 'user'
   );
 
+  const [referralCode, setReferralCode] = useState("");
+  const [referralError, setReferralError] = useState("");
+
   useEffect(() => {
     setSelectedRole(targetRole === 'host' ? 'host' : 'user');
   }, [targetRole]);
+
+  // Auto-fill referral code from ?ref= URL param
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref) {
+      const clean = ref.trim().toUpperCase();
+      if (/^WING[A-Z0-9]{6,}$/.test(clean)) {
+        setReferralCode(clean);
+      }
+    }
+  }, []);
 
   // Set initial phase based on path
   useEffect(() => {
@@ -248,6 +262,15 @@ const Auth = () => {
       setEmailPhase('enter');
     }
   }, [location.pathname]);
+
+  // Show account-deleted message if admin deleted this account
+  useEffect(() => {
+    const msg = localStorage.getItem('account_deleted_msg');
+    if (msg) {
+      localStorage.removeItem('account_deleted_msg');
+      toast({ variant: "destructive", title: "Account Removed", description: msg });
+    }
+  }, []);
 
   /* ─── routing ─── */
   const handleSuccessRoleRouting = async (currentUser = user) => {
@@ -646,6 +669,28 @@ const Auth = () => {
         });
         setLoading(false);
         return;
+      }
+
+      // Validate and store referral code if provided
+      const trimmedRef = referralCode.trim().toUpperCase();
+      if (trimmedRef) {
+        if (!/^WING[A-Z0-9]{6,}$/.test(trimmedRef)) {
+          setReferralError("Invalid referral code format");
+          setLoading(false);
+          return;
+        }
+        const { data: refProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('referral_code', trimmedRef)
+          .maybeSingle();
+        if (!refProfile) {
+          setReferralError("Referral code not found");
+          setLoading(false);
+          return;
+        }
+        const { captureReferral } = await import('@/lib/referral');
+        captureReferral(trimmedRef);
       }
 
       const { data, error } = await signUp(parsed.email, parsed.password, parsed.fullName, parsed.mobileNumber, parsed.role);
@@ -1113,6 +1158,24 @@ const Auth = () => {
                       <button type="button" onClick={() => { setEmailPhase('enter'); setPassword(''); setFullName(''); setFormErrors({}); }} className="text-[10px] font-bold text-[#115f10] hover:opacity-70 shrink-0">Change</button>
                     )}
                   </div>
+                  {/* Referral code field — optional */}
+                  <div className="relative">
+                    <Gift className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
+                    <input
+                      type="text"
+                      value={referralCode}
+                      onChange={(e) => { setReferralCode(e.target.value.toUpperCase()); setReferralError(""); }}
+                      className="auth-input"
+                      style={{ paddingLeft: '3rem' }}
+                      placeholder="Referral Code (Optional)"
+                      maxLength={20}
+                      autoComplete="off"
+                    />
+                  </div>
+                  {referralError && <p className="text-[11px] text-red-500">{referralError}</p>}
+                  {referralCode && !referralError && /^WING[A-Z0-9]{6,}$/.test(referralCode) && (
+                    <p className="text-[11px] text-green-300">✓ Referral code applied</p>
+                  )}
                   <div className="relative flex items-center">
                     <div className="absolute left-3.5 flex items-center gap-1.5 pointer-events-none z-10">
                       <PhoneCall className="h-[18px] w-[18px] text-gray-400" />

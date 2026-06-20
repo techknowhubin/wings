@@ -105,6 +105,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Deleted-account detection ─────────────────────────────────────────────────
+  // Periodically verify the signed-in user's profile still exists.
+  // When an admin deletes a user the auth token stays valid until it expires,
+  // so we need a client-side liveness check to force an immediate logout.
+  useEffect(() => {
+    if (!user) return;
+
+    const checkAlive = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return; // already signed out through normal flow
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!profile) {
+        // Profile gone — admin deleted this account
+        localStorage.setItem(
+          'account_deleted_msg',
+          'Your account has been removed. Please contact support if you believe this is an error.'
+        );
+        await supabase.auth.signOut({ scope: 'local' });
+        window.location.href = '/auth';
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') checkAlive();
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    const interval = setInterval(checkAlive, 30_000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      clearInterval(interval);
+    };
+  }, [user?.id]);
+
   // ── Auth Actions ─────────────────────────────────────────────────────────────
 
   const signUp = async (

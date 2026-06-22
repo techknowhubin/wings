@@ -8,6 +8,7 @@ import ListingCard from "@/components/ListingCard";
 import CustomerTestimonials from "@/components/CustomerTestimonials";
 import HomeFAQ from "@/components/HomeFAQ";
 import CabFareSection from "@/components/CabFareSection";
+import LocalAirportCabsSection from "@/components/LocalAirportCabsSection";
 import OffersSection from "@/components/OffersSection";
 import WhatsNewSection from "@/components/WhatsNewSection";
 import JourneyCTA from "@/components/JourneyCTA";
@@ -468,6 +469,9 @@ const LandingPage = () => {
           </motion.div>
         </section>
       )}
+
+      {/* Local & Airport Cabs Section */}
+      <LocalAirportCabsSection />
 
       {/* Cab Fare Section */}
       <CabFareSection withContainer />

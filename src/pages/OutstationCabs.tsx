@@ -9,6 +9,7 @@ import CustomerTestimonials from "@/components/CustomerTestimonials";
 import HomeFAQ from "@/components/HomeFAQ";
 import CabFareSection from "@/components/CabFareSection";
 import CabDriverCTA from "@/components/CabDriverCTA";
+import LocalAirportCabsSection from "@/components/LocalAirportCabsSection";
 import WhatsNewSection from "@/components/WhatsNewSection";
 import JourneyCTA from "@/components/JourneyCTA";
 import { motion, AnimatePresence } from "framer-motion";
@@ -345,6 +346,7 @@ const OutstationCabs = () => {
 
 
       <main className="flex-grow flex flex-col">
+        <LocalAirportCabsSection />
         <div className="pt-2 md:pt-16">
           <CabFareSection />
         </div>

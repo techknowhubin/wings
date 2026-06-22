@@ -16,13 +16,15 @@ export default function SEOSchema() {
     name: "Xplorwing",
     alternateName: "WINGSNNESTS ECO SOLUTIONS PVT LTD",
     url: SITE_URL,
-    logo: `${SITE_URL}/hero-xplorwing.jpg`,
+    logo: `${SITE_URL}/logo.png`,
     description:
       "India's first experience-focused integrated travel solution. Book homestays, hotels, resorts, bike rentals, car rentals, outstation cabs, and curated packages.",
     sameAs: [
       "https://www.instagram.com/xplorwing",
       "https://facebook.com/joinXplorwing",
       "https://www.linkedin.com/company/xplor-wing/",
+      "https://www.youtube.com/@XplorWing",
+      "https://twitter.com/xplorwing"
     ],
     contactPoint: {
       "@type": "ContactPoint",

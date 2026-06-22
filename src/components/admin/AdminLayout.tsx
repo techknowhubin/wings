@@ -10,7 +10,7 @@ import { DynamicLogo } from '@/components/DynamicLogo';
 import {
   LayoutDashboard, ShieldCheck, CheckSquare, Store, Users,
   CalendarCheck, Building2, Wallet, BarChart3, Settings,
-  LogOut, FileText, Menu, X, Bell, Search, Mail, Lock, QrCode, Map,
+  LogOut, FileText, Menu, X, Bell, Search, Mail, Lock, QrCode, Map, Globe
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -90,6 +90,7 @@ export default function AdminLayout() {
       title: 'Platform',
       items: [
         { label: 'Blog Posts', to: '/admin/blog-posts', icon: FileText },
+        { label: 'SEO Dashboard', to: '/admin/seo', icon: Globe },
         { label: 'Settings', to: '/admin/settings', icon: Settings },
       ],
     },

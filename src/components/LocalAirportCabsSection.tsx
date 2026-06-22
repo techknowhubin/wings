@@ -12,16 +12,9 @@ import muvImg from "@/assets/MUV-Ertiga.jpeg";
 import suvImg from "@/assets/SUV-Innova.jpeg";
 import { useAuth } from "@/hooks/useAuth";
 import { Check } from "lucide-react";
-import LocationAutocomplete from "./LocationAutocomplete";
+
 
 type BookingType = "Airport Transfer" | "4 Hours Local" | "8 Hours Local";
-
-interface LocationData {
-  address: string;
-  lat: number;
-  lng: number;
-  placeId?: string;
-}
 
 const PRICING: Record<BookingType, { distance: string; prices: Record<string, number>; img: string; badge: string; vehicleBadge: string }> = {
   "Airport Transfer": {
@@ -65,7 +58,7 @@ export default function LocalAirportCabsSection() {
 
   const [travelTime, setTravelTime] = useState("08:00");
   const [travelDate, setTravelDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
-  const [pickupLocation, setPickupLocation] = useState<LocationData | null>(null);
+  const [pickupLocation, setPickupLocation] = useState("");
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -106,7 +99,7 @@ export default function LocalAirportCabsSection() {
     setActiveBookingType(type);
     setPickedVehicle(null);
     setTravelTime("08:00");
-    setPickupLocation(null);
+    setPickupLocation("");
     setSpecialInstructions("");
     setIsVehicleSelectOpen(true);
   };
@@ -115,7 +108,7 @@ export default function LocalAirportCabsSection() {
   const getDropLocation = () => {
     if (!activeBookingType) return "";
     if (activeBookingType === "Airport Transfer") return FIXED_AIRPORT_DROP;
-    return pickupLocation?.address || "Same as Pickup Location";
+    return pickupLocation || "Same as Pickup Location";
   };
 
   const handleOnlinePayment = () => {
@@ -138,15 +131,13 @@ export default function LocalAirportCabsSection() {
       quantity: 1,
       startDate: new Date(travelDate).toISOString(),
       endDate: new Date(travelDate).toISOString(),
-      description: `${pickupLocation.address} → ${dropLocStr} · ${distanceIncluded}`,
+      description: `${pickupLocation} → ${dropLocStr} · ${distanceIncluded}`,
       subtotal: fare,
       discount: 0,
       serviceFee: 0,
       total: fare,
       cabDetails: {
-        pickup_location: pickupLocation.address,
-        pickup_lat: pickupLocation.lat,
-        pickup_lng: pickupLocation.lng,
+        pickup_location: pickupLocation,
         drop_location: dropLocStr,
         travel_date: travelDate,
         pickup_time: travelTime,
@@ -226,13 +217,14 @@ export default function LocalAirportCabsSection() {
               transition={{ duration: 0.3 }}
               className="mt-4 space-y-4 overflow-hidden"
             >
-              {/* ── Pickup Location Autocomplete ── */}
-              <div className="col-span-2">
-                <LocationAutocomplete
-                  label="Pickup Location *"
-                  value={pickupLocation?.address || ""}
-                  onChange={setPickupLocation}
-                  placeholder="Search or use current location"
+              {/* ── Pickup Location ── */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-semibold text-[#013220]">Pickup Location *</Label>
+                <Input
+                  value={pickupLocation}
+                  onChange={(e) => setPickupLocation(e.target.value)}
+                  placeholder="Enter pickup address"
+                  className="h-10 text-sm rounded-xl border-[#e2e8f0]"
                 />
               </div>
 
@@ -359,8 +351,8 @@ export default function LocalAirportCabsSection() {
               <Button
                 className="w-full h-12 text-sm font-bold bg-gradient-to-r from-[#013220] to-[#064e3b] hover:from-[#064e3b] hover:to-[#013220] text-white rounded-xl shadow-md"
                 onClick={() => {
-                  if (!pickupLocation) {
-                    alert("Please select a Pickup Location.");
+                  if (!pickupLocation.trim()) {
+                    alert("Please enter a Pickup Location.");
                     return;
                   }
                   setIsVehicleSelectOpen(false);

@@ -514,12 +514,10 @@ const ConfirmAndPay = () => {
       };
 
       const finalListingId = booking.listingId || "00000000-0000-0000-0000-000000000001";
-      if (finalListingId && finalListingId !== "00000000-0000-0000-0000-000000000001") {
-        bookingData.listing_id = finalListingId;
-      }
-      if (booking.hostId && booking.hostId !== "00000000-0000-0000-0000-000000000000") {
-        bookingData.host_id = booking.hostId;
-      }
+      bookingData.listing_id = finalListingId;
+
+      const finalHostId = (booking.hostId && booking.hostId !== "00000000-0000-0000-0000-000000000000") ? booking.hostId : user.id;
+      bookingData.host_id = finalHostId;
 
       const { data: newBooking, error: bookingError } = await supabase
         .from("bookings")
@@ -531,15 +529,8 @@ const ConfirmAndPay = () => {
         const errMsg = bookingError?.message ?? "Unknown error";
         console.error("Booking insert error:", bookingError);
 
-        // Give an actionable message for RLS violations
-        if (errMsg.includes("row-level security") || errMsg.includes("violates")) {
-          toast.error(
-            "Booking failed: database permission denied. Please ask your admin to add an INSERT policy on the bookings table for authenticated users.",
-            { duration: 8000 }
-          );
-        } else {
-          toast.error(`Failed to initialize booking: ${errMsg}`);
-        }
+        // Show exact error message for debugging
+        toast.error(`Booking DB Error: ${errMsg}`, { duration: 10000 });
         setIsProcessing(false);
         return;
       }
@@ -589,7 +580,7 @@ const ConfirmAndPay = () => {
           const { error: cabError } = await supabase.from('cab_bookings').insert({
             booking_id: newBooking.id,
             traveller_id: user.id,
-            host_id: booking.hostId,
+            host_id: finalHostId,
             hub_partner_id: matchedHubPartnerId,
             assignment_status: assignmentStatus,
             distance_km: booking.cabDetails.distance_km,
@@ -626,7 +617,7 @@ const ConfirmAndPay = () => {
       }
 
       // Notify the host about the new booking request
-      if (booking.hostId) {
+      if (booking.hostId && booking.hostId !== "00000000-0000-0000-0000-000000000000") {
         await createNotification({
           user_id: booking.hostId,
           title: "New Booking Request!",

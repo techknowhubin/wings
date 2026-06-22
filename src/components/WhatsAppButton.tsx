@@ -6,8 +6,12 @@ const WhatsAppButton = () => {
   const { hasResponded } = useCookieConsent();
   const location = useLocation();
 
-  // Hide the Chat with us widget on admin and traveller dashboard pages
-  if (location.pathname.startsWith("/admin") || location.pathname.startsWith("/profile")) {
+  // Hide the Chat with us widget on admin, traveller dashboard, and hub partner pages
+  if (
+    location.pathname.startsWith("/admin") ||
+    location.pathname.startsWith("/profile") ||
+    location.pathname.startsWith("/hub")
+  ) {
     return null;
   }
 

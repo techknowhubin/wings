@@ -1,9 +1,11 @@
 import type { CouponOffer } from "@/lib/discounts";
 
+export type CabBookingSource = 'outstation_cab' | 'airport_transfer' | 'local_4hrs' | 'local_8hrs' | 'marketplace';
+
 export interface BookingDetails {
   listingId?: string;
   listingType: "stay" | "vehicle" | "experience";
-  listingCouponType?: "stays" | "hotels" | "resorts" | "cars" | "bikes" | "experiences";
+  listingCouponType?: "stays" | "hotels" | "resorts" | "cars" | "bikes" | "experiences" | "cabs";
   bookingChannel?: "marketplace" | "link-in-bio";
   hostId?: string;
   listingTitle: string;
@@ -22,6 +24,7 @@ export interface BookingDetails {
   total: number;
   hostDiscountPercent?: number;
   availableCoupons?: CouponOffer[];
+  bookingSource?: CabBookingSource;
   cabDetails?: {
     pickup_location: string;
     drop_location: string;
@@ -31,5 +34,8 @@ export interface BookingDetails {
     cab_type: string;
     fare_amount: number;
     state: string;
+    distance_km?: number;
+    special_instructions?: string;
+    booking_source?: CabBookingSource;
   };
 }

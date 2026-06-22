@@ -40,7 +40,7 @@ function TripStatusBadge({ status }: { status: string }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${cls}`}>{status || 'Awaiting Assignment'}</span>;
 }
 
-export default function HubOutstationCabs() {
+export default function HubLocalCabs() {
   const { uuid } = useParams<{ uuid: string }>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -50,9 +50,11 @@ export default function HubOutstationCabs() {
   const [selectedDriverId, setSelectedDriverId] = useState('');
 
   const { data: bookings, isLoading } = useQuery({
-    queryKey: ['hub-outstation-cabs', uuid],
+    queryKey: ['hub-local-cabs', uuid],
     enabled: !!uuid,
     queryFn: async () => {
+      // NOTE: `assigned_hub_uuid` isn't populated currently, but `hub_partner_id` is.
+      // Let's get the profile ID for this hub first.
       const { data: hub } = await supabase.from('hubs').select('id').eq('uuid', uuid).single();
       const profileId = hub?.id;
 
@@ -61,6 +63,7 @@ export default function HubOutstationCabs() {
         .select(`*, traveller:profiles!cab_bookings_traveller_id_fkey(full_name, phone)`);
 
       if (profileId) {
+        // Support either assigned_hub_uuid or hub_partner_id
         query = query.or(`assigned_hub_uuid.eq.${uuid},hub_partner_id.eq.${profileId}`);
       } else {
         query = query.eq('assigned_hub_uuid', uuid);
@@ -69,8 +72,9 @@ export default function HubOutstationCabs() {
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
-      // Filter strictly by booking_source — outstation only
-      return (data || []).filter((b: any) => b.booking_source === 'outstation_cab');
+      // Filter strictly by booking_source — airport and local rentals only
+      const LOCAL_SOURCES = ['airport_transfer', 'local_4hrs', 'local_8hrs'];
+      return (data || []).filter((b: any) => LOCAL_SOURCES.includes(b.booking_source));
     }
   });
 
@@ -89,7 +93,7 @@ export default function HubOutstationCabs() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hub-outstation-cabs'] });
+      queryClient.invalidateQueries({ queryKey: ['hub-local-cabs'] });
       toast({ title: 'Trip updated' });
     },
     onError: (e: any) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
@@ -127,8 +131,8 @@ export default function HubOutstationCabs() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black tracking-tight">Outstation Cabs</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Manage cab trips, driver assignments, and trip tracking</p>
+          <h1 className="text-2xl font-black tracking-tight">Airport & Local Rentals</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Manage airport transfers, local rentals, driver assignments, and trip tracking</p>
         </div>
       </div>
 

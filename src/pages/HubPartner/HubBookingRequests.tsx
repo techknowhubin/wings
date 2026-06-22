@@ -84,17 +84,28 @@ export default function HubBookingRequests() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('All');
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [detailBooking, setDetailBooking] = useState<Booking | null>(null);
+  const [assigningBooking, setAssigningBooking] = useState<Booking | null>(null);
 
   const { data: bookings, isLoading } = useQuery({
     queryKey: ['hub-booking-requests', uuid],
     enabled: !!uuid,
     queryFn: async () => {
-      const { data, error } = await supabase
+      // NOTE: `assigned_hub_uuid` isn't populated currently, but `hub_partner_id` is.
+      const { data: hub } = await supabase.from('hubs').select('id').eq('uuid', uuid).single();
+      const profileId = hub?.id;
+
+      let query = supabase
         .from('cab_bookings')
-        .select(`*, traveller:profiles!cab_bookings_traveller_id_fkey(full_name, phone)`)
-        .eq('assigned_hub_uuid', uuid)
-        .order('created_at', { ascending: false });
+        .select(`*, traveller:profiles!cab_bookings_traveller_id_fkey(full_name, phone)`);
+
+      if (profileId) {
+        query = query.or(`assigned_hub_uuid.eq.${uuid},hub_partner_id.eq.${profileId}`);
+      } else {
+        query = query.eq('assigned_hub_uuid', uuid);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
     }
@@ -133,7 +144,7 @@ export default function HubBookingRequests() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hub-booking-requests'] });
       toast({ title: 'Driver assigned successfully' });
-      setSelectedBooking(null);
+      setAssigningBooking(null);
     },
     onError: (e: any) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
@@ -145,16 +156,22 @@ export default function HubBookingRequests() {
       b.traveller?.phone?.includes(search) ||
       b.pickup_location?.toLowerCase().includes(search.toLowerCase());
 
-    const status = b.booking_status || 'Pending';
+    const status = (b.booking_status || 'pending').toLowerCase();
     const matchTab = activeTab === 'All' ||
-      status === activeTab ||
-      (activeTab === 'New' && (status === 'Pending' || status === 'Awaiting Hub Partner Assignment'));
+      status === activeTab.toLowerCase() ||
+      (activeTab === 'New' && (
+        status === 'pending' ||
+        status === 'awaiting hub partner assignment'
+      ));
     return matchSearch && matchTab;
   });
 
+  const PENDING_STATUSES = ['pending', 'awaiting hub partner assignment'];
   const counts = {
     All: bookings?.length || 0,
-    New: bookings?.filter((b: Booking) => ['Pending', 'Awaiting Hub Partner Assignment'].includes(b.booking_status || '')).length || 0,
+    New: bookings?.filter((b: Booking) =>
+      PENDING_STATUSES.includes((b.booking_status || 'pending').toLowerCase())
+    ).length || 0,
   };
 
   return (
@@ -254,7 +271,13 @@ export default function HubBookingRequests() {
                       <p className="text-xs text-muted-foreground">→ {b.drop_location || '—'}</p>
                     </TableCell>
                     <TableCell>
-                      <span className="text-xs font-medium text-foreground">{b.service_type || 'Outstation Cab'}</span>
+                      <span className="text-xs font-medium text-foreground">
+                        {b.booking_source === 'airport_transfer' ? '✈ Airport Transfer'
+                          : b.booking_source === 'local_4hrs' ? '🕒 4HRS Local Rental'
+                          : b.booking_source === 'local_8hrs' ? '🕒 8HRS Local Rental'
+                          : b.booking_source === 'outstation_cab' ? '🚗 Outstation Cab'
+                          : b.booking_type || 'Cab Booking'}
+                      </span>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {b.travel_date ? format(new Date(b.travel_date), 'dd MMM yy') : 'TBD'}
@@ -262,16 +285,21 @@ export default function HubBookingRequests() {
                     <TableCell className="font-semibold text-sm">₹{(b.fare_amount || 0).toLocaleString('en-IN')}</TableCell>
                     <TableCell>
                       <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                        b.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                        b.payment_status === 'completed' || b.payment_status === 'paid'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : b.payment_status === 'failed'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-amber-100 text-amber-700'
                       }`}>
-                        {b.payment_status || 'Pending'}
+                        {b.payment_status === 'completed' || b.payment_status === 'paid' ? 'Paid'
+                          : b.payment_status === 'failed' ? 'Failed'
+                          : 'Pending'}
                       </span>
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={b.booking_status || 'Pending'} />
                     </TableCell>
                     <TableCell className="text-right">
-                      <Dialog>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
@@ -281,12 +309,13 @@ export default function HubBookingRequests() {
                           <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DialogTrigger asChild>
-                              <DropdownMenuItem onClick={() => setSelectedBooking(b)}>
-                                <Eye className="h-4 w-4 mr-2" /> View Details
-                              </DropdownMenuItem>
-                            </DialogTrigger>
-                            {['Pending', 'Awaiting Hub Partner Assignment'].includes(b.booking_status || '') && (
+                            <DropdownMenuItem onClick={() => setDetailBooking(b)}>
+                              <Eye className="h-4 w-4 mr-2" /> View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setAssigningBooking(b)}>
+                              <UserPlus className="h-4 w-4 mr-2 text-blue-600" /> Assign Driver
+                            </DropdownMenuItem>
+                            {['pending', 'awaiting hub partner assignment'].includes((b.booking_status || '').toLowerCase()) && (
                               <>
                                 <DropdownMenuItem onClick={() => updateStatus.mutate({ id: b.booking_id, status: 'Confirmed' })}>
                                   <Check className="h-4 w-4 mr-2 text-emerald-600" /> Approve
@@ -312,10 +341,6 @@ export default function HubBookingRequests() {
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
-                        {selectedBooking?.booking_id === b.booking_id && (
-                          <BookingDetailDialog booking={selectedBooking} />
-                        )}
-                      </Dialog>
                     </TableCell>
                   </TableRow>
                 ))
@@ -325,17 +350,74 @@ export default function HubBookingRequests() {
         </div>
       </Card>
 
+      {/* View Details Dialog */}
+      <Dialog open={!!detailBooking} onOpenChange={() => setDetailBooking(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Car className="h-5 w-5 text-primary" />
+              Booking Details
+            </DialogTitle>
+          </DialogHeader>
+          {detailBooking && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm py-2">
+                {[
+                  ['Booking ID', detailBooking.booking_id?.slice(0, 8) + '...'],
+                  ['Service Type', detailBooking.booking_source === 'airport_transfer' ? '✈ Airport Transfer'
+                    : detailBooking.booking_source === 'local_4hrs' ? '🕒 4HRS Local Rental'
+                    : detailBooking.booking_source === 'local_8hrs' ? '🕒 8HRS Local Rental'
+                    : detailBooking.booking_source === 'outstation_cab' ? '🚗 Outstation Cab'
+                    : detailBooking.booking_type || 'Cab Booking'],
+                  ['Traveller', detailBooking.traveller?.full_name || 'N/A'],
+                  ['Mobile', detailBooking.traveller?.phone || 'N/A'],
+                  ['Pickup', detailBooking.pickup_location || 'N/A'],
+                  ['Drop', detailBooking.drop_location || 'N/A'],
+                  ['Travel Date', detailBooking.travel_date ? format(new Date(detailBooking.travel_date), 'dd MMM yyyy, HH:mm') : 'N/A'],
+                  ['Vehicle Type', detailBooking.cab_type || 'Any'],
+                  ['Fare Amount', `₹${(detailBooking.fare_amount || 0).toLocaleString('en-IN')}`],
+                  ['Payment Status', detailBooking.payment_status === 'completed' ? '✅ Paid'
+                    : detailBooking.payment_status === 'failed' ? '❌ Failed'
+                    : '⏳ Pending'],
+                  ['Booking Status', detailBooking.booking_status || 'N/A'],
+                  ['Created', detailBooking.created_at ? format(new Date(detailBooking.created_at), 'dd MMM yyyy') : 'N/A'],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+                    <p className="font-medium text-foreground mt-0.5">{value}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button className="flex-1" onClick={() => { setAssigningBooking(detailBooking); setDetailBooking(null); }}>
+                  <UserPlus className="h-4 w-4 mr-2" /> Assign Driver
+                </Button>
+                {detailBooking.traveller?.phone && (
+                  <Button variant="outline" asChild>
+                    <a href={`tel:${detailBooking.traveller.phone}`}><Phone className="h-4 w-4" /></a>
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Driver Assignment Dialog */}
-      {selectedBooking && (
-        <Dialog open={!!selectedBooking} onOpenChange={() => setSelectedBooking(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Assign Driver</DialogTitle>
-            </DialogHeader>
+      <Dialog open={!!assigningBooking} onOpenChange={() => setAssigningBooking(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><UserPlus className="h-5 w-5 text-primary" />Assign Driver</DialogTitle>
+          </DialogHeader>
+          {assigningBooking && (
             <div className="space-y-4 py-2">
+              <div className="p-3 bg-muted/50 rounded-xl text-sm">
+                <p className="font-semibold">{assigningBooking.traveller?.full_name}</p>
+                <p className="text-muted-foreground text-xs mt-0.5">{assigningBooking.pickup_location} → {assigningBooking.drop_location}</p>
+              </div>
               <p className="text-sm text-muted-foreground">Select a driver for this trip</p>
-              <Select onValueChange={val => assignDriver.mutate({ bookingId: selectedBooking.booking_id, driverId: val })}>
-                <SelectTrigger>
+              <Select onValueChange={val => assignDriver.mutate({ bookingId: assigningBooking.booking_id, driverId: val })}>
+                <SelectTrigger className="rounded-xl">
                   <SelectValue placeholder="Choose driver..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -348,9 +430,9 @@ export default function HubBookingRequests() {
                 </SelectContent>
               </Select>
             </div>
-          </DialogContent>
-        </Dialog>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

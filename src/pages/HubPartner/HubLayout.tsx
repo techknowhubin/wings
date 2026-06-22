@@ -99,6 +99,7 @@ export default function HubLayout() {
       items: [
         { label: 'Booking Requests', to: `${baseUrl}/booking-requests`, icon: CalendarCheck, badge: pendingCount && pendingCount > 0 ? String(pendingCount) : undefined },
         { label: 'Outstation Cabs', to: `${baseUrl}/outstation-cabs`, icon: Car },
+        { label: 'Airport & Local Rentals', to: `${baseUrl}/local-cabs`, icon: Car },
         { label: 'Marketplace Bookings', to: `${baseUrl}/marketplace-bookings`, icon: ShoppingBag },
         { label: 'Walk-In Enquiries', to: `${baseUrl}/walkin-enquiries`, icon: PhoneIncoming },
         { label: 'Traveller Assistance', to: `${baseUrl}/traveller-assistance`, icon: HeadphonesIcon },

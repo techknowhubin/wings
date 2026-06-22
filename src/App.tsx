@@ -77,7 +77,8 @@ import KYCReview from "./pages/Admin/KYCReview";
 import ListingApprovals from "./pages/Admin/ListingApprovals";
 import AdminProviders from "./pages/Admin/AdminProviders";
 import AdminUsers from "./pages/Admin/AdminUsers";
-import AdminBookings from "./pages/Admin/AdminBookings";
+import AdminBookings from "@/pages/Admin/AdminBookings";
+import AdminCabBookings from "@/pages/Admin/AdminCabBookings";
 import AdminHubs from "./pages/Admin/AdminHubs";
 import AdminReferrals from "./pages/Admin/AdminReferrals";
 import AdminPayouts from "./pages/Admin/AdminPayouts";
@@ -102,6 +103,7 @@ import HubOverview from "./pages/HubPartner/HubOverview";
 import HubHosts from "./pages/HubPartner/HubHosts";
 import HubListings from "./pages/HubPartner/HubListings";
 import HubBookings from "./pages/HubPartner/HubBookings";
+import HubLocalCabs from "./pages/HubPartner/HubLocalCabs";
 import HubBookingRequests from "./pages/HubPartner/HubBookingRequests";
 import HubMarketplaceBookings from "./pages/HubPartner/HubMarketplaceBookings";
 import HubWalkInEnquiries from "./pages/HubPartner/HubWalkInEnquiries";
@@ -278,6 +280,7 @@ const App = () =>
               <Route path="providers" element={<AdminProviders />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="bookings" element={<AdminBookings />} />
+              <Route path="cab-bookings" element={<AdminCabBookings />} />
               <Route path="hubs" element={<AdminHubs />} />
               <Route path="referrals" element={<AdminReferrals />} />
               <Route path="payouts" element={<AdminPayouts />} />
@@ -310,6 +313,7 @@ const App = () =>
               {/* Operations */}
               <Route path="booking-requests" element={<HubBookingRequests />} />
               <Route path="outstation-cabs" element={<HubBookings />} />
+              <Route path="local-cabs" element={<HubLocalCabs />} />
               <Route path="marketplace-bookings" element={<HubMarketplaceBookings />} />
               <Route path="walkin-enquiries" element={<HubWalkInEnquiries />} />
               <Route path="traveller-assistance" element={<HubTravellerAssistance />} />

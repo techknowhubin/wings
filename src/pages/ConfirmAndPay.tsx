@@ -564,9 +564,9 @@ const ConfirmAndPay = () => {
             if (partners && partners.length > 0) {
               const pickupLower = booking.cabDetails.pickup_location.toLowerCase();
               const matched = partners.find((p: any) =>
-                (p.assigned_district && p.assigned_district.toLowerCase() === pickupLower) ||
-                (p.assigned_area && p.assigned_area.toLowerCase() === pickupLower) ||
-                (p.assigned_state && p.assigned_state.toLowerCase() === pickupLower)
+                (p.assigned_district && pickupLower.includes(p.assigned_district.toLowerCase())) ||
+                (p.assigned_area && pickupLower.includes(p.assigned_area.toLowerCase())) ||
+                (p.assigned_state && pickupLower.includes(p.assigned_state.toLowerCase()))
               );
               if (matched) {
                 matchedHubPartnerId = matched.id;
@@ -576,6 +576,14 @@ const ConfirmAndPay = () => {
           } catch (e) {
             console.error("Failed to route to hub partner:", e);
           }
+
+          // Derive booking_source from the booking details
+          const bookingSource = booking.bookingSource
+            || booking.cabDetails.booking_source
+            || (booking.listingTitle?.toLowerCase().includes('airport') ? 'airport_transfer'
+              : booking.listingTitle?.toLowerCase().includes('4 hour') || booking.listingTitle?.toLowerCase().includes('4hrs') ? 'local_4hrs'
+              : booking.listingTitle?.toLowerCase().includes('8 hour') || booking.listingTitle?.toLowerCase().includes('8hrs') ? 'local_8hrs'
+              : 'outstation_cab');
 
           const { error: cabError } = await supabase.from('cab_bookings').insert({
             booking_id: newBooking.id,
@@ -592,10 +600,16 @@ const ConfirmAndPay = () => {
             cab_type: booking.cabDetails.cab_type,
             fare_amount: booking.cabDetails.fare_amount,
             base_amount: Number(fullBaseAmount.toFixed(2)),
+            base_fare: Number(fullBaseAmount.toFixed(2)),
             gst_percentage: Number(gstPercentage.toFixed(2)),
             gst_amount: Number(gstAmount.toFixed(2)),
             payment_status: 'pending',
-            booking_status: 'pending'
+            booking_status: 'pending',
+            booking_type: booking.listingTitle,
+            booking_source: bookingSource,
+            booking_category: 'cab',
+            customer_name: name,
+            customer_phone: phone
           });
           if (cabError) console.error("Cab booking insert error:", cabError);
 
@@ -683,7 +697,21 @@ const ConfirmAndPay = () => {
           });
         }
       },
-      onFailure: () => {
+      onFailure: async () => {
+        // Mark the booking as payment_failed so it doesn't sit as 'pending' forever
+        if (pendingBookingId) {
+          // bookings table only supports 'cancelled', not 'failed' for booking_status
+          await supabase.from('bookings').update({
+            payment_status: 'failed',
+            booking_status: 'cancelled',
+          }).eq('id', pendingBookingId);
+
+          // cab_bookings supports 'failed' for booking_status
+          await supabase.from('cab_bookings').update({
+            payment_status: 'failed',
+            booking_status: 'failed',
+          }).eq('booking_id', pendingBookingId);
+        }
         setIsProcessing(false);
         navigate("/transaction-failed", {
           state: { booking: { ...booking, discount: hostDiscountAmount + couponDiscountAmount, total: totalPayable } },

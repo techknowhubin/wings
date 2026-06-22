@@ -118,6 +118,14 @@ export default function LocalAirportCabsSection() {
     const distanceIncluded = PRICING[activeBookingType].distance;
     const dropLocStr = getDropLocation();
 
+    // Determine the exact booking source from the active booking type
+    const bookingSourceMap: Record<BookingType, 'airport_transfer' | 'local_4hrs' | 'local_8hrs'> = {
+      "Airport Transfer": "airport_transfer",
+      "4 Hours Local": "local_4hrs",
+      "8 Hours Local": "local_8hrs",
+    };
+    const bookingSource = bookingSourceMap[activeBookingType];
+
     const bookingDetails = {
       listingType: "vehicle" as const,
       listingCouponType: "cabs" as const,
@@ -136,6 +144,7 @@ export default function LocalAirportCabsSection() {
       discount: 0,
       serviceFee: 0,
       total: fare,
+      bookingSource,
       cabDetails: {
         pickup_location: pickupLocation,
         drop_location: dropLocStr,
@@ -146,6 +155,7 @@ export default function LocalAirportCabsSection() {
         state: "Local",
         distance_km: parseInt(distanceIncluded),
         special_instructions: specialInstructions,
+        booking_source: bookingSource,
       },
     };
 

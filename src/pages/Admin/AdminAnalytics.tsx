@@ -254,6 +254,11 @@ export default function AdminAnalytics() {
     let yearlyRevenue = 0;
     let pendingRevenue = 0;
 
+    let totalGst = 0;
+    let todayGst = 0;
+    let monthlyGst = 0;
+    let yearlyGst = 0;
+
     let totalBookings = 0;
     let bookingFeeRevenue = 0;
     let couponImpact = 0;
@@ -276,20 +281,24 @@ export default function AdminAnalytics() {
     realBookings.forEach(b => {
       const isCompletedOrConfirmed = b.booking_status === 'completed' || b.booking_status === 'confirmed';
       
-      if (isCompletedOrConfirmed) {
-        totalGMV += b.amount;
-        bookingFeeRevenue += b.booking_fee;
-        couponImpact += b.coupon_discount;
+        if (isCompletedOrConfirmed) {
+          totalGMV += b.amount;
+          bookingFeeRevenue += b.booking_fee;
+          couponImpact += b.coupon_discount;
+          totalGst += (b.gst_amount || 0);
 
-        if (b.payment_status === 'completed') {
-          yearlyRevenue += b.platform_revenue;
-          if (b.created_at.startsWith(todayStr)) {
-            todayRevenue += b.platform_revenue;
-          }
-          if (b.created_at.startsWith(monthStr)) {
-            monthlyRevenue += b.platform_revenue;
-          }
-          completedPayouts += b.host_earning;
+          if (b.payment_status === 'completed') {
+            yearlyRevenue += b.platform_revenue;
+            yearlyGst += (b.gst_amount || 0);
+            if (b.created_at.startsWith(todayStr)) {
+              todayRevenue += b.platform_revenue;
+              todayGst += (b.gst_amount || 0);
+            }
+            if (b.created_at.startsWith(monthStr)) {
+              monthlyRevenue += b.platform_revenue;
+              monthlyGst += (b.gst_amount || 0);
+            }
+            completedPayouts += b.host_earning;
         } else if (b.payment_status === 'pending') {
           pendingRevenue += b.platform_revenue;
           pendingPayouts += b.host_earning;
@@ -308,6 +317,10 @@ export default function AdminAnalytics() {
       monthlyRevenue,
       yearlyRevenue,
       pendingRevenue,
+      totalGst,
+      todayGst,
+      monthlyGst,
+      yearlyGst,
       totalBookings,
       bookingFeeRevenue,
       couponImpact,
@@ -457,6 +470,7 @@ export default function AdminAnalytics() {
               ))}
             </div>
           ) : (
+          <>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <Card className="border-border/50">
               <CardContent className="p-5">
@@ -494,6 +508,39 @@ export default function AdminAnalytics() {
               </CardContent>
             </Card>
           </div>
+          
+          <h2 className="text-xl font-bold tracking-tight text-[#013220] mt-6">GST Analytics</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
+            <Card className="border-border/50">
+              <CardContent className="p-5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Total GST Collected (Year)</p>
+                <p className="text-2xl font-black text-orange-600">{INR(ledgerMetrics.yearlyGst)}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Total GST collected this year</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50">
+              <CardContent className="p-5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Monthly GST</p>
+                <p className="text-2xl font-black text-orange-500">{INR(ledgerMetrics.monthlyGst)}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">GST collected this month</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50">
+              <CardContent className="p-5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Today's GST</p>
+                <p className="text-2xl font-black text-orange-400">{INR(ledgerMetrics.todayGst)}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">GST collected today</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50">
+              <CardContent className="p-5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Overall GST</p>
+                <p className="text-2xl font-black text-amber-500">{INR(ledgerMetrics.totalGst)}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Total lifetime GST</p>
+              </CardContent>
+            </Card>
+          </div>
+          </>
           )}
 
           {/* Sub Stats breakdown */}

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
+import { generateInvoicePDF } from "@/lib/invoice";
 
 type Booking = any;
 
@@ -227,7 +228,7 @@ export default function HubOutstationCabs() {
                               <CheckCircle className="h-4 w-4 mr-2 text-emerald-600" />Mark Completed
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => generateInvoicePDF(b)}>
                             <FileText className="h-4 w-4 mr-2" />Generate Invoice
                           </DropdownMenuItem>
                           <DropdownMenuItem>

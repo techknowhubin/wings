@@ -38,7 +38,7 @@ interface Transaction {
   commission_percentage: number;
   payment_status: string;
   created_at: string;
-  bookings: { listing_type: string; start_date: string } | null;
+  bookings: { listing_type: string; start_date: string; base_amount: number; gst_amount: number; total_price: number } | null;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -123,7 +123,7 @@ export default function PartnerDashboard() {
 
       const { data: txns } = await (supabase as any)
         .from('referral_transactions')
-        .select('id, booking_amount, commission_amount, commission_percentage, payment_status, created_at, bookings(listing_type, start_date)')
+        .select('id, booking_amount, commission_amount, commission_percentage, payment_status, created_at, bookings(listing_type, start_date, base_amount, gst_amount, total_price)')
         .eq('partner_id', hub.id)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -161,12 +161,15 @@ export default function PartnerDashboard() {
   const paidAmount     = transactions.filter(t => t.payment_status === 'completed').reduce((s, t) => s + Number(t.commission_amount ?? 0), 0);
   const totalBookings  = transactions.length;
 
+  const totalBaseRevenue = transactions.reduce((s, t) => s + Number(t.bookings?.base_amount ?? t.booking_amount), 0);
+  const totalGstCollected = transactions.reduce((s, t) => s + Number(t.bookings?.gst_amount ?? 0), 0);
+
   const stats = [
     { label: 'QR Scans',        value: partner.qr_scans ?? 0, icon: QrCode,        color: 'text-indigo-600 bg-indigo-50', suffix: '' },
     { label: 'Total Referrals', value: totalBookings, icon: Users,       color: 'text-blue-600 bg-blue-50',   suffix: '' },
-    { label: 'Total Revenue',   value: Number(partner.total_revenue ?? 0).toFixed(0), icon: BarChart3, color: 'text-purple-600 bg-purple-50', prefix: '₹' },
-    { label: 'Commission Earned', value: totalEarned.toFixed(0), icon: TrendingUp, color: 'text-green-700 bg-green-50', prefix: '₹' },
-    { label: 'Pending Payout', value: pendingAmount.toFixed(0), icon: Clock,       color: 'text-amber-600 bg-amber-50', prefix: '₹' },
+    { label: 'Revenue (Before GST)', value: totalBaseRevenue.toFixed(0), icon: BarChart3, color: 'text-purple-600 bg-purple-50', prefix: '₹' },
+    { label: 'GST Collected',   value: totalGstCollected.toFixed(0), icon: TrendingUp, color: 'text-orange-600 bg-orange-50', prefix: '₹' },
+    { label: 'Total Revenue',   value: (totalBaseRevenue + totalGstCollected).toFixed(0), icon: BarChart3, color: 'text-emerald-600 bg-emerald-50', prefix: '₹' },
   ];
 
   return (
@@ -319,7 +322,10 @@ export default function PartnerDashboard() {
                     </div>
 
                     <div className="text-right">
-                      <p className="text-sm font-bold text-gray-900">₹{Number(tx.booking_amount).toFixed(0)}</p>
+                      <p className="text-sm font-bold text-gray-900">₹{Number(tx.bookings?.total_price ?? tx.booking_amount).toFixed(0)}</p>
+                      {tx.bookings?.gst_amount ? (
+                        <p className="text-[10px] text-gray-500">Includes ₹{Number(tx.bookings.gst_amount).toFixed(0)} GST</p>
+                      ) : null}
                       <p className="text-xs text-green-600 font-medium">+₹{Number(tx.commission_amount).toFixed(2)} ({tx.commission_percentage}%)</p>
                     </div>
 

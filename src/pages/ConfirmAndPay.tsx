@@ -110,6 +110,10 @@ const ConfirmAndPay = () => {
   const [maxRedemptionPercentage, setMaxRedemptionPercentage] = useState(10);
   const [useWingCredits, setUseWingCredits] = useState(false);
 
+  // GST Settings
+  const [gstPercentage, setGstPercentage] = useState(0);
+  const [gstEnabled, setGstEnabled] = useState(false);
+
   useEffect(() => {
     async function fetchPlatformCommissionAndWallet() {
       if (!booking) return;
@@ -130,9 +134,40 @@ const ConfirmAndPay = () => {
         if (walletRes.data) setWalletBalance(Number(walletRes.data.balance || 0));
         if (settingsRes.data) setMaxRedemptionPercentage(Number(settingsRes.data.max_redemption_percentage || 10));
       }
+
+      // Fetch GST Settings
+      let rawType = "stays";
+      if (booking.listingType === "stay") {
+        if (booking.listingCouponType === "hotels") rawType = "hotels";
+        else if (booking.listingCouponType === "resorts") rawType = "resorts";
+        else rawType = "stays";
+      } else if (booking.listingType === "experience") {
+        rawType = "experiences";
+      } else if (booking.listingType === "vehicle") {
+        rawType = booking.listingCouponType === "bikes" ? "bikes" : "cars";
+      }
+
+      const { data: gstData } = await supabase
+        .from('gst_settings')
+        .select('listing_type, gst_percentage, is_enabled')
+        .in('listing_type', ['GLOBAL', rawType]);
+      
+      if (gstData) {
+        const globalSetting = gstData.find((s: any) => s.listing_type === 'GLOBAL');
+        const typeSetting = gstData.find((s: any) => s.listing_type === rawType);
+        
+        if (globalSetting?.is_enabled && typeSetting?.is_enabled) {
+          setGstEnabled(true);
+          setGstPercentage(Number(typeSetting.gst_percentage));
+        } else {
+          setGstEnabled(false);
+          setGstPercentage(0);
+        }
+      }
+
     }
     fetchPlatformCommissionAndWallet();
-  }, [booking?.bookingChannel, user]);
+  }, [booking?.bookingChannel, user, booking]);
 
   useEffect(() => {
     const prefillFromProfile = async () => {
@@ -335,11 +370,18 @@ const ConfirmAndPay = () => {
 
   const wingCreditsDiscountAmount = useWingCredits ? maxRedeemableCredits : 0;
 
+  // Xplorwing now acts as merchant of record, collecting full amount
+  // Calculate full final amount
+  const fullBaseAmount = baseTotal; // Subtotal - host discount + service fee
+  const gstAmount = gstEnabled ? (fullBaseAmount * gstPercentage) / 100 : 0;
+  const fullTotalWithTax = fullBaseAmount + gstAmount;
+
   const totalPayable = useMemo(() => {
-    const raw = normalBookingFee - couponDiscountAmount - wingCreditsDiscountAmount;
+    // If the requirement is to charge the full amount + GST:
+    const raw = fullTotalWithTax - couponDiscountAmount - wingCreditsDiscountAmount;
     if (raw <= 0) return 0;
     return Math.max(raw, 1.00);
-  }, [normalBookingFee, couponDiscountAmount, wingCreditsDiscountAmount]);
+  }, [fullTotalWithTax, couponDiscountAmount, wingCreditsDiscountAmount]);
 
   const formatAmount = (val: number) => val.toFixed(2);
 
@@ -429,6 +471,9 @@ const ConfirmAndPay = () => {
         start_date: new Date(booking.startDate).toISOString(),
         end_date: new Date(booking.endDate).toISOString(),
         total_price: Number(totalPayable.toFixed(2)),
+        base_amount: Number(fullBaseAmount.toFixed(2)),
+        gst_percentage: Number(gstPercentage.toFixed(2)),
+        gst_amount: Number(gstAmount.toFixed(2)),
         currency: booking.currencySymbol === "₹" ? "INR" : "USD",
         payment_status: "pending" as Enums<"payment_status">,
         payment_method: "razorpay",
@@ -526,6 +571,9 @@ const ConfirmAndPay = () => {
             return_date: booking.cabDetails.return_date ? new Date(booking.cabDetails.return_date).toISOString() : null,
             cab_type: booking.cabDetails.cab_type,
             fare_amount: booking.cabDetails.fare_amount,
+            base_amount: Number(fullBaseAmount.toFixed(2)),
+            gst_percentage: Number(gstPercentage.toFixed(2)),
+            gst_amount: Number(gstAmount.toFixed(2)),
             payment_status: 'pending',
             booking_status: 'pending'
           });
@@ -1125,23 +1173,17 @@ const ConfirmAndPay = () => {
             {/* Price Breakdown */}
             <div className="space-y-2 text-sm border-t border-border pt-4">
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Item total</span>
-                <span className="font-medium text-foreground">{booking.currencySymbol}{formatAmount(booking.subtotal)}</span>
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-medium text-foreground">{booking.currencySymbol}{formatAmount(fullBaseAmount)}</span>
               </div>
-              {hostDiscountAmount > 0 ? (
+
+              {gstEnabled && gstPercentage > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Host discount ({booking.hostDiscountPercent ?? 0}%)</span>
-                  <span className="font-medium text-accent">-{booking.currencySymbol}{formatAmount(hostDiscountAmount)}</span>
+                  <span className="text-muted-foreground">GST ({gstPercentage}%)</span>
+                  <span className="font-medium text-foreground">{booking.currencySymbol}{formatAmount(gstAmount)}</span>
                 </div>
-              ) : null}
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Service fee</span>
-                <span className="font-medium text-foreground">{booking.currencySymbol}{formatAmount(booking.serviceFee)}</span>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-dashed border-border">
-                <span className="text-muted-foreground">Booking Fee ({bookingFeeRate}%)</span>
-                <span className="font-medium text-foreground">{booking.currencySymbol}{formatAmount(normalBookingFee)}</span>
-              </div>
+              )}
+
               {appliedCoupon ? (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground font-semibold text-accent">

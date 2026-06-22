@@ -10,7 +10,7 @@ import { DynamicLogo } from '@/components/DynamicLogo';
 import {
   LayoutDashboard, ShieldCheck, CheckSquare, Store, Users,
   CalendarCheck, Building2, Wallet, BarChart3, Settings,
-  LogOut, FileText, Menu, X, Bell, Search, Mail, Lock, QrCode, Map, Globe
+  LogOut, FileText, Menu, X, Bell, Search, Mail, Lock, QrCode, Map, Globe, Receipt
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -77,6 +77,7 @@ export default function AdminLayout() {
       items: [
         { label: 'Payouts', to: '/admin/payouts', icon: Wallet },
         { label: 'Wing Credits', to: '/admin/wing-credits', icon: Store },
+        { label: 'Tax & GST', to: '/admin/gst', icon: Receipt },
         { label: 'Revenue Analytics', to: '/admin/analytics', icon: BarChart3 },
       ],
     },

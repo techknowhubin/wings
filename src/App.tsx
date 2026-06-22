@@ -87,6 +87,7 @@ import AdminBlogPosts from "./pages/Admin/AdminBlogPosts";
 import AdminWalletManagement from "./pages/Admin/AdminWalletManagement";
 import AdminSecurityDashboard from "./pages/Admin/AdminSecurityDashboard";
 import SEODashboard from "./pages/Admin/SEODashboard";
+import AdminGSTSettings from "./pages/Admin/AdminGSTSettings";
 import CreatePackage from "./pages/Admin/Packages/CreatePackage";
 import EditPackage from "./pages/Admin/Packages/EditPackage";
 import PackageList from "./pages/Admin/Packages/PackageList";
@@ -285,6 +286,7 @@ const App = () =>
               <Route path="blog-posts" element={<AdminBlogPosts />} />
               <Route path="security" element={<AdminSecurityDashboard />} />
               <Route path="seo" element={<SEODashboard />} />
+              <Route path="gst" element={<AdminGSTSettings />} />
               <Route path="settings" element={<AdminSettings />} />
               
               <Route path="experiences" element={<PackageList />} />

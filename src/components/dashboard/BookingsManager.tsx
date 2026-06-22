@@ -32,6 +32,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import { generateInvoicePDF } from '@/lib/invoice';
+import { FileText } from 'lucide-react';
 
 const statusConfig: Record<BookingStatus, { label: string; color: string; icon: React.ElementType }> = {
   pending:   { label: 'Pending',   color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Clock },
@@ -332,6 +334,11 @@ export function BookingsManager() {
                                     Mark as Completed
                                   </DropdownMenuItem>
                                 )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => generateInvoicePDF(booking)}>
+                                  <FileText className="h-4 w-4 mr-2" />
+                                  Download Invoice
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
@@ -388,6 +395,18 @@ export function BookingsManager() {
                               <span className="text-sm text-muted-foreground">Total Amount</span>
                               <span className="font-semibold">{formatPrice(totalAmount)}</span>
                             </div>
+                            {booking.base_amount != null && booking.gst_amount != null && (
+                              <>
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                  <span>↳ Base</span>
+                                  <span>{formatPrice(booking.base_amount)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                  <span>↳ GST ({booking.gst_percentage}%)</span>
+                                  <span>{formatPrice(booking.gst_amount)}</span>
+                                </div>
+                              </>
+                            )}
                             <div className="flex justify-between text-sm text-muted-foreground">
                               <span>Paid (Online)</span>
                               <span>{formatPrice(paidAmount)}</span>

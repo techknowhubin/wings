@@ -145,24 +145,53 @@ const ConfirmAndPay = () => {
         rawType = "experiences";
       } else if (booking.listingType === "vehicle") {
         rawType = booking.listingCouponType === "bikes" ? "bikes" : "cars";
+      } else if (booking.listingType === "outstation_cab") {
+        rawType = "outstation_cabs";
+      } else if (booking.listingType === "airport_cab") {
+        rawType = "airport_cabs";
+      } else if (booking.listingType === "tour_package") {
+        rawType = "experiences";
       }
 
-      const { data: gstData } = await supabase
-        .from('gst_settings')
-        .select('listing_type, gst_percentage, is_enabled')
-        .in('listing_type', ['GLOBAL', rawType]);
-      
-      if (gstData) {
-        const globalSetting = gstData.find((s: any) => s.listing_type === 'GLOBAL');
-        const typeSetting = gstData.find((s: any) => s.listing_type === rawType);
-        
-        if (globalSetting?.is_enabled && typeSetting?.is_enabled) {
-          setGstEnabled(true);
-          setGstPercentage(Number(typeSetting.gst_percentage));
+      console.log("[GST] Booking listingType:", booking.listingType, "| listingCouponType:", booking.listingCouponType, "| Resolved rawType:", rawType);
+
+      try {
+        const { data: gstData, error: gstError } = await supabase
+          .from('gst_settings' as any)
+          .select('listing_type, gst_percentage, is_enabled')
+          .in('listing_type', ['GLOBAL', rawType]);
+
+        console.log("[GST] Query result:", { gstData, gstError });
+
+        if (gstError) {
+          console.error("[GST] Supabase query error:", gstError);
+        }
+
+        if (gstData && Array.isArray(gstData) && gstData.length > 0) {
+          const globalSetting = gstData.find((s: any) => s.listing_type === 'GLOBAL');
+          const typeSetting = gstData.find((s: any) => s.listing_type === rawType);
+
+          console.log("[GST] Global setting:", globalSetting, "| Type setting:", typeSetting);
+
+          if (globalSetting?.is_enabled && typeSetting?.is_enabled) {
+            const pct = Number(typeSetting.gst_percentage);
+            setGstEnabled(true);
+            setGstPercentage(pct);
+            console.log("[GST] ✅ Enabled with", pct, "% for", rawType);
+          } else {
+            setGstEnabled(false);
+            setGstPercentage(0);
+            console.log("[GST] ❌ Disabled. Global enabled:", globalSetting?.is_enabled, "| Type enabled:", typeSetting?.is_enabled);
+          }
         } else {
           setGstEnabled(false);
           setGstPercentage(0);
+          console.log("[GST] ⚠️ No data returned for rawType:", rawType);
         }
+      } catch (gstFetchError) {
+        console.error("[GST] Fetch failed:", gstFetchError);
+        setGstEnabled(false);
+        setGstPercentage(0);
       }
 
     }

@@ -17,6 +17,35 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { DynamicLogo } from "../DynamicLogo";
 
+const companyLinks = [
+  { label: "About Us", to: "/about" },
+  { label: "Contact Us", to: "/contact" },
+  { label: "Careers", to: "/careers" },
+  { label: "Blog", to: "/blog" },
+  { label: "Privacy Policy", to: "/privacy" },
+  { label: "Terms & Conditions", to: "/terms" },
+];
+
+const travelLinks = [
+  { label: "Home Stays", to: "/home-stays" },
+  { label: "Hotels", to: "/hotels" },
+  { label: "Resorts", to: "/resorts" },
+  { label: "Packages & Experiences", to: "/experiences" },
+];
+
+const transportLinks = [
+  { label: "Bike Rentals", to: "/bike-rentals" },
+  { label: "Car Rentals", to: "/car-rentals" },
+  { label: "Airport Cabs", to: "/airport-cabs" },
+  { label: "Outstation Cabs", to: "/outstation-cabs" },
+];
+
+const hostLinks = [
+  { label: "Become a Host", to: "/become-host" },
+  { label: "Host Dashboard", to: "/host" },
+  { label: "Wing Link", to: "/link-in-bio" },
+];
+
 function Footerdemo() {
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
@@ -27,26 +56,26 @@ function Footerdemo() {
   return (
     <footer className="relative border-t border-border bg-[hsl(48,100%,99%)] dark:bg-card text-foreground transition-colors duration-300">
       <div className="container mx-auto px-4 py-12 md:px-6 lg:px-8">
-        <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-6">
           {/* Newsletter Section */}
-          <div className="relative">
+          <div className="relative lg:col-span-2">
             <Link to="/">
               <DynamicLogo lightHeightClass="h-10" darkHeightClass="h-[53px]" className="mb-4" />
             </Link>
             <h2 className="mb-4 text-lg font-semibold tracking-tight">Stay Connected</h2>
-            <p className="mb-6 text-muted-foreground">
+            <p className="mb-6 text-sm text-muted-foreground">
               Join our newsletter for the latest updates and exclusive offers.
             </p>
-            <form 
-              className="relative" 
+            <form
+              className="relative"
               onSubmit={async (e) => {
                 e.preventDefault();
                 const form = e.currentTarget;
                 const email = (form.elements.namedItem("email") as HTMLInputElement).value;
                 if (!email) return;
-                
+
                 setIsSubscribing(true);
-                
+
                 try {
                   const { data, error } = await supabase.functions.invoke("send-newsletter-welcome", {
                     body: { email },
@@ -58,7 +87,7 @@ function Footerdemo() {
                     title: "Joined Xplorwing newsletter!",
                     description: "A confirmation has been sent to your email.",
                   });
-                  
+
                   setHasSubscribed(true);
                 } catch (error) {
                   console.error("Newsletter error:", error);
@@ -96,111 +125,107 @@ function Footerdemo() {
                 </p>
               )}
             </form>
-          </div>
 
-          {/* Quick Links */}
-          <div>
-            <h3 className="mb-6 text-lg font-semibold">Quick Links</h3>
-            <nav className="space-y-3 text-sm">
-              <Link to="/" className="block text-muted-foreground transition-colors hover:text-primary-text">
-                Home
-              </Link>
-              <Link to="/about" className="block text-muted-foreground transition-colors hover:text-primary-text">
-                About Us
-              </Link>
-              <Link to="/stays" className="block text-muted-foreground transition-colors hover:text-primary-text">
-                Homestays
-              </Link>
-              <Link to="/experiences" className="block text-muted-foreground transition-colors hover:text-primary-text">
-                Experiences
-              </Link>
-              <Link to="/help" className="block text-muted-foreground transition-colors hover:text-primary-text">
-                Help Center
-              </Link>
-            </nav>
-          </div>
-
-          {/* Service Providers */}
-          <div>
-            <h3 className="mb-6 text-lg font-semibold">Service Providers</h3>
-            <nav className="space-y-3 text-sm">
-              <Link to="/link-in-bio" className="block text-muted-foreground transition-colors hover:text-primary-text">
-                Link in Bio
-              </Link>
-              <Link to="/onboarding/host" className="block text-muted-foreground transition-colors hover:text-primary-text">
-                Become a Host
-              </Link>
-            </nav>
-          </div>
-
-          {/* Contact Info */}
-          <div>
-            <h3 className="mb-6 text-lg font-semibold">Contact Us</h3>
-            <address className="space-y-3 text-sm not-italic text-muted-foreground">
-              <p>Serving across India</p>
-              <p>Phone: +91 9422799420</p>
-              <p>Email: hello@xplorwing.com</p>
-            </address>
-          </div>
-
-          {/* Social Links & Theme Toggle */}
-          <div>
-            <h3 className="mb-6 text-lg font-semibold">Follow Us</h3>
-            <TooltipProvider>
-              <div className="mb-6 flex space-x-3">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <a href="http://facebook.com/joinXplorwing" target="_blank" rel="noopener noreferrer">
-                      <Button variant="outline" size="icon" className="rounded-full">
-                        <Facebook className="h-4 w-4" />
-                        <span className="sr-only">Facebook</span>
-                      </Button>
-                    </a>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Follow us on Facebook</p>
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <a href="https://www.instagram.com/xplorwing" target="_blank" rel="noopener noreferrer">
-                      <Button variant="outline" size="icon" className="rounded-full">
-                        <Instagram className="h-4 w-4" />
-                        <span className="sr-only">Instagram</span>
-                      </Button>
-                    </a>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Follow us on Instagram</p>
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <a href="https://www.linkedin.com/company/xplor-wing/" target="_blank" rel="noopener noreferrer">
-                      <Button variant="outline" size="icon" className="rounded-full">
-                        <Linkedin className="h-4 w-4" />
-                        <span className="sr-only">LinkedIn</span>
-                      </Button>
-                    </a>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Connect with us on LinkedIn</p>
-                  </TooltipContent>
-                </Tooltip>
+            {/* Social Links & Theme Toggle */}
+            <div className="mt-6">
+              <TooltipProvider>
+                <div className="mb-4 flex space-x-3">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <a href="http://facebook.com/joinXplorwing" target="_blank" rel="noopener noreferrer">
+                        <Button variant="outline" size="icon" className="rounded-full">
+                          <Facebook className="h-4 w-4" />
+                          <span className="sr-only">Facebook</span>
+                        </Button>
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Follow us on Facebook</p></TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <a href="https://www.instagram.com/xplorwing" target="_blank" rel="noopener noreferrer">
+                        <Button variant="outline" size="icon" className="rounded-full">
+                          <Instagram className="h-4 w-4" />
+                          <span className="sr-only">Instagram</span>
+                        </Button>
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Follow us on Instagram</p></TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <a href="https://www.linkedin.com/company/xplor-wing/" target="_blank" rel="noopener noreferrer">
+                        <Button variant="outline" size="icon" className="rounded-full">
+                          <Linkedin className="h-4 w-4" />
+                          <span className="sr-only">LinkedIn</span>
+                        </Button>
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Connect with us on LinkedIn</p></TooltipContent>
+                  </Tooltip>
+                </div>
+              </TooltipProvider>
+              <div className="flex items-center space-x-2">
+                <Sun className="h-4 w-4" />
+                <Switch checked={isDarkMode} onCheckedChange={toggleTheme} aria-label="Toggle dark mode" />
+                <Moon className="h-4 w-4" />
+                <Label htmlFor="dark-mode" className="sr-only">Toggle dark mode</Label>
               </div>
-            </TooltipProvider>
+            </div>
+          </div>
 
-            <div className="flex items-center space-x-2">
-              <Sun className="h-4 w-4" />
-              <Switch
-                checked={isDarkMode}
-                onCheckedChange={toggleTheme}
-                aria-label="Toggle dark mode"
-              />
-              <Moon className="h-4 w-4" />
-              <Label htmlFor="dark-mode" className="sr-only">
-                Toggle dark mode
-              </Label>
+          {/* Company */}
+          <div>
+            <h3 className="mb-6 text-sm font-bold uppercase tracking-wider text-foreground/70">Company</h3>
+            <nav className="space-y-3 text-sm" aria-label="Company links">
+              {companyLinks.map((l) => (
+                <Link key={l.to} to={l.to} className="block text-muted-foreground transition-colors hover:text-primary-text">
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+
+          {/* Travel */}
+          <div>
+            <h3 className="mb-6 text-sm font-bold uppercase tracking-wider text-foreground/70">Travel</h3>
+            <nav className="space-y-3 text-sm" aria-label="Travel links">
+              {travelLinks.map((l) => (
+                <Link key={l.to} to={l.to} className="block text-muted-foreground transition-colors hover:text-primary-text">
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+
+          {/* Transport */}
+          <div>
+            <h3 className="mb-6 text-sm font-bold uppercase tracking-wider text-foreground/70">Transport</h3>
+            <nav className="space-y-3 text-sm" aria-label="Transport links">
+              {transportLinks.map((l) => (
+                <Link key={l.to} to={l.to} className="block text-muted-foreground transition-colors hover:text-primary-text">
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+
+          {/* Host */}
+          <div>
+            <h3 className="mb-6 text-sm font-bold uppercase tracking-wider text-foreground/70">Host</h3>
+            <nav className="space-y-3 text-sm" aria-label="Host links">
+              {hostLinks.map((l) => (
+                <Link key={l.to} to={l.to} className="block text-muted-foreground transition-colors hover:text-primary-text">
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+            <div className="mt-6 pt-4 border-t border-border/50">
+              <h4 className="text-sm font-bold text-foreground/70 mb-2">Contact</h4>
+              <address className="space-y-2 text-sm not-italic text-muted-foreground">
+                <p>📞 +91 6362986420</p>
+                <p>✉️ hello@xplorwing.com</p>
+              </address>
             </div>
           </div>
         </div>

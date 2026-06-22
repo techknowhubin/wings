@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { resolveListingCardImage } from "@/lib/listing-images";
+import SEOHead from "@/components/SEOHead";
 
 interface Bike {
   id: string;
@@ -80,6 +81,15 @@ const Bikes = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <SEOHead 
+        title="Bike Rentals" 
+        description="Rent scooters and motorcycles for your adventures. Best rates, well-maintained bikes, and easy booking process across India."
+        canonicalPath="/bike-rentals"
+        breadcrumbs={[
+          { name: "Home", url: "/" },
+          { name: "Bike Rentals", url: "/bike-rentals" }
+        ]}
+      />
       <Marquee />
       <Header />
 

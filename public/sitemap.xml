@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Primary Pages -->
+  <url><loc>https://xplorwing.com/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>https://xplorwing.com/about</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://xplorwing.com/contact</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+
+  <!-- Travel Categories -->
+  <url><loc>https://xplorwing.com/home-stays</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://xplorwing.com/stays</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://xplorwing.com/hotels</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://xplorwing.com/resorts</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://xplorwing.com/experiences</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+
+  <!-- Transport Categories -->
+  <url><loc>https://xplorwing.com/bike-rentals</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://xplorwing.com/bikes</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://xplorwing.com/car-rentals</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://xplorwing.com/cars</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://xplorwing.com/outstation-cabs</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://xplorwing.com/airport-cabs</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+
+  <!-- Host Pages -->
+  <url><loc>https://xplorwing.com/become-host</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xplorwing.com/link-in-bio</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+
+  <!-- Destinations -->
+  <url><loc>https://xplorwing.com/destinations</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xplorwing.com/destinations/goa</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://xplorwing.com/destinations/manali</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://xplorwing.com/destinations/jaipur</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://xplorwing.com/destinations/udaipur</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://xplorwing.com/destinations/munnar</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://xplorwing.com/destinations/rishikesh</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+
+  <!-- Content -->
+  <url><loc>https://xplorwing.com/blog</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://xplorwing.com/offers</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://xplorwing.com/careers</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://xplorwing.com/help</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+
+  <!-- Legal -->
+  <url><loc>https://xplorwing.com/privacy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://xplorwing.com/terms</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+</urlset>

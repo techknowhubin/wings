@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { destinationCoordinates } from "@/lib/destination-coordinates";
 import { useIsMobile } from "@/hooks/use-mobile";
+import SEOHead from "@/components/SEOHead";
 
 // Demo images for fallback
 import manaliImage from "@/assets/stays/manali-mountain-homestay.jpg";
@@ -282,6 +283,16 @@ const DestinationDetail = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <SEOHead 
+        title={`${displayName} - Stays, Rentals & Experiences`} 
+        description={`Book the best homestays, hotels, resorts, car rentals, bike rentals, and experiences in ${displayName} on Xplorwing.`}
+        canonicalPath={`/destinations/${name}`}
+        breadcrumbs={[
+          { name: "Home", url: "/" },
+          { name: "Destinations", url: "/destinations" },
+          { name: displayName, url: `/destinations/${name}` }
+        ]}
+      />
       <Marquee />
       <Header />
 

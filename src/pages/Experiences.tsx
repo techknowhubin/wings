@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { resolveListingCardImage } from "@/lib/listing-images";
+import SEOHead from "@/components/SEOHead";
 
 interface Experience {
   id: string;
@@ -81,6 +82,15 @@ const Experiences = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <SEOHead 
+        title="Curated Packages & Experiences" 
+        description="Book local experiences, guided tours, and curated travel packages across India. Find the best authentic activities with Xplorwing."
+        canonicalPath="/packages"
+        breadcrumbs={[
+          { name: "Home", url: "/" },
+          { name: "Packages & Experiences", url: "/packages" }
+        ]}
+      />
       <Marquee />
       <Header />
       <BackButton />

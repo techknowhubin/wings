@@ -27,6 +27,8 @@ interface Stay {
   long_stay_discount_30?: number;
 }
 
+import SEOHead from "@/components/SEOHead";
+
 const Stays = () => {
   const [stays, setStays] = useState<Stay[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +86,15 @@ const Stays = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <SEOHead 
+        title="Home Stays & Villas" 
+        description="Book the best authentic homestays and private villas across India. Experience local culture, homemade food, and beautiful locations with Xplorwing."
+        canonicalPath="/home-stays"
+        breadcrumbs={[
+          { name: "Home", url: "/" },
+          { name: "Home Stays", url: "/home-stays" }
+        ]}
+      />
       <Marquee />
       <Header />
       <BackButton />

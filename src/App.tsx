@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from "react-router-dom";
 import { useEffect } from "react";
+import { HelmetProvider } from "react-helmet-async";
 import { captureReferral } from "@/lib/referral";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -13,6 +14,7 @@ import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
 import MissingSupabaseConfig from "@/components/MissingSupabaseConfig";
 import ScrollToTop from "./components/ScrollToTop";
 import AuthRedirectHandler from "./components/AuthRedirectHandler";
+import SEOSchema from "./components/SEOSchema";
 import LandingPage from "./pages/LandingPage";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -54,6 +56,10 @@ import CookieSettings from "./pages/CookieSettings";
 import CabsBookingPage from "./pages/CabsBookingPage";
 import WhatsAppButton from "./components/WhatsAppButton";
 import PartnerDashboard from "./pages/PartnerDashboard";
+import Contact from "./pages/Contact";
+import BecomeHost from "./pages/BecomeHost";
+import AirportCabs from "./pages/AirportCabs";
+import SEOLandingPage from "./pages/SEOLandingPage";
 
 import { ProtectedTravelerRoute } from "./components/ProtectedTravelerRoute";
 import { RoleGuard } from "./components/RoleGuard";
@@ -139,6 +145,7 @@ const App = () =>
   !isSupabaseConfigured ? (
     <MissingSupabaseConfig />
   ) : (
+    <HelmetProvider>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <CookieConsentProvider>
@@ -150,6 +157,7 @@ const App = () =>
           <ScrollToTop />
           <ReferralCapture />
           <AuthRedirectHandler />
+          <SEOSchema />
           <Routes>
             <Route path="/" element={<RoleGuard><OutstationCabs /></RoleGuard>} />
             <Route path="/landing-page" element={<LandingPage />} />
@@ -160,6 +168,8 @@ const App = () =>
             <Route path="/signup" element={<Navigate to="/auth" replace />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+
+            {/* Primary category pages */}
             <Route path="/stays" element={<Stays />} />
             <Route path="/stays/:id" element={<StayDetail tableType="stays" />} />
             <Route path="/hotels" element={<Hotels />} />
@@ -171,13 +181,32 @@ const App = () =>
             <Route path="/experiences" element={<TourPackages />} />
             <Route path="/experiences/:id" element={<TourPackageDetail />} />
             <Route path="/experiences/:id/book" element={<PackageBookingFlow />} />
-            <Route path="/packages" element={<Navigate to="/experiences" replace />} />
-            <Route path="/outstation-cabs" element={<Navigate to="/" replace />} />
-            <Route path="/cabs-booking" element={<CabsBookingPage />} />
             <Route path="/bikes" element={<Bikes />} />
             <Route path="/bikes/:id" element={<BikeDetail />} />
             <Route path="/cars" element={<Cars />} />
             <Route path="/cars/:id" element={<CarDetail />} />
+
+            {/* SEO-friendly URL aliases for sitelinks */}
+            <Route path="/home-stays" element={<Stays />} />
+            <Route path="/bike-rentals" element={<Bikes />} />
+            <Route path="/car-rentals" element={<Cars />} />
+            <Route path="/outstation-cabs" element={<Navigate to="/" replace />} />
+            <Route path="/airport-cabs" element={<AirportCabs />} />
+            <Route path="/packages" element={<Navigate to="/experiences" replace />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/become-host" element={<BecomeHost />} />
+
+            {/* Specific SEO Location Pages */}
+            <Route path="/hotels-in-hyderabad" element={<SEOLandingPage type="hotels" city="hyderabad" title="Hotels in Hyderabad" />} />
+            <Route path="/resorts-in-goa" element={<SEOLandingPage type="resorts" city="goa" title="Resorts in Goa" />} />
+            <Route path="/home-stays-in-vizag" element={<SEOLandingPage type="stays" city="vizag" title="Homestays in Vizag" />} />
+            <Route path="/outstation-cabs-hyderabad" element={<SEOLandingPage type="outstation-cabs" city="hyderabad" title="Outstation Cabs from Hyderabad" />} />
+            <Route path="/airport-cabs-hyderabad" element={<SEOLandingPage type="airport-cabs" city="hyderabad" title="Airport Cabs in Hyderabad" />} />
+
+            {/* Cab booking */}
+            <Route path="/cabs-booking" element={<CabsBookingPage />} />
+
+            {/* Info & content pages */}
             <Route path="/about" element={<AboutUs />} />
             <Route path="/careers" element={<Careers />} />
             <Route path="/blog" element={<Blog />} />
@@ -316,6 +345,7 @@ const App = () =>
         </CookieConsentProvider>
       </AuthProvider>
     </QueryClientProvider>
+    </HelmetProvider>
   );
 
 export default App;

@@ -21,6 +21,7 @@ import heroXplorwing from "@/assets/hero-xplorwing.jpg";
 import heroTajmahal from "@/assets/hero-tajmahal.jpg";
 import { format } from "date-fns";
 import { BookOpen } from "lucide-react";
+import SEOHead from "@/components/SEOHead";
 
 import heroOutstationCabs from "@/assets/hero-outstation-cabs.jpg";
 import heroOutstationCabs1 from "@/assets/hero-outstation-cabs-1.jpg";
@@ -283,6 +284,11 @@ const OutstationCabs = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead 
+        title="Outstation Cabs & Intercity Travel" 
+        description="Book outstation cabs, one-way drops, and round trips across India. Clean cars, verified drivers, transparent billing, and zero hidden charges."
+        canonicalPath="/outstation-cabs"
+      />
       <Marquee />
       <Header />
       <BackButton />

@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { resolveListingCardImage } from "@/lib/listing-images";
+import SEOHead from "@/components/SEOHead";
 
 interface Resort {
   id: string;
@@ -90,6 +91,15 @@ const Resorts = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <SEOHead 
+        title="Luxury Resorts & Retreats" 
+        description="Discover luxury resorts and nature retreats across India. Book exclusive getaways with top amenities on Xplorwing."
+        canonicalPath="/resorts"
+        breadcrumbs={[
+          { name: "Home", url: "/" },
+          { name: "Resorts", url: "/resorts" }
+        ]}
+      />
       <Marquee />
       <Header />
       <BackButton />

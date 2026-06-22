@@ -94,20 +94,24 @@ function HubOverviewContent() {
     queryKey: ['hub-overview-stats', uuid],
     enabled: !!uuid,
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+      const { data: hubData } = await supabase.from('hubs').select('id').eq('uuid', uuid).single();
+      const profileId = hubData?.id;
 
       const [
         { data: allBookings },
         { count: todayCount },
         { count: activeDrivers },
         { count: hostCount },
-        { data: listingCounts },
+        listingCounts,
         { count: travellerCount },
         { data: recentBookings },
       ] = await Promise.all([
-        supabase.from('cab_bookings').select('fare_amount, booking_status, created_at, trip_status').eq('assigned_hub_uuid', uuid),
-        supabase.from('cab_bookings').select('*', { count: 'exact', head: true }).eq('assigned_hub_uuid', uuid).gte('created_at', today),
+        supabase.from('cab_bookings').select('fare_amount, booking_status, created_at, trip_status').eq('hub_partner_id', profileId),
+        supabase.from('cab_bookings').select('*', { count: 'exact', head: true }).eq('hub_partner_id', profileId).gte('created_at', todayStart),
         supabase.from('hub_drivers').select('*', { count: 'exact', head: true }).eq('hub_uuid', uuid).eq('status', 'active'),
         // Hosts = user_roles rows with role='host'
         supabase.from('user_roles').select('*', { count: 'exact', head: true }).eq('role', 'host'),
@@ -124,7 +128,7 @@ function HubOverviewContent() {
         supabase.from('user_roles').select('*', { count: 'exact', head: true }).eq('role', 'user'),
         supabase.from('cab_bookings')
           .select(`*, traveller:profiles!cab_bookings_traveller_id_fkey(full_name, phone)`)
-          .eq('assigned_hub_uuid', uuid)
+          .eq('hub_partner_id', profileId)
           .order('created_at', { ascending: false })
           .limit(8),
       ]);
@@ -159,7 +163,7 @@ function HubOverviewContent() {
         hostCount: hostCount || 0,
         listingCount: totalListings,
         travellerCount: travellerCount || 0,
-        monthlyRevenue,
+        totalBookings: bookings.length,
         pendingApprovals,
         recentBookings: recentBookings || [],
         chartData: Array.from(chartMap.values()),
@@ -181,7 +185,7 @@ function HubOverviewContent() {
     { label: "Active Drivers", value: stats?.activeDrivers ?? 0, icon: Users, color: "text-emerald-600", bgColor: "bg-emerald-500/10", sub: "Available for trips" },
     { label: "Total Listings", value: stats?.listingCount ?? 0, icon: Building, color: "text-amber-600", bgColor: "bg-amber-500/10", sub: "Stays, hotels, etc." },
     { label: "Registered Travellers", value: stats?.travellerCount ?? 0, icon: MapPin, color: "text-rose-600", bgColor: "bg-rose-500/10", sub: "Platform users" },
-    { label: "Monthly Revenue", value: `₹${((stats?.monthlyRevenue ?? 0) / 1000).toFixed(1)}K`, icon: IndianRupee, color: "text-teal-600", bgColor: "bg-teal-500/10", sub: "This month's cab fares" },
+    { label: "Total Bookings", value: stats?.totalBookings ?? 0, icon: CalendarCheck, color: "text-teal-600", bgColor: "bg-teal-500/10", sub: "All time cab bookings" },
   ];
 
   return (

@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import {
   Search, Loader2, CalendarCheck, Car, Eye, Check, X, UserPlus,
-  Phone, MessageCircle, ArrowRight, MoreHorizontal, Filter
+  Phone, MessageCircle, ArrowRight, MoreHorizontal, Filter, MapPin
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -43,6 +43,17 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+const safeFormatDate = (dateStr: any, fmt: string) => {
+  if (!dateStr) return 'N/A';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'Invalid Date';
+    return format(d, fmt);
+  } catch (e) {
+    return 'Invalid Date';
+  }
+};
+
 function BookingDetailDialog({ booking }: { booking: Booking }) {
   return (
     <DialogContent className="max-w-lg">
@@ -54,22 +65,22 @@ function BookingDetailDialog({ booking }: { booking: Booking }) {
       </DialogHeader>
       <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm py-2">
         {[
-          ['Booking ID', booking.booking_id?.slice(0, 8) + '...'],
+          ['Booking ID', booking.booking_id ? booking.booking_id.slice(0, 8) + '...' : 'N/A'],
           ['Service Type', booking.service_type || 'Outstation Cab'],
           ['Traveller', booking.traveller?.full_name || 'N/A'],
           ['Mobile', booking.traveller?.phone || 'N/A'],
           ['Pickup', booking.pickup_location || 'N/A'],
           ['Drop', booking.drop_location || 'N/A'],
-          ['Travel Date', booking.travel_date ? format(new Date(booking.travel_date), 'dd MMM yyyy, HH:mm') : 'N/A'],
+          ['Travel Date', safeFormatDate(booking.travel_date, 'dd MMM yyyy, HH:mm')],
           ['Vehicle Type', booking.cab_type || 'Any'],
-          ['Fare Amount', `₹${(booking.fare_amount || 0).toLocaleString('en-IN')}`],
+          ['Fare Amount', `₹${Number(booking.fare_amount || 0).toLocaleString('en-IN')}`],
           ['Payment Status', booking.payment_status || 'N/A'],
           ['Booking Status', booking.booking_status || 'N/A'],
-          ['Created', booking.created_at ? format(new Date(booking.created_at), 'dd MMM yyyy') : 'N/A'],
-        ].map(([label, value]) => (
-          <div key={label}>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-            <p className="font-medium text-foreground mt-0.5">{value}</p>
+          ['Created', safeFormatDate(booking.created_at, 'dd MMM yyyy')],
+        ].map(([label, value], idx) => (
+          <div key={String(label) + idx}>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{String(label)}</p>
+            <p className="font-medium text-foreground mt-0.5">{String(value)}</p>
           </div>
         ))}
       </div>
@@ -256,7 +267,7 @@ export default function HubBookingRequests() {
                 filtered.map((b: Booking) => (
                   <TableRow key={b.booking_id} className="hover:bg-muted/30 transition-colors">
                     <TableCell className="font-mono text-xs text-muted-foreground">
-                      #{b.booking_id?.slice(-8).toUpperCase()}
+                      #{b.booking_id ? String(b.booking_id).slice(-8).toUpperCase() : 'N/A'}
                     </TableCell>
                     <TableCell>
                       <div>
@@ -285,14 +296,14 @@ export default function HubBookingRequests() {
                     <TableCell className="font-semibold text-sm">₹{(b.fare_amount || 0).toLocaleString('en-IN')}</TableCell>
                     <TableCell>
                       <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                        b.payment_status === 'completed' || b.payment_status === 'paid'
+                        b.payment_status?.toLowerCase() === 'completed' || b.payment_status?.toLowerCase() === 'paid'
                           ? 'bg-emerald-100 text-emerald-700'
-                          : b.payment_status === 'failed'
+                          : b.payment_status?.toLowerCase() === 'failed'
                           ? 'bg-red-100 text-red-700'
                           : 'bg-amber-100 text-amber-700'
                       }`}>
-                        {b.payment_status === 'completed' || b.payment_status === 'paid' ? 'Paid'
-                          : b.payment_status === 'failed' ? 'Failed'
+                        {b.payment_status?.toLowerCase() === 'completed' || b.payment_status?.toLowerCase() === 'paid' ? 'Paid'
+                          : b.payment_status?.toLowerCase() === 'failed' ? 'Failed'
                           : 'Pending'}
                       </span>
                     </TableCell>
@@ -363,7 +374,7 @@ export default function HubBookingRequests() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm py-2">
                 {[
-                  ['Booking ID', detailBooking.booking_id?.slice(0, 8) + '...'],
+                  ['Booking ID', detailBooking.booking_id ? String(detailBooking.booking_id).slice(0, 8) + '...' : 'N/A'],
                   ['Service Type', detailBooking.booking_source === 'airport_transfer' ? '✈ Airport Transfer'
                     : detailBooking.booking_source === 'local_4hrs' ? '🕒 4HRS Local Rental'
                     : detailBooking.booking_source === 'local_8hrs' ? '🕒 8HRS Local Rental'
@@ -373,18 +384,18 @@ export default function HubBookingRequests() {
                   ['Mobile', detailBooking.traveller?.phone || 'N/A'],
                   ['Pickup', detailBooking.pickup_location || 'N/A'],
                   ['Drop', detailBooking.drop_location || 'N/A'],
-                  ['Travel Date', detailBooking.travel_date ? format(new Date(detailBooking.travel_date), 'dd MMM yyyy, HH:mm') : 'N/A'],
+                  ['Travel Date', safeFormatDate(detailBooking.travel_date, 'dd MMM yyyy, HH:mm')],
                   ['Vehicle Type', detailBooking.cab_type || 'Any'],
-                  ['Fare Amount', `₹${(detailBooking.fare_amount || 0).toLocaleString('en-IN')}`],
-                  ['Payment Status', detailBooking.payment_status === 'completed' ? '✅ Paid'
-                    : detailBooking.payment_status === 'failed' ? '❌ Failed'
+                  ['Fare Amount', `₹${Number(detailBooking.fare_amount || 0).toLocaleString('en-IN')}`],
+                  ['Payment Status', detailBooking.payment_status?.toLowerCase() === 'completed' || detailBooking.payment_status?.toLowerCase() === 'paid' ? '✅ Paid'
+                    : detailBooking.payment_status?.toLowerCase() === 'failed' ? '❌ Failed'
                     : '⏳ Pending'],
                   ['Booking Status', detailBooking.booking_status || 'N/A'],
-                  ['Created', detailBooking.created_at ? format(new Date(detailBooking.created_at), 'dd MMM yyyy') : 'N/A'],
-                ].map(([label, value]) => (
-                  <div key={label}>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-                    <p className="font-semibold text-sm truncate">{value}</p>
+                  ['Created', safeFormatDate(detailBooking.created_at, 'dd MMM yyyy')],
+                ].map(([label, value], idx) => (
+                  <div key={String(label) + idx}>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{String(label)}</p>
+                    <p className="font-semibold text-sm truncate">{String(value)}</p>
                   </div>
                 ))}
               </div>

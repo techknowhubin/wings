@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Search, Loader2, Car, Phone, MessageCircle, UserPlus, FileText,
   Download, MapPin, Calendar, MoreHorizontal, Navigation, CheckCircle,
-  Clock, AlertCircle, RefreshCw
+  Clock, AlertCircle, RefreshCw, Eye
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -40,12 +40,24 @@ function TripStatusBadge({ status }: { status: string }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${cls}`}>{status || 'Awaiting Assignment'}</span>;
 }
 
+const safeFormatDate = (dateStr: any, fmt: string) => {
+  if (!dateStr) return 'N/A';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'Invalid Date';
+    return format(d, fmt);
+  } catch (e) {
+    return 'Invalid Date';
+  }
+};
+
 export default function HubOutstationCabs() {
   const { uuid } = useParams<{ uuid: string }>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('All');
+  const [detailBooking, setDetailBooking] = useState<Booking | null>(null);
   const [assigningBooking, setAssigningBooking] = useState<Booking | null>(null);
   const [selectedDriverId, setSelectedDriverId] = useState('');
 
@@ -183,7 +195,7 @@ export default function HubOutstationCabs() {
               ) : (
                 filtered.map((b: Booking) => (
                   <TableRow key={b.booking_id} className="hover:bg-muted/30 transition-colors">
-                    <TableCell className="font-mono text-xs text-muted-foreground">#{b.booking_id?.slice(-8).toUpperCase()}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">#{b.booking_id ? String(b.booking_id).slice(-8).toUpperCase() : 'N/A'}</TableCell>
                     <TableCell>
                       <p className="font-semibold text-sm">{b.traveller?.full_name || 'N/A'}</p>
                       <p className="text-xs text-muted-foreground">{b.traveller?.phone || 'N/A'}</p>
@@ -205,14 +217,14 @@ export default function HubOutstationCabs() {
                     <TableCell className="font-semibold text-sm">₹{(b.fare_amount || 0).toLocaleString('en-IN')}</TableCell>
                     <TableCell>
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                        b.payment_status === 'completed' || b.payment_status === 'paid'
+                        b.payment_status?.toLowerCase() === 'completed' || b.payment_status?.toLowerCase() === 'paid'
                           ? 'bg-emerald-100 text-emerald-700'
-                          : b.payment_status === 'failed'
+                          : b.payment_status?.toLowerCase() === 'failed'
                           ? 'bg-red-100 text-red-700'
                           : 'bg-amber-100 text-amber-700'
                       }`}>
-                        {b.payment_status === 'completed' || b.payment_status === 'paid' ? 'Paid'
-                          : b.payment_status === 'failed' ? 'Failed'
+                        {b.payment_status?.toLowerCase() === 'completed' || b.payment_status?.toLowerCase() === 'paid' ? 'Paid'
+                          : b.payment_status?.toLowerCase() === 'failed' ? 'Failed'
                           : 'Pending'}
                       </span>
                     </TableCell>
@@ -225,6 +237,9 @@ export default function HubOutstationCabs() {
                         <DropdownMenuContent align="end" className="w-52">
                           <DropdownMenuLabel className="text-xs">Trip Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => setDetailBooking(b)}>
+                            <Eye className="h-4 w-4 mr-2" /> View Details
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setAssigningBooking(b)}>
                             <UserPlus className="h-4 w-4 mr-2 text-blue-600" />
                             {b.driver_id ? 'Reassign Driver' : 'Assign Driver'}
@@ -314,6 +329,93 @@ export default function HubOutstationCabs() {
                 {updateTrip.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UserPlus className="h-4 w-4 mr-2" />}
                 Assign Driver
               </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* View Details Dialog */}
+      <Dialog open={!!detailBooking} onOpenChange={() => setDetailBooking(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Car className="h-5 w-5 text-primary" />
+              Trip Details
+            </DialogTitle>
+          </DialogHeader>
+          {detailBooking && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm py-2">
+                {[
+                  ['Booking ID', detailBooking.booking_id ? String(detailBooking.booking_id).slice(0, 8) + '...' : 'N/A'],
+                  ['Service Type', detailBooking.booking_source === 'airport_transfer' ? '✈ Airport Transfer'
+                    : detailBooking.booking_source === 'local_4hrs' ? '🕒 4HRS Local Rental'
+                    : detailBooking.booking_source === 'local_8hrs' ? '🕒 8HRS Local Rental'
+                    : detailBooking.booking_source === 'outstation_cab' ? '🚗 Outstation Cab'
+                    : detailBooking.booking_type || 'Cab Booking'],
+                  ['Traveller', detailBooking.traveller?.full_name || 'N/A'],
+                  ['Mobile', detailBooking.traveller?.phone || 'N/A'],
+                  ['Pickup', detailBooking.pickup_location || 'N/A'],
+                  ['Drop', detailBooking.drop_location || 'N/A'],
+                  ['Travel Date', safeFormatDate(detailBooking.travel_date, 'dd MMM yyyy')],
+                  ['Vehicle Type', detailBooking.cab_type || 'Any'],
+                  ['Fare Amount', `₹${Number(detailBooking.fare_amount || 0).toLocaleString('en-IN')}`],
+                  ['Payment Status', detailBooking.payment_status?.toLowerCase() === 'completed' || detailBooking.payment_status?.toLowerCase() === 'paid' ? '✅ Paid'
+                    : detailBooking.payment_status?.toLowerCase() === 'failed' ? '❌ Failed'
+                    : '⏳ Pending'],
+                  ['Booking Status', detailBooking.booking_status || 'N/A'],
+                  ['Trip Status', detailBooking.trip_status || 'Awaiting Assignment'],
+                  ['Created', safeFormatDate(detailBooking.created_at, 'dd MMM yyyy')],
+                ].map(([label, value], idx) => (
+                  <div key={String(label) + idx}>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{String(label)}</p>
+                    <p className="font-semibold text-sm truncate">{String(value)}</p>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Map Preview */}
+              {(detailBooking.pickup_latitude && detailBooking.pickup_longitude) ? (
+                <div className="mt-4 pt-4 border-t border-border/50">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">📍 Pickup Location Map</p>
+                  <p className="text-xs text-foreground mb-3">{detailBooking.pickup_location}</p>
+                  <div className="rounded-xl overflow-hidden border border-border/50 bg-muted/30">
+                    <iframe 
+                      width="100%" 
+                      height="200" 
+                      style={{ border: 0 }} 
+                      src={`https://maps.google.com/maps?q=${detailBooking.pickup_latitude},${detailBooking.pickup_longitude}&z=15&output=embed`} 
+                    />
+                  </div>
+                  <a 
+                    href={`https://www.google.com/maps?q=${detailBooking.pickup_latitude},${detailBooking.pickup_longitude}`} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="inline-flex w-full items-center justify-center gap-2 mt-3 py-2 px-4 bg-muted hover:bg-muted/80 text-foreground font-semibold rounded-lg text-sm transition-colors"
+                  >
+                    <MapPin className="h-4 w-4" />
+                    Open in Google Maps
+                  </a>
+                </div>
+              ) : detailBooking.map_url ? (
+                <div className="mt-4 pt-4 border-t border-border/50">
+                  <a href={detailBooking.map_url} target="_blank" rel="noreferrer" className="inline-flex w-full items-center justify-center gap-2 py-2 px-4 bg-muted hover:bg-muted/80 text-foreground font-semibold rounded-lg text-sm transition-colors">
+                    <MapPin className="h-4 w-4" />
+                    View Map (Legacy Link)
+                  </a>
+                </div>
+              ) : null}
+
+              <div className="flex gap-2 pt-2">
+                <Button className="flex-1" onClick={() => { setAssigningBooking(detailBooking); setDetailBooking(null); }}>
+                  <UserPlus className="h-4 w-4 mr-2" /> Assign Driver
+                </Button>
+                {detailBooking.traveller?.phone && (
+                  <Button variant="outline" asChild>
+                    <a href={`tel:${detailBooking.traveller.phone}`}><Phone className="h-4 w-4" /></a>
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>

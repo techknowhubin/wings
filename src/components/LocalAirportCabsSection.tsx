@@ -12,6 +12,7 @@ import muvImg from "@/assets/MUV-Ertiga.jpeg";
 import suvImg from "@/assets/SUV-Innova.jpeg";
 import { useAuth } from "@/hooks/useAuth";
 import { Check } from "lucide-react";
+import LocationAutocomplete, { LocationData } from "@/components/LocationAutocomplete";
 
 
 type BookingType = "Airport Transfer" | "4 Hours Local" | "8 Hours Local";
@@ -47,6 +48,8 @@ const VEHICLES = [
 ];
 
 const FIXED_AIRPORT_DROP = "Rajiv Gandhi International Airport (HYD), Shamshabad, Hyderabad";
+const FIXED_AIRPORT_LAT = 17.2403;
+const FIXED_AIRPORT_LNG = 78.4294;
 
 export default function LocalAirportCabsSection() {
   const navigate = useNavigate();
@@ -156,6 +159,8 @@ export default function LocalAirportCabsSection() {
         distance_km: parseInt(distanceIncluded),
         special_instructions: specialInstructions,
         booking_source: bookingSource,
+        drop_latitude: activeBookingType === "Airport Transfer" ? FIXED_AIRPORT_LAT : undefined,
+        drop_longitude: activeBookingType === "Airport Transfer" ? FIXED_AIRPORT_LNG : undefined,
       },
     };
 
@@ -233,7 +238,7 @@ export default function LocalAirportCabsSection() {
                 <Input
                   value={pickupLocation}
                   onChange={(e) => setPickupLocation(e.target.value)}
-                  placeholder="Enter pickup address"
+                  placeholder="Enter your pickup address"
                   className="h-10 text-sm rounded-xl border-[#e2e8f0]"
                 />
               </div>

@@ -191,6 +191,11 @@ export default function HubOutstationCabs() {
                     <TableCell>
                       <p className="text-xs font-medium">{b.pickup_location}</p>
                       <p className="text-xs text-muted-foreground">→ {b.drop_location}</p>
+                      {b.map_url && (
+                        <a href={b.map_url} target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 underline mt-0.5 inline-block">
+                          View Map
+                        </a>
+                      )}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {b.travel_date ? format(new Date(b.travel_date), 'dd MMM') : 'TBD'}

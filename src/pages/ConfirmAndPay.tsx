@@ -87,7 +87,7 @@ const ConfirmAndPay = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [pickupAddress, setPickupAddress] = useState("");
+  const [pickupAddress, setPickupAddress] = useState(booking?.cabDetails?.pickup_location || "");
   const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [mapLoading, setMapLoading] = useState(false);
 
@@ -460,6 +460,11 @@ const ConfirmAndPay = () => {
       navigate("/auth");
       return;
     }
+    if (booking.cabDetails && !pickupCoords) {
+      toast.error("Please click '🗺️ Show on Map' to verify your exact pickup location.");
+      setIsProcessing(false);
+      return;
+    }
 
     setIsProcessing(true);
 
@@ -593,7 +598,7 @@ const ConfirmAndPay = () => {
             assignment_status: assignmentStatus,
             distance_km: booking.cabDetails.distance_km,
             state: booking.cabDetails.state,
-            pickup_location: booking.cabDetails.pickup_location,
+            pickup_location: pickupAddress,
             drop_location: booking.cabDetails.drop_location,
             travel_date: finalTravelDate.toISOString(),
             return_date: booking.cabDetails.return_date ? new Date(booking.cabDetails.return_date).toISOString() : null,
@@ -609,7 +614,11 @@ const ConfirmAndPay = () => {
             booking_source: bookingSource,
             booking_category: 'cab',
             customer_name: name,
-            customer_phone: phone
+            customer_phone: phone,
+            pickup_latitude: pickupCoords?.lat,
+            pickup_longitude: pickupCoords?.lng,
+            drop_latitude: booking.cabDetails.drop_latitude,
+            drop_longitude: booking.cabDetails.drop_longitude
           });
           if (cabError) console.error("Cab booking insert error:", cabError);
 

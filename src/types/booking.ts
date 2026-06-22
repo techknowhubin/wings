@@ -37,5 +37,9 @@ export interface BookingDetails {
     distance_km?: number;
     special_instructions?: string;
     booking_source?: CabBookingSource;
+    pickup_latitude?: number;
+    pickup_longitude?: number;
+    drop_latitude?: number;
+    drop_longitude?: number;
   };
 }

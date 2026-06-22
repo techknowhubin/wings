@@ -195,6 +195,38 @@ export default function AdminBookings() {
                     <div><p className="text-xs text-muted-foreground">Area</p><p className="font-semibold">{selected.cabDetails.assigned_area || '—'}</p></div>
                     <div><p className="text-xs text-muted-foreground">Assignment Status</p><p className="font-semibold">{selected.cabDetails.assignment_status || '—'}</p></div>
                   </div>
+
+                  {/* Pickup Location Map Preview */}
+                  {(selected.cabDetails.pickup_latitude && selected.cabDetails.pickup_longitude) ? (
+                    <div className="mt-6 space-y-2">
+                      <p className="text-sm font-semibold text-[#013220]">📍 Pickup Location Map</p>
+                      <p className="text-xs text-muted-foreground mb-2">{selected.cabDetails.pickup_location}</p>
+                      <div className="rounded-xl overflow-hidden border border-border/50">
+                        <iframe 
+                          width="100%" 
+                          height="200" 
+                          style={{ border: 0 }} 
+                          src={`https://maps.google.com/maps?q=${selected.cabDetails.pickup_latitude},${selected.cabDetails.pickup_longitude}&z=15&output=embed`} 
+                        />
+                      </div>
+                      <a 
+                        href={`https://www.google.com/maps?q=${selected.cabDetails.pickup_latitude},${selected.cabDetails.pickup_longitude}`} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="inline-flex w-full items-center justify-center gap-2 mt-2 py-2 px-4 bg-muted hover:bg-muted/80 text-foreground font-semibold rounded-lg text-sm transition-colors"
+                      >
+                        <MapPin className="h-4 w-4" />
+                        Open in Google Maps
+                      </a>
+                    </div>
+                  ) : selected.cabDetails.map_url ? (
+                    <div className="mt-6">
+                      <a href={selected.cabDetails.map_url} target="_blank" rel="noreferrer" className="inline-flex w-full items-center justify-center gap-2 py-2 px-4 bg-muted hover:bg-muted/80 text-foreground font-semibold rounded-lg text-sm transition-colors">
+                        <MapPin className="h-4 w-4" />
+                        View Map (Legacy Link)
+                      </a>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>

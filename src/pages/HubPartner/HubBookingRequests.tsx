@@ -384,10 +384,43 @@ export default function HubBookingRequests() {
                 ].map(([label, value]) => (
                   <div key={label}>
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-                    <p className="font-medium text-foreground mt-0.5">{value}</p>
+                    <p className="font-semibold text-sm truncate">{value}</p>
                   </div>
                 ))}
               </div>
+              
+              {/* Pickup Location Map Preview */}
+              {(detailBooking.pickup_latitude && detailBooking.pickup_longitude) ? (
+                <div className="mt-4 pt-4 border-t border-border/50">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">📍 Pickup Location Map</p>
+                  <p className="text-xs text-foreground mb-3">{detailBooking.pickup_location}</p>
+                  <div className="rounded-xl overflow-hidden border border-border/50 bg-muted/30">
+                    <iframe 
+                      width="100%" 
+                      height="200" 
+                      style={{ border: 0 }} 
+                      src={`https://maps.google.com/maps?q=${detailBooking.pickup_latitude},${detailBooking.pickup_longitude}&z=15&output=embed`} 
+                    />
+                  </div>
+                  <a 
+                    href={`https://www.google.com/maps?q=${detailBooking.pickup_latitude},${detailBooking.pickup_longitude}`} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="inline-flex w-full items-center justify-center gap-2 mt-3 py-2 px-4 bg-muted hover:bg-muted/80 text-foreground font-semibold rounded-lg text-sm transition-colors"
+                  >
+                    <MapPin className="h-4 w-4" />
+                    Open in Google Maps
+                  </a>
+                </div>
+              ) : detailBooking.map_url ? (
+                <div className="mt-4 pt-4 border-t border-border/50">
+                  <a href={detailBooking.map_url} target="_blank" rel="noreferrer" className="inline-flex w-full items-center justify-center gap-2 py-2 px-4 bg-muted hover:bg-muted/80 text-foreground font-semibold rounded-lg text-sm transition-colors">
+                    <MapPin className="h-4 w-4" />
+                    View Map (Legacy Link)
+                  </a>
+                </div>
+              ) : null}
+
               <div className="flex gap-2 pt-2">
                 <Button className="flex-1" onClick={() => { setAssigningBooking(detailBooking); setDetailBooking(null); }}>
                   <UserPlus className="h-4 w-4 mr-2" /> Assign Driver
@@ -414,6 +447,29 @@ export default function HubBookingRequests() {
               <div className="p-3 bg-muted/50 rounded-xl text-sm">
                 <p className="font-semibold">{assigningBooking.traveller?.full_name}</p>
                 <p className="text-muted-foreground text-xs mt-0.5">{assigningBooking.pickup_location} → {assigningBooking.drop_location}</p>
+                
+                {assigningBooking.pickup_latitude && assigningBooking.pickup_longitude && (
+                  <div className="mt-3 pt-3 border-t border-border/50">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">📍 Pickup Address</p>
+                    <div className="rounded-xl overflow-hidden border border-border/50 bg-background">
+                      <iframe 
+                        width="100%" 
+                        height="120" 
+                        style={{ border: 0 }} 
+                        src={`https://maps.google.com/maps?q=${assigningBooking.pickup_latitude},${assigningBooking.pickup_longitude}&z=15&output=embed`} 
+                      />
+                    </div>
+                    <a 
+                      href={`https://www.google.com/maps?q=${assigningBooking.pickup_latitude},${assigningBooking.pickup_longitude}`} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="inline-flex w-full items-center justify-center gap-2 mt-2 py-2 px-4 bg-background border border-border/50 hover:bg-muted text-foreground font-semibold rounded-lg text-xs transition-colors"
+                    >
+                      <MapPin className="h-3 w-3" />
+                      Open in Google Maps
+                    </a>
+                  </div>
+                )}
               </div>
               <p className="text-sm text-muted-foreground">Select a driver for this trip</p>
               <Select onValueChange={val => assignDriver.mutate({ bookingId: assigningBooking.booking_id, driverId: val })}>

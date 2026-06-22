@@ -911,11 +911,9 @@ export async function createNotification(notification: {
   reference_type?: string;
 }) {
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('notifications')
-      .insert({ ...notification, is_read: false })
-      .select()
-      .single();
+      .insert({ ...notification, is_read: false });
     if (error) {
       if (error.code === 'PGRST204' || error.message?.includes('reference_id') || error.message?.includes('reference_type')) {
         const { reference_id, reference_type, ...rest } = notification;
@@ -923,17 +921,15 @@ export async function createNotification(notification: {
         if (reference_id && reference_type) {
           enrichedLink = `${rest.link || ''}${rest.link?.includes('?') ? '&' : '?'}ref_id=${reference_id}&ref_type=${reference_type}`;
         }
-        const { data: fallbackData, error: fallbackError } = await supabase
+        const { error: fallbackError } = await supabase
           .from('notifications')
-          .insert({ ...rest, link: enrichedLink, is_read: false })
-          .select()
-          .single();
+          .insert({ ...rest, link: enrichedLink, is_read: false });
         if (fallbackError) throw fallbackError;
-        return fallbackData;
+        return null;
       }
       throw error;
     }
-    return data;
+    return null;
   } catch (err) {
     console.error('Failed to create notification:', err);
     throw err;

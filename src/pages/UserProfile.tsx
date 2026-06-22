@@ -1403,7 +1403,7 @@ export default function UserProfile() {
                     <p className="text-sm text-muted-foreground mb-4">Our support team is available 24/7</p>
                     <Button className="bg-[#25D366] hover:bg-[#128C7E] text-white" asChild>
                       <a
-                        href="https://wa.me/919492986412?text=Hello%20Xplorwing%20Support%2C%20I%20need%20assistance."
+                        href="https://wa.me/916362986420?text=Hello%20Xplorwing%20Support%2C%20I%20need%20assistance."
                         target="_blank"
                         rel="noreferrer"
                       >

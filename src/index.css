@@ -137,6 +137,15 @@ All colors MUST be HSL.
     @apply transition-all duration-300 ease-out;
   }
 
+  /* Utility to completely hide scrollbars but allow scrolling */
+  .hide-scrollbar {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none !important;
+  }
+
   .hover-lift:hover {
     transform: translateY(-4px);
     box-shadow: var(--shadow-medium);

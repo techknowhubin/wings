@@ -412,7 +412,7 @@ export default function LocalAirportCabsSection() {
         <div 
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="flex overflow-x-auto snap-x snap-mandatory md:grid md:grid-cols-3 gap-6 md:gap-8 pb-4 md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth"
+          className="flex overflow-x-auto snap-x snap-mandatory md:grid md:grid-cols-3 gap-6 md:gap-8 pb-4 md:pb-0 hide-scrollbar scroll-smooth"
         >
           {(Object.keys(PRICING) as BookingType[]).map((type, i) => {
             const data = PRICING[type];

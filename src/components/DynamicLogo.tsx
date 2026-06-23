@@ -34,7 +34,7 @@ export const DynamicLogo = ({
         initial={false}
         animate={{ opacity: isDark ? 0 : 1 }}
         transition={{ duration: 0.4, ease: "easeInOut" }}
-        className={cn("w-auto", lightHeightClass, isDark && "pointer-events-none")}
+        className={cn("w-auto max-h-[50px] object-contain", lightHeightClass, isDark && "pointer-events-none")}
       />
       
       {/* Dark Theme Logo (Overlaid) */}
@@ -45,7 +45,7 @@ export const DynamicLogo = ({
         animate={{ opacity: isDark ? 1 : 0 }}
         transition={{ duration: 0.4, ease: "easeInOut" }}
         className={cn(
-          "absolute inset-0 w-auto", 
+          "absolute inset-0 w-auto max-h-[50px] object-contain", 
           darkHeightClass, 
           !isDark && "pointer-events-none"
         )}

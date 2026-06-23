@@ -742,6 +742,76 @@ export default function UserProfile() {
               </div>
             )}
 
+            {/* ====== My Coupons ====== */}
+            {activeSection === "coupons" && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h1 className="text-2xl font-bold text-foreground">My VIP Coupons</h1>
+                    <p className="text-sm text-muted-foreground mt-1">Exclusive discounts assigned to your account.</p>
+                  </div>
+                  <Ticket className="h-8 w-8 text-primary/20" />
+                </div>
+
+                {couponsLoading ? (
+                  <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+                ) : myCoupons.length === 0 ? (
+                  <Card className="border-border/50 bg-muted/20 border-dashed">
+                    <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                      <Ticket className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                      <h3 className="text-lg font-semibold mb-1">No coupons available</h3>
+                      <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                        You don't have any VIP coupons assigned to your account right now. Keep exploring and booking to unlock exclusive offers!
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {myCoupons.map((coupon: any) => (
+                      <Card key={coupon.id} className="relative overflow-hidden border-emerald-500/30 bg-emerald-50/50 shadow-sm transition-transform hover:scale-[1.02]">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/10 rounded-bl-full" />
+                        <CardContent className="p-5 flex flex-col h-full justify-between">
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <Badge variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-100/50 mb-2 font-semibold">VIP OFFER</Badge>
+                              <h3 className="text-2xl font-black text-emerald-800 tracking-tight">
+                                {coupon.discount_percent ? `${coupon.discount_percent}% OFF` : `₹${coupon.discount_value} OFF`}
+                              </h3>
+                            </div>
+                            <div className="h-10 w-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
+                              <Ticket className="h-5 w-5" />
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-4">
+                            <div className="bg-white/60 p-3 rounded-lg border border-emerald-100 flex items-center justify-between">
+                              <span className="font-mono text-lg font-bold text-foreground tracking-wider">{coupon.code}</span>
+                              <Button size="sm" variant="ghost" className="h-8 px-2 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100" onClick={() => {
+                                navigator.clipboard.writeText(coupon.code);
+                                toast.success("Coupon code copied!");
+                              }}>
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+                              <Clock className="h-3.5 w-3.5" />
+                              {coupon.expires_at || coupon.ends_at 
+                                ? `Valid until: ${format(new Date(coupon.expires_at || coupon.ends_at), 'dd MMM yyyy')}`
+                                : 'No expiry date'}
+                            </div>
+                          </div>
+                        </CardContent>
+                        {/* Ticket perforations */}
+                        <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-background border-r border-emerald-500/30" />
+                        <div className="absolute -right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-background border-l border-emerald-500/30" />
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ====== Booking History ====== */}
             {activeSection === "bookings" && (
               <div className="space-y-6">

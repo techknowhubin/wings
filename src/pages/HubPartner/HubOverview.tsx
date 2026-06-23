@@ -115,11 +115,9 @@ function HubOverviewContent() {
         supabase.from('hub_drivers').select('*', { count: 'exact', head: true }).eq('hub_uuid', uuid).eq('status', 'active'),
         // Hosts = user_roles rows with role='host'
         supabase.from('user_roles').select('*', { count: 'exact', head: true }).eq('role', 'host'),
-        // Listings = sum counts from all 6 listing tables
+        // Listings = sum counts from existing listing tables
         Promise.all([
           supabase.from('stays').select('*', { count: 'exact', head: true }),
-          supabase.from('hotels').select('*', { count: 'exact', head: true }),
-          supabase.from('resorts').select('*', { count: 'exact', head: true }),
           supabase.from('experiences').select('*', { count: 'exact', head: true }),
           supabase.from('cars').select('*', { count: 'exact', head: true }),
           supabase.from('bikes').select('*', { count: 'exact', head: true }),

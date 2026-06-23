@@ -139,7 +139,7 @@ const CabFareCard = ({
   const [selectedCabType, setSelectedCabType] = useState<"Sedan" | "MUV" | "SUV">("Sedan");
   const [pickedVehicle, setPickedVehicle] = useState<"Sedan" | "MUV" | "SUV" | null>(null);
   const [travelTime, setTravelTime] = useState("06:00");
-  const [selectedTripType, setSelectedTripType] = useState<"One Way" | "Round Trip">("Round Trip");
+  const [selectedTripType, setSelectedTripType] = useState<"One Way" | "Round Trip">("One Way");
   const [travelDate, setTravelDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
   const [returnDate, setReturnDate] = useState(format(addDays(new Date(), 2), "yyyy-MM-dd"));
   const [customerName, setCustomerName] = useState("");
@@ -538,7 +538,8 @@ const CabFareCard = ({
 
               <div className="rounded-2xl border border-[#e2e8f0] p-4 bg-white space-y-3 text-sm shadow-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Route</span><span className="font-semibold text-right text-[#013220]">{fromCity} → {toCity}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Distance</span><span className="font-semibold text-[#013220]">{selectedTripType === "One Way" ? `${oneWayDistance} km` : distance}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Distance</span><span className="font-semibold text-[#013220]">{selectedTripType === "One Way" ? `${oneWayDistance} km` : `${distance}`}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Buffer Included</span><span className="font-semibold text-[#013220]">{selectedTripType === "One Way" ? `+ ${oneWayBuffer} km` : `+ ${bufferDistance} km`}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Vehicle</span><span className="font-semibold text-[#013220]">{pickedVehicle}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Trip</span><span className="font-semibold text-[#013220]">{selectedTripType}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Pickup Time</span><span className="font-semibold text-[#013220]">{travelTime || "—"}</span></div>
@@ -621,6 +622,8 @@ const CabFareCard = ({
 
           <div className="rounded-xl border p-4 bg-muted/20 space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Route</span><span className="font-medium text-right">{fromCity} → {toCity}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Distance</span><span className="font-medium">{selectedTripType === "One Way" ? `${oneWayDistance} km` : `${distance}`}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Buffer Included</span><span className="font-medium">{selectedTripType === "One Way" ? `+ ${oneWayBuffer} km` : `+ ${bufferDistance} km`}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Vehicle</span><span className="font-medium">{selectedCabType}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Trip Type</span><span className="font-medium">{selectedTripType}</span></div>
             <div className="flex justify-between border-t border-[#e2e8f0] pt-3 mt-1">
@@ -688,7 +691,7 @@ const CabFareCard = ({
 
             {/* Car icon + distance */}
             <div className="flex flex-col items-center px-0.5 md:px-2 py-4 shrink-0">
-              <p className="text-[7px] md:text-[10px] font-bold text-muted-foreground tracking-tighter md:tracking-widest uppercase mb-1">ROUND TRIP</p>
+              <p className="text-[7px] md:text-[10px] font-bold text-muted-foreground tracking-tighter md:tracking-widest uppercase mb-1">ONE WAY</p>
               <div className="flex items-center gap-0.5 md:gap-1">
                 <div className="w-2 md:w-8 h-[1px] border-t border-dashed border-primary/30" />
                 <img src={carIcon} alt="Car" className="h-5 w-8 md:h-10 md:w-16 object-contain shrink-0" />
@@ -718,7 +721,7 @@ const CabFareCard = ({
                 </span>
               </div>
               <button
-                onClick={(e) => { e.stopPropagation(); openVehicleSelect("Round Trip"); }}
+                onClick={(e) => { e.stopPropagation(); openVehicleSelect("One Way"); }}
                 className="w-full px-2 md:px-4 py-1 md:py-1.5 bg-[#E5F76E] text-gray-900 text-[9px] md:text-xs font-bold rounded-full hover:bg-[#d4e85e] transition-colors whitespace-nowrap"
               >
                 Book Now

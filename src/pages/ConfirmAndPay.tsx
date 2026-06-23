@@ -12,11 +12,11 @@ import { toast } from "sonner";
 import { initiateRazorpayPayment } from "@/lib/razorpay";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { CalendarDays, CreditCard, MapPin, Plus, Receipt, ShieldCheck, Trash2, UserPlus, UserRound, X, Wallet } from "lucide-react";
+import { CalendarDays, CreditCard, MapPin, Plus, Receipt, ShieldCheck, Trash2, UserPlus, UserRound, X, Wallet, Ticket } from "lucide-react";
 import type { BookingDetails } from "@/types/booking";
 import type { CouponOffer } from "@/lib/discounts";
 import { getReferralCode, clearReferral } from "@/lib/referral";
-import type { Enums } from "@/integrations/supabase/types";
+
 import { createNotification } from "@/lib/supabase-helpers";
 
 type ConfirmAndPayState = {
@@ -258,9 +258,9 @@ const ConfirmAndPay = () => {
       const { data } = await supabase
         .from("host_coupons" as any)
         .select(
-          "id,code,discount_type,discount_value,discount_percent,is_enabled,listing_id,starts_at,ends_at,expires_at,usage_limit,used_count,one_time_per_user,listing_types"
+          "id,code,discount_type,discount_value,discount_percent,is_enabled,listing_id,starts_at,ends_at,expires_at,usage_limit,used_count,one_time_per_user,listing_types,target_user_id,target_email,target_phone,is_platform_offer"
         )
-        .eq("host_id", booking.hostId)
+        .or(`host_id.eq.${booking.hostId},is_platform_offer.eq.true`)
         .eq("is_active", true);
       const filtered = (data ?? []).filter((item: any) => {
         if (!item.is_enabled) return false;
@@ -288,6 +288,9 @@ const ConfirmAndPay = () => {
             usedCount: Number(item.used_count ?? 0),
             oneTimePerUser: Boolean(item.one_time_per_user),
             listingId: item.listing_id ?? null,
+            targetUserId: item.target_user_id ?? null,
+            targetEmail: item.target_email ?? null,
+            targetPhone: item.target_phone ?? null,
           };
         })
       );
@@ -414,8 +417,9 @@ const ConfirmAndPay = () => {
 
   const formatAmount = (val: number) => val.toFixed(2);
 
-  const handleApplyCoupon = async () => {
-    const normalized = promoCode.trim().toUpperCase();
+  const handleApplyCoupon = async (codeOverride?: string | React.MouseEvent) => {
+    const codeToUse = typeof codeOverride === 'string' ? codeOverride : promoCode;
+    const normalized = codeToUse.trim().toUpperCase();
     if (!normalized) { toast.error("Enter a coupon code to apply."); return; }
     const match = availableCoupons.find((coupon) => coupon.code.toUpperCase() === normalized);
     if (!match) { toast.error("Invalid or unavailable coupon code."); return; }
@@ -426,6 +430,20 @@ const ConfirmAndPay = () => {
     if ((match as any).listingId && booking?.listingId && (match as any).listingId !== booking.listingId) {
       toast.error("This coupon is not valid for the selected listing."); return;
     }
+    
+    // Validate User-Specific constraints
+    const matchAsAny = match as any;
+    if (matchAsAny.targetUserId || matchAsAny.targetEmail || matchAsAny.targetPhone) {
+      if (!user) { toast.error("You must be logged in to use this coupon."); return; }
+      const isUserMatch = 
+        (matchAsAny.targetUserId && matchAsAny.targetUserId === user.id) ||
+        (matchAsAny.targetEmail && matchAsAny.targetEmail.toLowerCase() === user.email?.toLowerCase()) ||
+        (matchAsAny.targetPhone && matchAsAny.targetPhone === user.phone);
+      if (!isUserMatch) {
+        toast.error("This coupon is not applicable to your account."); return;
+      }
+    }
+
     if (match.oneTimePerUser && user) {
       const { data: redemption } = await supabase
         .from("host_coupon_redemptions" as any)
@@ -469,7 +487,7 @@ const ConfirmAndPay = () => {
     setIsProcessing(true);
 
     // Map UI listing type → DB enum value
-    const listingTypeMap: Record<string, Enums<"listing_type">> = {
+    const listingTypeMap: Record<string, string> = {
       stay: "stay",
       hotel: "hotel",
       resort: "resort",
@@ -509,9 +527,8 @@ const ConfirmAndPay = () => {
         gst_percentage: Number(gstPercentage.toFixed(2)),
         gst_amount: Number(gstAmount.toFixed(2)),
         currency: booking.currencySymbol === "₹" ? "INR" : "USD",
-        payment_status: "pending" as Enums<"payment_status">,
-        payment_method: "razorpay",
-        booking_status: "pending" as Enums<"booking_status">,
+        payment_status: "pending",
+        booking_status: "pending",
         guests_count: (booking.quantity || 1) + allGuests.length,
         booking_channel: booking.bookingChannel || "marketplace",
         commission_amount: Number(normalBookingFee.toFixed(2)),
@@ -587,8 +604,8 @@ const ConfirmAndPay = () => {
             || booking.cabDetails.booking_source
             || (booking.listingTitle?.toLowerCase().includes('airport') ? 'airport_transfer'
               : booking.listingTitle?.toLowerCase().includes('4 hour') || booking.listingTitle?.toLowerCase().includes('4hrs') ? 'local_4hrs'
-              : booking.listingTitle?.toLowerCase().includes('8 hour') || booking.listingTitle?.toLowerCase().includes('8hrs') ? 'local_8hrs'
-              : 'outstation_cab');
+                : booking.listingTitle?.toLowerCase().includes('8 hour') || booking.listingTitle?.toLowerCase().includes('8hrs') ? 'local_8hrs'
+                  : 'outstation_cab');
 
           const { error: cabError } = await supabase.from('cab_bookings').insert({
             booking_id: newBooking.id,
@@ -617,8 +634,10 @@ const ConfirmAndPay = () => {
             customer_phone: phone,
             pickup_latitude: pickupCoords?.lat,
             pickup_longitude: pickupCoords?.lng,
+            pickup_place_id: booking.cabDetails.pickup_place_id,
             drop_latitude: booking.cabDetails.drop_latitude,
-            drop_longitude: booking.cabDetails.drop_longitude
+            drop_longitude: booking.cabDetails.drop_longitude,
+            drop_place_id: booking.cabDetails.drop_place_id
           });
           if (cabError) console.error("Cab booking insert error:", cabError);
 
@@ -1166,8 +1185,8 @@ const ConfirmAndPay = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       id="use-wing-credits"
                       checked={useWingCredits}
                       onChange={(e) => setUseWingCredits(e.target.checked)}
@@ -1198,6 +1217,39 @@ const ConfirmAndPay = () => {
                 Applied {appliedCoupon.code} ({appliedCoupon.type === "flat" ? `₹${appliedCoupon.value} off` : `${appliedCoupon.value}% off`}).
               </p>
             ) : null}
+
+            {/* Available Coupons */}
+            {user && availableCoupons.filter((c: any) => 
+               (!c.targetUserId && !c.targetEmail && !c.targetPhone) ||
+               (c.targetUserId === user.id || (c.targetEmail && c.targetEmail.toLowerCase() === user.email?.toLowerCase()) || c.targetPhone === user.phone)
+            ).length > 0 && !appliedCoupon && (
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-muted-foreground mb-2">Available Coupons</p>
+                <div className="flex flex-wrap gap-2">
+                  {availableCoupons.filter((c: any) => 
+                    (!c.targetUserId && !c.targetEmail && !c.targetPhone) ||
+                    (c.targetUserId === user.id || (c.targetEmail && c.targetEmail.toLowerCase() === user.email?.toLowerCase()) || c.targetPhone === user.phone)
+                  ).map((coupon: any) => (
+                    <div 
+                      key={coupon.id} 
+                      onClick={() => {
+                        setPromoCode(coupon.code);
+                        handleApplyCoupon(coupon.code);
+                      }}
+                      className="cursor-pointer flex items-center gap-2 bg-emerald-50 border border-emerald-200 hover:border-emerald-500 rounded-md px-3 py-1.5 transition-colors"
+                    >
+                      <Ticket className="h-4 w-4 text-emerald-600" />
+                      <div>
+                        <p className="text-xs font-bold text-emerald-800 tracking-wide">{coupon.code}</p>
+                        <p className="text-[10px] text-emerald-600 font-medium">
+                          Save {coupon.type === "flat" ? `₹${coupon.value}` : `${coupon.value}%`}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Referral Code */}
             <div className="mb-4">

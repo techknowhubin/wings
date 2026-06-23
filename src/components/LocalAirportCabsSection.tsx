@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,6 +66,15 @@ export default function LocalAirportCabsSection() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [adminHostId, setAdminHostId] = useState<string>("");
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return;
+    const { scrollLeft, clientWidth } = scrollContainerRef.current;
+    const index = Math.round(scrollLeft / clientWidth);
+    setActiveIndex(index);
+  };
 
   useEffect(() => {
     const fetchAdminId = async () => {
@@ -400,7 +409,11 @@ export default function LocalAirportCabsSection() {
 
         {vehicleSelectDialog}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+        <div 
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex overflow-x-auto snap-x snap-mandatory md:grid md:grid-cols-3 gap-6 md:gap-8 pb-4 md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth"
+        >
           {(Object.keys(PRICING) as BookingType[]).map((type, i) => {
             const data = PRICING[type];
             return (
@@ -409,7 +422,7 @@ export default function LocalAirportCabsSection() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: i * 0.1 }}
-                className="bg-white dark:bg-card border border-[#e2e8f0] dark:border-border rounded-[24px] overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_12px_30px_-8px_rgba(0,0,0,0.15)] transition-all duration-300 hover:-translate-y-1 group flex flex-col"
+                className="snap-center shrink-0 w-full max-w-full md:w-auto bg-white dark:bg-card border border-[#e2e8f0] dark:border-border rounded-[24px] overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_12px_30px_-8px_rgba(0,0,0,0.15)] transition-all duration-300 hover:-translate-y-1 group flex flex-col"
               >
                 <div className="p-6 flex-grow flex flex-col items-center">
                   <div className="w-full flex justify-between items-center mb-6">
@@ -464,6 +477,18 @@ export default function LocalAirportCabsSection() {
               </motion.div>
             );
           })}
+        </div>
+
+        {/* Pagination Dots for Mobile */}
+        <div className="flex justify-center gap-2 mt-2 md:hidden">
+          {(Object.keys(PRICING) as BookingType[]).map((_, i) => (
+            <div
+              key={i}
+              className={`h-2 rounded-full transition-all duration-300 ${
+                activeIndex === i ? "w-6 bg-[#013220]" : "w-2 bg-[#013220]/20"
+              }`}
+            />
+          ))}
         </div>
       </div>
     </section>

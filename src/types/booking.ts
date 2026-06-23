@@ -41,5 +41,7 @@ export interface BookingDetails {
     pickup_longitude?: number;
     drop_latitude?: number;
     drop_longitude?: number;
+    pickup_place_id?: string;
+    drop_place_id?: string;
   };
 }

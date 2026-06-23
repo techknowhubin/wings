@@ -1,684 +1,561 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
-  Download, BarChart3, Calendar, Users, Building, 
-  MapPin, Printer, ArrowUpRight, TrendingUp, Loader2, Star, Truck
+  Download, BarChart3, Calendar, Users, FileText,
+  Printer, TrendingUp, Loader2, Star, UserPlus, Activity, MapPin, 
+  CreditCard, XCircle, Clock, Maximize2
 } from "lucide-react";
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line, Legend
 } from "recharts";
-import { format, subDays, startOfDay, eachDayOfInterval } from "date-fns";
+import { format, subDays, startOfDay, endOfDay, startOfMonth, subMonths, eachDayOfInterval, isSameDay, endOfMonth } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
-type ReportType = "booking" | "traveller" | "listing" | "driver" | "package" | "performance";
+type ReportType = "booking" | "revenue" | "user_registration";
 
 export default function HubReports() {
   const { uuid } = useParams<{ uuid: string }>();
   const { toast } = useToast();
-  const [selectedReport, setSelectedReport] = useState<ReportType>("booking");
-  const [dateRange, setDateRange] = useState<string>("30");
+  const [selectedReport, setSelectedReport] = useState<ReportType>("revenue");
+  const [dateRange, setDateRange] = useState<string>("today");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  
+  const [drilldownData, setDrilldownData] = useState<{ title: string; data: any[] } | null>(null);
+  const [expandedChart, setExpandedChart] = useState<"bookings" | "revenue" | null>(null);
+  const queryClient = useQueryClient();
 
-  // Fetch Report & Analytics Data
+  // Real-time subscriptions
+  useEffect(() => {
+    if (!uuid) return;
+    const channel = supabase.channel('hub-reports-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => queryClient.invalidateQueries({ queryKey: ["hub-reports-enhanced", uuid] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cab_bookings' }, () => queryClient.invalidateQueries({ queryKey: ["hub-reports-enhanced", uuid] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'package_bookings' }, () => queryClient.invalidateQueries({ queryKey: ["hub-reports-enhanced", uuid] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => queryClient.invalidateQueries({ queryKey: ["hub-reports-enhanced", uuid] }))
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [uuid, queryClient]);
+
   const { data: analytics, isLoading } = useQuery({
-    queryKey: ["hub-reports", uuid, dateRange],
+    queryKey: ["hub-reports-enhanced", uuid, dateRange, customStart, customEnd],
     enabled: !!uuid,
     queryFn: async () => {
       const now = new Date();
-      const numDays = parseInt(dateRange);
-      const startDate = subDays(now, numDays);
+      let startDate: Date;
+      let endDate: Date = now;
 
-      // 1. Get Hub Details
+      if (dateRange === "today") {
+        startDate = startOfDay(now);
+      } else if (dateRange === "yesterday") {
+        startDate = startOfDay(subDays(now, 1));
+        endDate = endOfDay(subDays(now, 1));
+      } else if (dateRange === "7") {
+        startDate = startOfDay(subDays(now, 7));
+      } else if (dateRange === "30") {
+        startDate = startOfDay(subDays(now, 30));
+      } else if (dateRange === "this_month") {
+        startDate = startOfMonth(now);
+      } else if (dateRange === "last_month") {
+        startDate = startOfMonth(subMonths(now, 1));
+        endDate = endOfMonth(subMonths(now, 1));
+      } else if (dateRange === "this_year") {
+        startDate = new Date(now.getFullYear(), 0, 1);
+        endDate = endOfDay(now);
+      } else if (dateRange === "custom" && customStart && customEnd) {
+        startDate = startOfDay(new Date(customStart));
+        endDate = endOfDay(new Date(customEnd));
+      } else {
+        startDate = startOfDay(now);
+      }
+
       const { data: hub } = await supabase.from("hubs").select("id, hub_name").eq("uuid", uuid).single();
       if (!hub) throw new Error("Hub not found");
       const hubId = hub.id;
 
-      // 2. Get Cab Bookings
-      const { data: cabBookings } = await supabase
-        .from("cab_bookings")
-        .select(`
-          booking_id,
-          fare_amount,
-          booking_status,
-          trip_status,
-          created_at,
-          traveller_id,
-          driver_id,
-          pickup_location,
-          drop_location,
-          traveller:profiles!cab_bookings_traveller_id_fkey(full_name, phone)
-        `)
-        .eq("assigned_hub_uuid", uuid)
-        .gte("created_at", startDate.toISOString());
+      // Fetch all required data
+      const [
+        { data: cabBookings },
+        { data: pkgs },
+        { data: mkps },
+        { count: totalUsersCount },
+        { data: allProfiles }
+      ] = await Promise.all([
+        supabase.from("cab_bookings").select(`booking_id, fare_amount, booking_status, payment_status, created_at, traveller_id, booking_source, traveller:profiles!cab_bookings_traveller_id_fkey(full_name, phone, email)`).eq("hub_partner_id", hubId).gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
+        supabase.from("package_bookings").select(`id, booking_ref, total_amount, booking_status, created_at, user_id, user:profiles(full_name, phone, email), tour_packages(name)`).eq("hub_id", hubId).gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
+        supabase.from("bookings").select(`id, total_price, status, created_at, listing_type, user_id, user:profiles!bookings_user_id_fkey(full_name, phone, email)`).eq("hub_id", hubId).gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString()),
+        supabase.from("profiles").select("*", { count: "exact", head: true }),
+        supabase.from("profiles").select("id, full_name, email, phone, created_at").gte("created_at", startDate.toISOString()).lte("created_at", endDate.toISOString())
+      ]);
 
-      // 3. Get Package Bookings
-      const { data: packageBookings } = await supabase
-        .from("package_bookings")
-        .select(`
-          id,
-          booking_ref,
-          total_amount,
-          booking_status,
-          created_at,
-          tour_packages(name)
-        `)
-        .eq("hub_id", hubId)
-        .gte("created_at", startDate.toISOString());
+      const cabsList = cabBookings || [];
+      const pkgsList = pkgs || [];
+      const mkpsList = mkps || [];
+      const registeredUsers = allProfiles || [];
 
-      // 4. Get Drivers
-      const { data: drivers } = await supabase
-        .from("hub_drivers")
-        .select("id, name, rating, total_trips, status")
-        .eq("hub_uuid", uuid);
-
-      const cabs = cabBookings || [];
-      const pkgs = packageBookings || [];
-      const driverList = drivers || [];
-
-      // Create daily intervals for charts
-      const daysInterval = eachDayOfInterval({ start: startDate, end: now });
+      // Calculate Top Level Cards
+      let totalBookings = cabsList.length + pkgsList.length + mkpsList.length;
+      let newUsersToday = registeredUsers.filter(u => isSameDay(new Date(u.created_at), now)).length;
       
-      // Compute Trend Data
-      const dailyDataMap = new Map<string, { date: string, bookings: number, revenue: number, newTravellers: number, returningTravellers: number }>();
+      let todaysBookingsCount = 0;
+      let todaysRevenue = 0;
+      let pendingBookings = 0;
+      let cancelledBookings = 0;
+      let activeUserIds = new Set<string>();
+
+      const revenueCategories = {
+        marketplace: { revenue: 0, count: 0 },
+        airport: { revenue: 0, count: 0 },
+        local: { revenue: 0, count: 0 },
+        outstation: { revenue: 0, count: 0 },
+        experiences: { revenue: 0, count: 0 }
+      };
+
+      const processMetrics = (b: any, amount: number, isToday: boolean, status: string, source: string, userId: string) => {
+        if (isToday) {
+          todaysBookingsCount++;
+          if (status !== 'cancelled' && status !== 'rejected') todaysRevenue += amount;
+        }
+        if (['pending', 'awaiting hub partner assignment'].includes(status.toLowerCase())) pendingBookings++;
+        if (['cancelled', 'rejected'].includes(status.toLowerCase())) cancelledBookings++;
+        if (userId) activeUserIds.add(userId);
+
+        if (status !== 'cancelled' && status !== 'rejected') {
+          if (source === 'marketplace') { revenueCategories.marketplace.revenue += amount; revenueCategories.marketplace.count++; }
+          else if (source === 'airport') { revenueCategories.airport.revenue += amount; revenueCategories.airport.count++; }
+          else if (source === 'local') { revenueCategories.local.revenue += amount; revenueCategories.local.count++; }
+          else if (source === 'outstation') { revenueCategories.outstation.revenue += amount; revenueCategories.outstation.count++; }
+          else if (source === 'experiences') { revenueCategories.experiences.revenue += amount; revenueCategories.experiences.count++; }
+        }
+      };
+
+      cabsList.forEach(c => {
+        let source = c.booking_source;
+        if (source?.includes('airport')) source = 'airport';
+        else if (source?.includes('local')) source = 'local';
+        else source = 'outstation';
+        processMetrics(c, Number(c.fare_amount || 0), isSameDay(new Date(c.created_at), now), c.booking_status || 'pending', source, c.traveller_id);
+      });
+
+      pkgsList.forEach(p => {
+        processMetrics(p, Number(p.total_amount || 0), isSameDay(new Date(p.created_at), now), p.booking_status || 'pending', 'experiences', p.user_id);
+      });
+
+      mkpsList.forEach(m => {
+        processMetrics(m, Number(m.total_price || 0), isSameDay(new Date(m.created_at), now), m.status || 'pending', 'marketplace', m.user_id);
+      });
+
+      // Chart Data preparation
+      let daysInterval: Date[] = [];
+      try { daysInterval = eachDayOfInterval({ start: startDate, end: endDate }); } 
+      catch (e) { daysInterval = [startDate]; }
+      
+      const dailyDataMap = new Map<string, { date: string, bookings: number, revenue: number, rawBookings: any[] }>();
       daysInterval.forEach(day => {
-        const key = format(day, "yyyy-MM-dd");
-        dailyDataMap.set(key, {
-          date: format(day, "dd MMM"),
-          bookings: 0,
-          revenue: 0,
-          newTravellers: 0,
-          returningTravellers: 0
-        });
+        dailyDataMap.set(format(day, "yyyy-MM-dd"), { date: format(day, "dd MMM"), bookings: 0, revenue: 0, rawBookings: [] });
       });
 
-      // Keep track of traveler frequencies to categorize new vs returning
-      const travellerBookingsCount = new Map<string, number>();
-
-      cabs.forEach(c => {
-        const dateKey = format(new Date(c.created_at), "yyyy-MM-dd");
-        const fare = Number(c.fare_amount || 0);
-        
-        if (c.traveller_id) {
-          const count = (travellerBookingsCount.get(c.traveller_id) || 0) + 1;
-          travellerBookingsCount.set(c.traveller_id, count);
+      const pushToChart = (dateStr: string, amount: number, raw: any, status: string) => {
+        const key = format(new Date(dateStr), "yyyy-MM-dd");
+        if (dailyDataMap.has(key)) {
+          const entry = dailyDataMap.get(key)!;
+          entry.bookings += 1;
+          if (status !== 'cancelled' && status !== 'rejected') entry.revenue += amount;
+          entry.rawBookings.push(raw);
         }
+      };
 
-        if (dailyDataMap.has(dateKey)) {
-          const entry = dailyDataMap.get(dateKey)!;
-          if (c.booking_status !== "Cancelled") {
-            entry.bookings += 1;
-            entry.revenue += fare;
-
-            // Simple logic: if traveler has bookings before this, count as returning
-            if (c.traveller_id && (travellerBookingsCount.get(c.traveller_id) || 0) > 1) {
-              entry.returningTravellers += 1;
-            } else {
-              entry.newTravellers += 1;
-            }
-          }
-        }
-      });
-
-      pkgs.forEach(p => {
-        const dateKey = format(new Date(p.created_at), "yyyy-MM-dd");
-        const amt = Number(p.total_amount || 0);
-
-        if (dailyDataMap.has(dateKey)) {
-          const entry = dailyDataMap.get(dateKey)!;
-          if (p.booking_status !== "Cancelled") {
-            entry.bookings += 1;
-            entry.revenue += amt;
-            // assume packages mostly attract new travelers
-            entry.newTravellers += 1;
-          }
-        }
-      });
+      cabsList.forEach(c => pushToChart(c.created_at, Number(c.fare_amount || 0), { id: c.booking_id, type: "Cab", customer: c.traveller?.full_name, amount: c.fare_amount, date: format(new Date(c.created_at), "dd MMM yyyy"), status: c.booking_status, category: "Cab" }, c.booking_status));
+      pkgsList.forEach(p => pushToChart(p.created_at, Number(p.total_amount || 0), { id: p.booking_ref, type: "Package", customer: p.user?.full_name, amount: p.total_amount, date: format(new Date(p.created_at), "dd MMM yyyy"), status: p.booking_status, category: "Experience" }, p.booking_status));
+      mkpsList.forEach(m => pushToChart(m.created_at, Number(m.total_price || 0), { id: m.id, type: m.listing_type, customer: m.user?.full_name, amount: m.total_price, date: format(new Date(m.created_at), "dd MMM yyyy"), status: m.status, category: "Marketplace" }, m.status));
 
       const chartsTrend = Array.from(dailyDataMap.values());
 
-      // Driver Performance Data
-      const driverPerf = driverList.map(d => ({
-        name: d.name || "Unknown Driver",
-        trips: d.total_trips || 0,
-        rating: Number(d.rating || 5.0),
-      })).slice(0, 8);
-
-      // Fallback drivers if database is empty
-      if (driverPerf.length === 0) {
-        driverPerf.push(
-          { name: "Rahul Sharma", trips: 45, rating: 4.8 },
-          { name: "Amit Patel", trips: 38, rating: 4.9 },
-          { name: "Vikram Singh", trips: 30, rating: 4.6 },
-          { name: "Priya Das", trips: 28, rating: 4.7 }
-        );
-      }
-
-      // Listings performance (top cab routes/destinations & package names)
-      const listingPerfMap = new Map<string, { name: string, bookings: number, revenue: number }>();
-      cabs.forEach(c => {
-        if (c.booking_status !== "Cancelled") {
-          const route = `${c.pickup_location || "Local"} to ${c.drop_location || "Local"}`;
-          const current = listingPerfMap.get(route) || { name: route, bookings: 0, revenue: 0 };
-          current.bookings += 1;
-          current.revenue += Number(c.fare_amount || 0);
-          listingPerfMap.set(route, current);
-        }
-      });
-      pkgs.forEach(p => {
-        if (p.booking_status !== "Cancelled" && p.tour_packages?.name) {
-          const name = p.tour_packages.name;
-          const current = listingPerfMap.get(name) || { name, bookings: 0, revenue: 0 };
-          current.bookings += 1;
-          current.revenue += Number(p.total_amount || 0);
-          listingPerfMap.set(name, current);
+      // User Registration Analytics & Total Spend calc
+      const userSpendMap = new Map<string, { bookings: number, spent: number }>();
+      [...cabsList, ...pkgsList, ...mkpsList].forEach(b => {
+        const uid = b.traveller_id || b.user_id;
+        const amt = Number(b.fare_amount || b.total_amount || b.total_price || 0);
+        const stat = b.booking_status || b.status;
+        if (uid && stat !== 'cancelled' && stat !== 'rejected') {
+          const curr = userSpendMap.get(uid) || { bookings: 0, spent: 0 };
+          curr.bookings += 1;
+          curr.spent += amt;
+          userSpendMap.set(uid, curr);
         }
       });
 
-      let listingPerf = Array.from(listingPerfMap.values());
-      listingPerf.sort((a, b) => b.bookings - a.bookings);
-      listingPerf = listingPerf.slice(0, 5);
-
-      // Fallback listings if empty
-      if (listingPerf.length === 0) {
-        listingPerf = [
-          { name: "Airport Transfer - Bengaluru", bookings: 62, revenue: 93000 },
-          { name: "Coorg Weekend Explorer Tour", bookings: 24, revenue: 168000 },
-          { name: "Outstation Cab: Mysore Round-trip", bookings: 18, revenue: 81000 },
-          { name: "Ooty Mountain Heritage Package", bookings: 12, revenue: 144000 },
-          { name: "City Sightseeing Cab Service", bookings: 8, revenue: 24000 }
-        ];
-      }
-
-      // Generate Sub-Report structures
-      // 1. Bookings Report
-      const bookingReportRows = [...cabs.map(c => ({
-        id: c.booking_id.slice(0, 8).toUpperCase(),
-        customer: c.traveller?.full_name || "Guest",
-        type: "Cab Outstation",
-        amount: `₹${Number(c.fare_amount || 0).toLocaleString("en-IN")}`,
-        date: format(new Date(c.created_at), "dd MMM yyyy"),
-        status: c.booking_status || "Completed"
-      })), ...pkgs.map(p => ({
-        id: p.booking_ref || p.id.slice(0, 8).toUpperCase(),
-        customer: p.tour_packages?.name || "Package Tour",
-        type: "Tour Package",
-        amount: `₹${Number(p.total_amount || 0).toLocaleString("en-IN")}`,
-        date: format(new Date(p.created_at), "dd MMM yyyy"),
-        status: p.booking_status || "Confirmed"
-      }))];
-
-      // 2. Travellers Report
-      const travellerReportRows = Array.from(travellerBookingsCount.entries()).map(([id, count]) => {
-        const cabWithTraveller = cabs.find(c => c.traveller_id === id);
+      const userRegistrationRows = registeredUsers.map(u => {
+        const stats = userSpendMap.get(u.id) || { bookings: 0, spent: 0 };
         return {
-          name: cabWithTraveller?.traveller?.full_name || "Regular Traveller",
-          phone: cabWithTraveller?.traveller?.phone || "N/A",
-          totalBookings: count,
-          status: count > 1 ? "Returning" : "New",
-          lastActive: cabWithTraveller ? format(new Date(cabWithTraveller.created_at), "dd MMM yyyy") : "N/A"
+          name: u.full_name || "Unknown",
+          email: u.email || "N/A",
+          phone: u.phone || "N/A",
+          date: format(new Date(u.created_at), "dd MMM yyyy"),
+          source: "Organic",
+          bookings: stats.bookings,
+          spent: stats.spent
         };
       });
 
-      // 3. Listings Report
-      const listingsReportRows = listingPerf.map((l, i) => ({
-        rank: `#${i + 1}`,
-        name: l.name,
-        bookings: l.bookings,
-        conversion: `${Math.round((l.bookings / (l.bookings + 5)) * 100)}%`,
-        grossRevenue: `₹${l.revenue.toLocaleString("en-IN")}`
-      }));
+      const revenueRows = [
+        { category: "Marketplace", revenue: revenueCategories.marketplace.revenue, bookings: revenueCategories.marketplace.count, avg: revenueCategories.marketplace.count ? (revenueCategories.marketplace.revenue / revenueCategories.marketplace.count).toFixed(2) : 0 },
+        { category: "Airport Transfers", revenue: revenueCategories.airport.revenue, bookings: revenueCategories.airport.count, avg: revenueCategories.airport.count ? (revenueCategories.airport.revenue / revenueCategories.airport.count).toFixed(2) : 0 },
+        { category: "Local Rentals", revenue: revenueCategories.local.revenue, bookings: revenueCategories.local.count, avg: revenueCategories.local.count ? (revenueCategories.local.revenue / revenueCategories.local.count).toFixed(2) : 0 },
+        { category: "Outstation Cabs", revenue: revenueCategories.outstation.revenue, bookings: revenueCategories.outstation.count, avg: revenueCategories.outstation.count ? (revenueCategories.outstation.revenue / revenueCategories.outstation.count).toFixed(2) : 0 },
+        { category: "Experiences", revenue: revenueCategories.experiences.revenue, bookings: revenueCategories.experiences.count, avg: revenueCategories.experiences.count ? (revenueCategories.experiences.revenue / revenueCategories.experiences.count).toFixed(2) : 0 },
+      ];
 
-      // 4. Drivers Report
-      const driversReportRows = driverList.map(d => ({
-        name: d.name || "N/A",
-        trips: d.total_trips || 0,
-        rating: `${Number(d.rating || 5.0).toFixed(1)} / 5.0`,
-        status: d.status || "Active",
-        utilization: `${Math.min(100, Math.round((d.total_trips / (d.total_trips + 10)) * 100))}%`
-      }));
-
-      // 5. Package Reports
-      const packageReportRows = pkgs.map(p => ({
-        id: p.booking_ref || p.id.slice(0, 8).toUpperCase(),
-        name: p.tour_packages?.name || "Adventure Tour",
-        sales: `₹${Number(p.total_amount || 0).toLocaleString("en-IN")}`,
-        date: format(new Date(p.created_at), "dd MMM yyyy"),
-        status: p.booking_status || "Completed"
-      }));
-
-      // 6. Hub Performance Report
-      const performanceReportRows = [
-        { metric: "Total Bookings Generated", value: cabs.length + pkgs.length, status: "Healthy" },
-        { metric: "Average Cab Ticket Size", value: cabs.length ? `₹${Math.round(cabs.reduce((s, c) => s + Number(c.fare_amount || 0), 0) / cabs.length).toLocaleString("en-IN")}` : "N/A", status: "Optimal" },
-        { metric: "Package Conversion Rate", value: pkgs.length ? "78.4%" : "N/A", status: "Strong" },
-        { metric: "Support Escalation Rate", value: "2.1%", status: "Good" },
-        { metric: "Driver Attendance Rate", value: "94.5%", status: "Excellent" },
-        { metric: "Traveller Rating Average", value: "4.75 / 5.00", status: "Exceptional" }
+      const allBookingsForTable = [
+        ...cabsList.map(c => ({ id: c.booking_id, name: c.traveller?.full_name || "Guest", category: "Cab", amount: Number(c.fare_amount), date: format(new Date(c.created_at), "dd MMM yyyy"), status: c.booking_status })),
+        ...pkgsList.map(p => ({ id: p.booking_ref || p.id, name: p.user?.full_name, category: "Experience", amount: Number(p.total_amount), date: format(new Date(p.created_at), "dd MMM yyyy"), status: p.booking_status })),
+        ...mkpsList.map(m => ({ id: m.id, name: m.user?.full_name, category: "Marketplace", amount: Number(m.total_price), date: format(new Date(m.created_at), "dd MMM yyyy"), status: m.status }))
       ];
 
       return {
-        chartsTrend,
-        driverPerf,
-        listingPerf,
         hubName: hub.hub_name,
+        totalUsersCount: totalUsersCount || 0,
+        newUsersToday,
+        activeUsers: activeUserIds.size,
+        totalBookings,
+        todaysBookingsCount,
+        todaysRevenue,
+        pendingBookings,
+        cancelledBookings,
+        chartsTrend,
         reports: {
-          booking: bookingReportRows,
-          traveller: travellerReportRows,
-          listing: listingsReportRows,
-          driver: driversReportRows,
-          package: packageReportRows,
-          performance: performanceReportRows
+          booking: allBookingsForTable,
+          revenue: revenueRows,
+          user_registration: userRegistrationRows
         }
       };
     }
   });
 
-  const triggerPrint = () => {
-    window.print();
-  };
-
-  const exportReportCSV = () => {
+  const exportReport = (formatType: "csv" | "excel" | "pdf") => {
     if (!analytics?.reports?.[selectedReport]) return;
     const dataList = analytics.reports[selectedReport];
-    if (dataList.length === 0) {
-      toast({ title: "No data to export", variant: "destructive" });
-      return;
-    }
+    if (dataList.length === 0) { toast({ title: "No data to export", variant: "destructive" }); return; }
 
-    const headers = Object.keys(dataList[0]);
-    const csvRows = [headers.join(",")];
-    
-    dataList.forEach((item: any) => {
-      const values = headers.map(header => {
-        const val = item[header];
-        if (typeof val === "string") {
-          return `"${val.replace(/"/g, '""')}"`;
-        }
-        return val;
+    if (formatType === "csv" || formatType === "excel") {
+      const headers = Object.keys(dataList[0]);
+      const rows = [headers.join(",")];
+      dataList.forEach((item: any) => {
+        const values = headers.map(h => typeof item[h] === "string" ? `"${item[h].replace(/"/g, '""')}"` : item[h]);
+        rows.push(values.join(","));
       });
-      csvRows.push(values.join(","));
-    });
-
-    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.setAttribute("href", url);
-    a.setAttribute("download", `Hub_${selectedReport}_report_${format(new Date(), "yyyyMMdd")}.csv`);
-    a.click();
-    toast({ title: "Report exported successfully!" });
+      const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+      const a = document.createElement("a");
+      a.href = window.URL.createObjectURL(blob);
+      a.download = `Hub_${selectedReport}_${format(new Date(), "yyyyMMdd")}.csv`;
+      a.click();
+      toast({ title: `Exported to ${formatType.toUpperCase()}` });
+    } else {
+      window.print();
+    }
   };
 
-  if (isLoading) {
-    return (
-      <div className="h-[75vh] flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const handleChartClick = (data: any, title: string) => {
+    if (data && data.activePayload && data.activePayload.length > 0) {
+      const point = data.activePayload[0].payload;
+      if(point.rawBookings.length > 0) {
+        setDrilldownData({ title: `${title} on ${point.date}`, data: point.rawBookings });
+      }
+    }
+  };
 
   return (
     <div className="space-y-6 print:p-0 print:space-y-4">
-      {/* Header */}
+      {/* Header & Date Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <div>
-          <h1 className="text-2xl font-black tracking-tight">Reports & Intelligence</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Explore operational trends, driver scores, listing ranks, and detailed sub-reports.</p>
+          <h1 className="text-2xl font-black tracking-tight">Reports & Analytics Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Deep insights, completely filtered by your chosen dates.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="w-[140px] rounded-xl bg-card border-border/50">
-              <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+            <SelectTrigger className="w-[180px] rounded-xl bg-card border-border/50 font-semibold">
+              <Calendar className="h-4 w-4 mr-2 text-primary" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="yesterday">Yesterday</SelectItem>
               <SelectItem value="7">Last 7 Days</SelectItem>
               <SelectItem value="30">Last 30 Days</SelectItem>
-              <SelectItem value="90">Last 90 Days</SelectItem>
+              <SelectItem value="this_month">This Month</SelectItem>
+              <SelectItem value="last_month">Last Month</SelectItem>
+              <SelectItem value="this_year">This Year</SelectItem>
+              <SelectItem value="custom">Custom Date Range</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={triggerPrint} variant="outline" size="sm" className="rounded-xl gap-2 font-semibold">
-            <Printer className="h-4 w-4" /> Print PDF
+          
+          {dateRange === "custom" && (
+            <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl">
+              <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="w-[130px] rounded-lg h-9 text-xs" />
+              <span className="text-xs text-muted-foreground font-medium">to</span>
+              <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="w-[130px] rounded-lg h-9 text-xs" />
+            </div>
+          )}
+
+          <Button onClick={() => window.print()} variant="outline" size="sm" className="rounded-xl h-10">
+            <Printer className="h-4 w-4 mr-2 text-muted-foreground" /> Print Dashboard
           </Button>
         </div>
       </div>
 
-      {/* Print Only Header */}
-      <div className="hidden print:block border-b pb-4 mb-4">
-        <h1 className="text-3xl font-black">Xplorwing Hub Partner Report</h1>
-        <p className="text-sm text-muted-foreground">Hub Name: {analytics?.hubName || "Hub Partner"}</p>
-        <p className="text-xs text-muted-foreground mt-1">Generated Date: {format(new Date(), "dd MMMM yyyy HH:mm")}</p>
-      </div>
-
-      {/* Grid of Trends and Insights */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        
-        {/* Trend 1: Booking Volume Trend */}
-        <Card className="border-border/50 shadow-sm print:break-inside-avoid">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-emerald-600" /> Booking Volume Trend
-            </CardTitle>
-            <CardDescription className="text-xs">Daily confirmed bookings over selected range</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[220px] pt-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={analytics?.chartsTrend} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: "10px", border: "1px solid hsl(var(--border))" }} />
-                <Line type="monotone" dataKey="bookings" stroke="hsl(158 60% 50%)" strokeWidth={2.5} name="Bookings" activeDot={{ r: 6 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Trend 2: Revenue Growth Trend */}
-        <Card className="border-border/50 shadow-sm print:break-inside-avoid">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-blue-600" /> Revenue Growth Trend
-            </CardTitle>
-            <CardDescription className="text-xs">Daily cumulative transaction volumes (₹)</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[220px] pt-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={analytics?.chartsTrend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip 
-                  formatter={(value: number) => `₹${value.toLocaleString("en-IN")}`}
-                  contentStyle={{ borderRadius: "10px", border: "1px solid hsl(var(--border))" }} 
-                />
-                <Bar dataKey="revenue" fill="hsl(220 70% 60%)" radius={[4, 4, 0, 0]} name="Gross Revenue" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Trend 3: Traveller Growth (New vs Returning) */}
-        <Card className="border-border/50 shadow-sm print:break-inside-avoid">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Users className="h-4 w-4 text-purple-600" /> Traveller Engagement
-            </CardTitle>
-            <CardDescription className="text-xs">Distribution of new versus returning customers</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[220px] pt-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={analytics?.chartsTrend} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: "10px", border: "1px solid hsl(var(--border))" }} />
-                <Legend iconSize={10} wrapperStyle={{ fontSize: 10 }} />
-                <Area type="monotone" dataKey="newTravellers" stackId="1" stroke="hsl(262 80% 60%)" fill="hsl(262 80% 60% / 0.1)" name="New Travellers" />
-                <Area type="monotone" dataKey="returningTravellers" stackId="1" stroke="hsl(158 60% 50%)" fill="hsl(158 60% 50% / 0.1)" name="Returning Travellers" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Trend 4: Listing & Route Performance */}
-        <Card className="border-border/50 shadow-sm print:break-inside-avoid">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Building className="h-4 w-4 text-amber-600" /> Listing & Route Performance
-            </CardTitle>
-            <CardDescription className="text-xs">Top performing cab routes and tour packages by booking count</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[220px] pt-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart layout="vertical" data={analytics?.listingPerf} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
-                <XAxis type="number" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={100} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: "10px", border: "1px solid hsl(var(--border))" }} />
-                <Bar dataKey="bookings" fill="hsl(68 90% 65%)" radius={[0, 4, 4, 0]} name="Bookings Count" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Trend 5: Driver Performance Analytics */}
-        <Card className="xl:col-span-2 border-border/50 shadow-sm print:break-inside-avoid">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Truck className="h-4 w-4 text-teal-600" /> Driver Utilization & Scores
-            </CardTitle>
-            <CardDescription className="text-xs">Completed trips count vs customer rating</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[240px] pt-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={analytics?.driverPerf} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis yAxisId="left" orientation="left" stroke="hsl(220 70% 60%)" tick={{ fontSize: 10 }} label={{ value: 'Trips Completed', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: 10 } }} />
-                <YAxis yAxisId="right" orientation="right" stroke="hsl(158 60% 50%)" domain={[0, 5]} tick={{ fontSize: 10 }} label={{ value: 'Average Rating', angle: 90, position: 'insideRight', style: { textAnchor: 'middle', fontSize: 10 } }} />
-                <Tooltip contentStyle={{ borderRadius: "10px", border: "1px solid hsl(var(--border))" }} />
-                <Bar yAxisId="left" dataKey="trips" fill="hsl(220 70% 60% / 0.8)" radius={[4, 4, 0, 0]} name="Trips Completed" />
-                <Line yAxisId="right" type="monotone" dataKey="rating" stroke="hsl(158 60% 50%)" strokeWidth={3} name="Rating Score" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Sub-Reports sheets selector and table */}
-      <Card className="border-border/50 shadow-sm mt-6 print:break-inside-avoid">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/50 pb-4 print:hidden">
-          <div>
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-emerald-600" /> Sub-Report Ledger
-            </CardTitle>
-            <CardDescription className="text-xs">Select, view, and export specific reporting worksheets.</CardDescription>
+      {isLoading ? (
+        <div className="h-64 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+      ) : (
+        <>
+          {/* Top Level Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 print:hidden">
+            <Card className="border-border/50 shadow-sm">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Total Users</p><p className="text-2xl font-black">{analytics?.totalUsersCount}</p></div>
+                <div className="h-10 w-10 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center"><Users className="h-5 w-5" /></div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 shadow-sm">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">New Users Today</p><p className="text-2xl font-black">{analytics?.newUsersToday}</p></div>
+                <div className="h-10 w-10 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center"><UserPlus className="h-5 w-5" /></div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 shadow-sm">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Active Users</p><p className="text-2xl font-black">{analytics?.activeUsers}</p></div>
+                <div className="h-10 w-10 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center"><Activity className="h-5 w-5" /></div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 shadow-sm bg-primary/5 border-primary/20">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div><p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Today's Revenue</p><p className="text-2xl font-black text-primary">₹{analytics?.todaysRevenue.toLocaleString()}</p></div>
+                <div className="h-10 w-10 bg-primary/20 text-primary rounded-full flex items-center justify-center"><CreditCard className="h-5 w-5" /></div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 shadow-sm">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Total Bookings</p><p className="text-2xl font-black">{analytics?.totalBookings}</p></div>
+                <div className="h-10 w-10 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center"><FileText className="h-5 w-5" /></div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 shadow-sm">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Today's Bookings</p><p className="text-2xl font-black">{analytics?.todaysBookingsCount}</p></div>
+                <div className="h-10 w-10 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center"><Clock className="h-5 w-5" /></div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 shadow-sm">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div><p className="text-xs font-semibold text-amber-600 uppercase tracking-wider mb-1">Pending</p><p className="text-2xl font-black">{analytics?.pendingBookings}</p></div>
+                <div className="h-10 w-10 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center"><Clock className="h-5 w-5" /></div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 shadow-sm">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div><p className="text-xs font-semibold text-red-600 uppercase tracking-wider mb-1">Cancelled</p><p className="text-2xl font-black">{analytics?.cancelledBookings}</p></div>
+                <div className="h-10 w-10 bg-red-50 text-red-600 rounded-full flex items-center justify-center"><XCircle className="h-5 w-5" /></div>
+              </CardContent>
+            </Card>
           </div>
-          <div className="flex flex-wrap items-center gap-2 mt-3 sm:mt-0">
-            <Select value={selectedReport} onValueChange={(val) => setSelectedReport(val as ReportType)}>
-              <SelectTrigger className="w-[220px] rounded-xl bg-card border-border/50 text-xs font-semibold">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="booking">Booking Reports</SelectItem>
-                <SelectItem value="traveller">Traveller Reports</SelectItem>
-                <SelectItem value="listing">Listing Ranks & Performance</SelectItem>
-                <SelectItem value="driver">Driver Analytics & Scores</SelectItem>
-                <SelectItem value="package">Package Sales Reports</SelectItem>
-                <SelectItem value="performance">Hub Performance KPI Overview</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button onClick={exportReportCSV} variant="outline" size="sm" className="rounded-xl gap-2 font-semibold">
-              <Download className="h-4 w-4" /> Export Report CSV
-            </Button>
+
+          {/* Charts */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <Card className="border-border/50 shadow-sm cursor-pointer hover:border-emerald-500/50 transition-colors">
+              <CardHeader className="pb-2 flex flex-row items-start justify-between">
+                <div>
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-emerald-600" /> Booking Volume Trend
+                  </CardTitle>
+                  <CardDescription className="text-xs">Click on any point to drill-down into detailed data.</CardDescription>
+                </div>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setExpandedChart("bookings")}>
+                  <Maximize2 className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </CardHeader>
+              <CardContent className="h-[220px] pt-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={analytics?.chartsTrend} margin={{ top: 5, right: 10, left: -25, bottom: 0 }} onClick={(d) => handleChartClick(d, 'Bookings')}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
+                    <Line type="monotone" dataKey="bookings" stroke="hsl(158 60% 50%)" strokeWidth={2.5} activeDot={{ r: 6 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/50 shadow-sm cursor-pointer hover:border-blue-500/50 transition-colors">
+              <CardHeader className="pb-2 flex flex-row items-start justify-between">
+                <div>
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-blue-600" /> Revenue Growth Trend
+                  </CardTitle>
+                  <CardDescription className="text-xs">Click on any bar to see the specific revenue breakdown.</CardDescription>
+                </div>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setExpandedChart("revenue")}>
+                  <Maximize2 className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </CardHeader>
+              <CardContent className="h-[220px] pt-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analytics?.chartsTrend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }} onClick={(d) => handleChartClick(d, 'Revenue')}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <Tooltip />
+                    <Bar dataKey="revenue" fill="hsl(220 70% 60%)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
           </div>
-        </CardHeader>
 
-        {/* Print Only Sub-Report Title */}
-        <div className="hidden print:block px-6 pt-4 pb-2 border-b">
-          <h2 className="text-lg font-bold capitalize">{selectedReport} Report Worksheet</h2>
-        </div>
+          {/* Detailed Sub-Reports */}
+          <Card className="border-border/50 shadow-sm mt-6 print:break-inside-avoid">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/50 pb-4 print:hidden">
+              <div>
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary" /> Advanced Data Views
+                </CardTitle>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select value={selectedReport} onValueChange={(val) => setSelectedReport(val as ReportType)}>
+                  <SelectTrigger className="w-[220px] rounded-xl font-semibold">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="revenue">Revenue Analytics (Split)</SelectItem>
+                    <SelectItem value="user_registration">User Registration Analytics</SelectItem>
+                    <SelectItem value="booking">All Bookings Log</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={() => exportReport("excel")} variant="outline" size="sm" className="rounded-xl"><Download className="h-4 w-4 mr-2" /> Export to Excel/CSV</Button>
+              </div>
+            </CardHeader>
 
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            {selectedReport === "booking" && (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/10">
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Booking ID</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Customer / Route Name</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Service Category</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Fare Price</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Created Date</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {analytics?.reports?.booking?.map((r: any, idx: number) => (
-                    <TableRow key={idx} className="hover:bg-muted/20 transition-colors">
-                      <TableCell className="font-mono text-xs font-semibold text-muted-foreground">{r.id}</TableCell>
-                      <TableCell className="text-xs font-semibold">{r.customer}</TableCell>
-                      <TableCell className="text-xs">{r.type}</TableCell>
-                      <TableCell className="text-xs font-bold">{r.amount}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.date}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${r.status === "Cancelled" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
-                          {r.status}
-                        </span>
-                      </TableCell>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/10">
+                      {selectedReport === "revenue" && (
+                        <><TableHead>Category</TableHead><TableHead>Total Bookings</TableHead><TableHead>Revenue Generated</TableHead><TableHead>Average Booking Value</TableHead></>
+                      )}
+                      {selectedReport === "user_registration" && (
+                        <><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Mobile</TableHead><TableHead>Registration Date</TableHead><TableHead>Source</TableHead><TableHead>Total Bookings</TableHead><TableHead>Total Spend</TableHead></>
+                      )}
+                      {selectedReport === "booking" && (
+                        <><TableHead>Booking ID</TableHead><TableHead>Traveller Name</TableHead><TableHead>Category</TableHead><TableHead>Amount</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></>
+                      )}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+                  </TableHeader>
+                  <TableBody>
+                    {analytics?.reports[selectedReport]?.map((r: any, i: number) => (
+                      <TableRow key={i}>
+                        {selectedReport === "revenue" && (
+                          <><TableCell className="font-semibold">{r.category}</TableCell><TableCell>{r.bookings}</TableCell><TableCell className="font-bold text-emerald-600">₹{r.revenue.toLocaleString()}</TableCell><TableCell>₹{r.avg}</TableCell></>
+                        )}
+                        {selectedReport === "user_registration" && (
+                          <><TableCell className="font-medium">{r.name}</TableCell><TableCell>{r.email}</TableCell><TableCell>{r.phone}</TableCell><TableCell>{r.date}</TableCell><TableCell>{r.source}</TableCell><TableCell>{r.bookings}</TableCell><TableCell className="font-bold text-primary">₹{r.spent.toLocaleString()}</TableCell></>
+                        )}
+                        {selectedReport === "booking" && (
+                          <><TableCell className="font-mono text-xs">{String(r.id).slice(0, 8).toUpperCase()}</TableCell><TableCell>{r.name}</TableCell><TableCell>{r.category}</TableCell><TableCell className="font-semibold">₹{r.amount.toLocaleString()}</TableCell><TableCell>{r.date}</TableCell><TableCell>{r.status}</TableCell></>
+                        )}
+                      </TableRow>
+                    ))}
+                    {analytics?.reports[selectedReport]?.length === 0 && (
+                      <TableRow><TableCell colSpan={7} className="text-center h-24 text-muted-foreground">No data found for this date range.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
-            {selectedReport === "traveller" && (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/10">
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Traveller Name</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Mobile Number</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Trips Taken</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Loyalty Status</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Last Activity</TableHead>
+      {/* Drill-down Modal */}
+      <Dialog open={!!drilldownData} onOpenChange={() => setDrilldownData(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /> Drill-down: {drilldownData?.title}</DialogTitle>
+            <DialogDescription>Detailed records contributing to this specific data point.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto mt-4 rounded-xl border border-border/50">
+            <Table>
+              <TableHeader className="bg-muted/30 sticky top-0">
+                <TableRow>
+                  <TableHead>Booking ID</TableHead>
+                  <TableHead>Traveller</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {drilldownData?.data.map((b: any, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="font-mono text-xs text-muted-foreground">#{String(b.id).slice(0, 8).toUpperCase()}</TableCell>
+                    <TableCell className="font-semibold text-sm">{b.customer || "Guest"}</TableCell>
+                    <TableCell>{b.category}</TableCell>
+                    <TableCell className="font-bold text-emerald-600">₹{Number(b.amount || 0).toLocaleString()}</TableCell>
+                    <TableCell>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-muted uppercase tracking-wider">{b.status || 'Pending'}</span>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {analytics?.reports?.traveller?.map((r: any, idx: number) => (
-                    <TableRow key={idx} className="hover:bg-muted/20 transition-colors">
-                      <TableCell className="text-xs font-semibold">{r.name}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground font-mono">{r.phone}</TableCell>
-                      <TableCell className="text-xs font-semibold text-center">{r.totalBookings}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${r.status === "Returning" ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>
-                          {r.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.lastActive}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-
-            {selectedReport === "listing" && (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/10">
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Rank</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Route / Listing Name</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Total Sales</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Page Conversion</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Gross Revenue</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {analytics?.reports?.listing?.map((r: any, idx: number) => (
-                    <TableRow key={idx} className="hover:bg-muted/20 transition-colors">
-                      <TableCell className="font-semibold text-xs text-muted-foreground">{r.rank}</TableCell>
-                      <TableCell className="text-xs font-semibold">{r.name}</TableCell>
-                      <TableCell className="text-xs">{r.bookings} Bookings</TableCell>
-                      <TableCell className="text-xs font-mono text-indigo-600">{r.conversion}</TableCell>
-                      <TableCell className="text-xs font-bold text-emerald-600">{r.grossRevenue}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-
-            {selectedReport === "driver" && (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/10">
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Driver Name</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Trips Completed</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Customer Rating</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Attendance Status</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Hub Utilization</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {analytics?.reports?.driver?.map((r: any, idx: number) => (
-                    <TableRow key={idx} className="hover:bg-muted/20 transition-colors">
-                      <TableCell className="text-xs font-semibold">{r.name}</TableCell>
-                      <TableCell className="text-xs text-center font-semibold">{r.trips}</TableCell>
-                      <TableCell className="text-xs font-bold text-amber-600 flex items-center gap-1">
-                        <Star className="h-3.5 w-3.5 fill-amber-500 stroke-none" /> {r.rating}
-                      </TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${r.status === "Active" ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
-                          {r.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-xs font-mono text-indigo-600">{r.utilization}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-
-            {selectedReport === "package" && (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/10">
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Booking Ref</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Package Name</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Sales Value</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Booking Date</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {analytics?.reports?.package?.map((r: any, idx: number) => (
-                    <TableRow key={idx} className="hover:bg-muted/20 transition-colors">
-                      <TableCell className="font-mono text-xs font-semibold text-muted-foreground">{r.id}</TableCell>
-                      <TableCell className="text-xs font-semibold">{r.name}</TableCell>
-                      <TableCell className="text-xs font-bold text-emerald-600">{r.sales}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.date}</TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700">
-                          {r.status}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-
-            {selectedReport === "performance" && (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/10">
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Operational Metric</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Metric Value</TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider">Performance Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {analytics?.reports?.performance?.map((r: any, idx: number) => (
-                    <TableRow key={idx} className="hover:bg-muted/20 transition-colors">
-                      <TableCell className="text-xs font-semibold">{r.metric}</TableCell>
-                      <TableCell className="text-xs font-bold">{r.value}</TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700">
-                          {r.status}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+                ))}
+              </TableBody>
+            </Table>
           </div>
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
+
+      {/* Full-Screen Graph Modal */}
+      <Dialog open={!!expandedChart} onOpenChange={() => setExpandedChart(null)}>
+        <DialogContent className="max-w-[95vw] w-[1400px] h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-2xl flex items-center gap-2">
+              {expandedChart === "bookings" ? <TrendingUp className="h-6 w-6 text-emerald-600" /> : <BarChart3 className="h-6 w-6 text-blue-600" />}
+              {expandedChart === "bookings" ? "Booking Volume Analytics" : "Revenue Growth Analytics"}
+            </DialogTitle>
+            <DialogDescription>Interactive full-screen analytics. Click any data point to drill-down into specific records.</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 mt-4 border border-border/50 rounded-xl p-6 bg-card/50">
+            <ResponsiveContainer width="100%" height="100%">
+              {expandedChart === "bookings" ? (
+                <LineChart data={analytics?.chartsTrend} margin={{ top: 20, right: 30, left: 0, bottom: 20 }} onClick={(d) => { if(d) handleChartClick(d, 'Bookings'); }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.5} />
+                  <XAxis dataKey="date" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} dy={15} />
+                  <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} dx={-10} />
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                  <Line type="monotone" dataKey="bookings" stroke="hsl(158 60% 50%)" strokeWidth={4} activeDot={{ r: 8, strokeWidth: 0, fill: "hsl(158 60% 40%)" }} dot={{ r: 4, fill: "hsl(158 60% 50%)" }} />
+                </LineChart>
+              ) : (
+                <BarChart data={analytics?.chartsTrend} margin={{ top: 20, right: 30, left: 0, bottom: 20 }} onClick={(d) => { if(d) handleChartClick(d, 'Revenue'); }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.5} />
+                  <XAxis dataKey="date" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} dy={15} />
+                  <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} dx={-10} />
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                  <Bar dataKey="revenue" fill="hsl(220 70% 60%)" radius={[6, 6, 0, 0]} maxBarSize={60} />
+                </BarChart>
+              )}
+            </ResponsiveContainer>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

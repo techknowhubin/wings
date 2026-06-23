@@ -1,0 +1,304 @@
+import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { Tag, Users, Plus, Search, Check, Loader2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+
+export default function HubCoupons() {
+  const { uuid } = useParams<{ uuid: string }>();
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  const [hubId, setHubId] = useState<string | null>(null);
+
+  // Form State
+  const [showForm, setShowForm] = useState(false);
+  const [code, setCode] = useState("");
+  const [discountValue, setDiscountValue] = useState("");
+  const [discountType, setDiscountType] = useState<"flat" | "percent">("flat");
+  const [usageLimit, setUsageLimit] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
+  
+  // User Search State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [openUserSearch, setOpenUserSearch] = useState(false);
+
+  useEffect(() => {
+    if (uuid) {
+      loadHubAndCoupons();
+    }
+  }, [uuid]);
+
+  const loadHubAndCoupons = async () => {
+    setLoading(true);
+    const { data: hub } = await supabase.from('hubs').select('id').eq('uuid', uuid).single();
+    if (hub) {
+      setHubId(hub.id);
+      await loadCoupons(hub.id);
+    }
+    setLoading(false);
+  };
+
+  const loadCoupons = async (hId: string) => {
+    const { data } = await supabase
+      .from('host_coupons' as any)
+      .select('*, target_user:profiles!target_user_id(full_name, email, phone)')
+      .eq('host_id', hId)
+      .order('created_at', { ascending: false });
+    
+    if (data) setCoupons(data);
+  };
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (!searchQuery.trim()) {
+        setSearchResults([]);
+        return;
+      }
+      setIsSearching(true);
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, phone')
+        .or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%`)
+        .limit(5);
+      
+      setSearchResults(data || []);
+      setIsSearching(false);
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code) return toast({ title: "Code required", variant: "destructive" });
+    if (!hubId) return toast({ title: "Error", description: "Hub ID not loaded", variant: "destructive" });
+
+    const payload: any = {
+      code: code.toUpperCase(),
+      host_id: hubId,
+      is_platform_offer: false,
+      is_active: true,
+      discount_value: discountType === "flat" ? Number(discountValue) : null,
+      discount_percent: discountType === "percent" ? Number(discountValue) : null,
+      target_user_id: selectedUser?.id || null,
+      target_email: selectedUser?.email || null,
+      target_phone: selectedUser?.phone || null,
+      usage_limit: usageLimit ? Number(usageLimit) : null,
+      expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+    };
+
+    const { error } = await supabase.from('host_coupons' as any).insert(payload);
+    if (error) {
+      toast({ title: "Failed to create", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "VIP Coupon Created" });
+      setShowForm(false);
+      setCode("");
+      setDiscountValue("");
+      setSelectedUser(null);
+      setSearchQuery("");
+      setUsageLimit("");
+      setExpiresAt("");
+      loadCoupons(hubId);
+    }
+  };
+
+  const handleToggleStatus = async (id: string, currentStatus: boolean) => {
+    const { error } = await supabase.from('host_coupons' as any).update({ is_active: !currentStatus }).eq('id', id);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else {
+      toast({ title: "Status updated" });
+      if (hubId) loadCoupons(hubId);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-foreground">VIP Coupon Management</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Manage and assign VIP coupons to specific users for your Hub.</p>
+        </div>
+        <Button onClick={() => setShowForm(!showForm)} className="rounded-xl gap-2">
+          <Plus className="h-4 w-4" /> Create VIP Coupon
+        </Button>
+      </div>
+
+      {showForm && (
+        <Card className="border-border/50 border-emerald-500/30 shadow-md">
+          <CardHeader>
+            <CardTitle className="text-lg">Create New VIP Coupon</CardTitle>
+            <CardDescription>Create a global hub coupon or assign it to a specific traveller.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Coupon Code</Label>
+                  <Input value={code} onChange={e => setCode(e.target.value)} placeholder="e.g. HUBVIP100" required className="uppercase font-mono font-bold text-emerald-600" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Discount ({discountType === "flat" ? "₹" : "%"})</Label>
+                  <div className="flex gap-2">
+                    <Input type="number" value={discountValue} onChange={e => setDiscountValue(e.target.value)} placeholder="e.g. 500" required />
+                    <Button type="button" variant="outline" onClick={() => setDiscountType(t => t === 'flat' ? 'percent' : 'flat')}>
+                      Switch to {discountType === 'flat' ? '%' : '₹'}
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Assign to specific user (Optional)</Label>
+                  <Popover open={openUserSearch} onOpenChange={setOpenUserSearch}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" role="combobox" aria-expanded={openUserSearch} className="w-full justify-between font-normal h-auto py-2.5">
+                        {selectedUser ? (
+                          <div className="flex flex-col items-start text-left">
+                            <span className="font-semibold text-sm">{selectedUser.full_name}</span>
+                            <span className="text-xs text-muted-foreground">{selectedUser.email} • {selectedUser.phone}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Search by Name, Email, or Phone...</span>
+                        )}
+                        <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0" align="start">
+                      <div className="flex items-center border-b px-3">
+                        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                        <Input 
+                          placeholder="Type a name, email or mobile..." 
+                          value={searchQuery} 
+                          onChange={(e) => setSearchQuery(e.target.value)} 
+                          className="flex-1 border-0 bg-transparent py-3 focus-visible:ring-0 shadow-none" 
+                        />
+                      </div>
+                      <div className="max-h-[300px] overflow-y-auto p-1">
+                        {isSearching ? (
+                          <div className="flex items-center justify-center py-6 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin mr-2" /> Searching...</div>
+                        ) : searchResults.length === 0 && searchQuery ? (
+                          <div className="py-6 text-center text-sm text-muted-foreground">No users found.</div>
+                        ) : (
+                          searchResults.map((user) => (
+                            <div 
+                              key={user.id}
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setOpenUserSearch(false);
+                              }}
+                              className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                            >
+                              <div className="flex flex-col flex-1">
+                                <span className="font-medium">{user.full_name || 'Guest User'}</span>
+                                <span className="text-xs text-muted-foreground">{user.email || 'No email'} • {user.phone || 'No phone'}</span>
+                              </div>
+                              {selectedUser?.id === user.id && <Check className="h-4 w-4 ml-2 text-emerald-600" />}
+                            </div>
+                          ))
+                        )}
+                        <div 
+                           onClick={() => { setSelectedUser(null); setOpenUserSearch(false); setSearchQuery(""); }}
+                           className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none hover:bg-destructive/10 text-destructive mt-1 border-t"
+                        >
+                          Clear Selection (Make Global to Hub)
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Usage Limit (Optional)</Label>
+                  <Input type="number" value={usageLimit} onChange={e => setUsageLimit(e.target.value)} placeholder="e.g. 1" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Expiry Date (Optional)</Label>
+                  <Input type="datetime-local" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} />
+                </div>
+              </div>
+              <Button type="submit" className="w-full">Create VIP Coupon</Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="border-border/50">
+        <CardHeader>
+          <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <Tag className="h-4 w-4 text-emerald-600" /> Hub Coupon Directory
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/10">
+                <TableHead className="text-xs font-semibold">Code</TableHead>
+                <TableHead className="text-xs font-semibold">Discount</TableHead>
+                <TableHead className="text-xs font-semibold">Assigned To</TableHead>
+                <TableHead className="text-xs font-semibold">Usage Limit</TableHead>
+                <TableHead className="text-xs font-semibold">Expiry</TableHead>
+                <TableHead className="text-xs font-semibold">Status</TableHead>
+                <TableHead className="text-xs font-semibold">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow><TableCell colSpan={7} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" /></TableCell></TableRow>
+              ) : coupons.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    No hub coupons found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                coupons.map(c => (
+                  <TableRow key={c.id}>
+                    <TableCell className="font-mono text-sm font-bold text-emerald-600">{c.code}</TableCell>
+                    <TableCell className="font-semibold text-sm">{c.discount_percent ? `${c.discount_percent}% OFF` : `₹${c.discount_value} OFF`}</TableCell>
+                    <TableCell>
+                      {c.target_user ? (
+                        <div>
+                          <p className="font-semibold text-sm text-blue-600 flex items-center gap-1"><Users className="h-3 w-3" /> {c.target_user.full_name}</p>
+                          <p className="text-[10px] text-muted-foreground">{c.target_email || c.target_phone}</p>
+                        </div>
+                      ) : (
+                        <Badge variant="secondary" className="text-[10px] font-medium">Hub Global</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs">{c.usage_limit ? `${c.usage_count || 0} / ${c.usage_limit}` : 'Unlimited'}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {c.expires_at ? format(new Date(c.expires_at), 'dd MMM yyyy, hh:mm a') : "No Expiry"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={c.is_active ? "default" : "destructive"} className="text-[10px]">
+                        {c.is_active ? "Active" : "Disabled"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm" onClick={() => handleToggleStatus(c.id, c.is_active)} className="h-8 text-xs">
+                        {c.is_active ? "Disable" : "Enable"}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

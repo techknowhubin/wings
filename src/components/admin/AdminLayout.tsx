@@ -7,10 +7,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAdminMetrics } from '@/hooks/useAdmin';
 import { useProfile } from '@/hooks/useListings';
 import { DynamicLogo } from '@/components/DynamicLogo';
+import NotificationBell from '@/components/NotificationBell';
 import {
   LayoutDashboard, ShieldCheck, CheckSquare, Store, Users,
   CalendarCheck, Building2, Wallet, BarChart3, Settings,
-  LogOut, FileText, Menu, X, Bell, Search, Mail, Lock, QrCode, Map, Globe, Receipt
+  LogOut, FileText, Menu, X, Bell, Search, Mail, Lock, QrCode, Map, Globe, Receipt, Tag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,6 +62,7 @@ export default function AdminLayout() {
         { label: 'Airport & Local Rentals', to: '/admin/cab-bookings', icon: CalendarCheck },
         { label: 'Hub Partners', to: '/admin/hubs', icon: Building2 },
         { label: 'Referrals', to: '/admin/referrals', icon: QrCode },
+        { label: 'VIP Coupons', to: '/admin/coupons', icon: Tag },
       ],
     },
     {
@@ -207,9 +209,7 @@ export default function AdminLayout() {
           <DynamicLogo lightHeightClass="h-7" darkHeightClass="h-[36px]" />
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="relative rounded-xl">
-            <Bell className="h-5 w-5" />
-          </Button>
+          <NotificationBell />
           <Avatar className="h-8 w-8">
             <AvatarImage src={profile?.profile_image || ''} />
             <AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
@@ -263,9 +263,7 @@ export default function AdminLayout() {
             <Button variant="ghost" size="icon" className="rounded-xl relative h-10 w-10">
               <Mail className="h-[18px] w-[18px] text-muted-foreground" />
             </Button>
-            <Button variant="ghost" size="icon" className="rounded-xl relative h-10 w-10">
-              <Bell className="h-[18px] w-[18px] text-muted-foreground" />
-            </Button>
+            <NotificationBell />
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
               <span>System operational</span>

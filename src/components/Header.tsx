@@ -74,9 +74,9 @@ const Header = () => {
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.5 }}
-        className="sticky top-0 z-[90] glass-effect"
+        className="sticky top-8 z-[90] glass-effect"
       >
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-4 min-h-[72px] flex flex-col justify-center">
           <div className="flex items-center justify-between">
             {/* Logo */}
             <div className="flex-1 flex justify-start min-w-[150px] shrink-0">

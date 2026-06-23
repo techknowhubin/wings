@@ -7,12 +7,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { DynamicLogo } from '@/components/DynamicLogo';
+import NotificationBell from '@/components/NotificationBell';
 import {
   LayoutDashboard, Users, Building, CalendarCheck, Car,
   LifeBuoy, BarChart3, Settings, User, LogOut, Menu, X, Bell, Search,
   Building2, PhoneIncoming, HeadphonesIcon, MapPin, Star,
   ShoppingBag, Coins, FileText, ChevronDown, ChevronRight, Truck,
-  Navigation, Mail, Map
+  Navigation, Mail, Map, Tag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -137,6 +138,7 @@ export default function HubLayout() {
       title: 'Platform',
       items: [
         { label: 'Reports', to: `${baseUrl}/reports`, icon: BarChart3 },
+        { label: 'Coupons & Offers', to: `${baseUrl}/coupons`, icon: Tag },
         { label: 'Support', to: `${baseUrl}/support`, icon: LifeBuoy },
         { label: 'Profile', to: `${baseUrl}/profile`, icon: User },
         { label: 'Settings', to: `${baseUrl}/settings`, icon: Settings },
@@ -153,12 +155,12 @@ export default function HubLayout() {
   const isActivePath = (path: string) => {
     if (path === baseUrl) return location.pathname === baseUrl;
     if (location.pathname === path) return true;
-    
+
     const allPaths = sections.flatMap(s => s.items.map(i => i.to));
     if (allPaths.includes(location.pathname)) {
-        return false;
+      return false;
     }
-    
+
     return location.pathname.startsWith(path + '/');
   };
 
@@ -269,12 +271,7 @@ export default function HubLayout() {
           <DynamicLogo lightHeightClass="h-7" darkHeightClass="h-[36px]" />
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="relative rounded-xl">
-            <Bell className="h-5 w-5" />
-            {pendingCount && pendingCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-destructive rounded-full" />
-            )}
-          </Button>
+          <NotificationBell />
           <Avatar className="h-8 w-8">
             <AvatarFallback className="bg-emerald-600 text-white text-sm font-bold">
               {(hubDetails?.display_name)?.charAt(0)?.toUpperCase() || 'H'}
@@ -329,12 +326,7 @@ export default function HubLayout() {
               <span>Hub Operational</span>
             </div>
             <div className="w-px h-6 bg-border mx-1" />
-            <Button variant="ghost" size="icon" className="rounded-xl relative h-9 w-9">
-              <Bell className="h-4 w-4 text-muted-foreground" />
-              {pendingCount && pendingCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-destructive rounded-full" />
-              )}
-            </Button>
+            <NotificationBell />
             <div className="flex items-center gap-2 pl-1">
               <Avatar className="h-8 w-8 border-2 border-border">
                 <AvatarFallback className="bg-emerald-600 text-white text-xs font-bold">

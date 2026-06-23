@@ -51,14 +51,54 @@ export default function HubMarketplaceBookings() {
       const { data, error } = await supabase
         .from('bookings')
         .select(`
-          id, listing_type, booking_status, payment_status, check_in, check_out, total_price, created_at, currency,
+          id, listing_type, listing_id, booking_status, payment_status, check_in, check_out, total_price, created_at, currency,
           user:profiles!bookings_user_id_fkey(full_name, phone, email)
         `)
         .in('listing_type', ['hotel', 'stay', 'resort', 'experience', 'car', 'bike'])
         .order('created_at', { ascending: false })
         .limit(200);
+      
       if (error) throw error;
-      return data || [];
+      if (!data || data.length === 0) return [];
+
+      const hotelIds = data.filter(b => b.listing_type === 'hotel').map(b => b.listing_id).filter(Boolean);
+      const stayIds = data.filter(b => b.listing_type === 'stay').map(b => b.listing_id).filter(Boolean);
+      const resortIds = data.filter(b => b.listing_type === 'resort').map(b => b.listing_id).filter(Boolean);
+      const experienceIds = data.filter(b => b.listing_type === 'experience').map(b => b.listing_id).filter(Boolean);
+      const carIds = data.filter(b => b.listing_type === 'car').map(b => b.listing_id).filter(Boolean);
+      const bikeIds = data.filter(b => b.listing_type === 'bike').map(b => b.listing_id).filter(Boolean);
+
+      const listingMap: Record<string, any> = {};
+
+      if (hotelIds.length > 0) {
+        const { data: hotels } = await supabase.from('hotels').select('id, title, cover_image').in('id', hotelIds);
+        hotels?.forEach(h => listingMap[h.id] = h);
+      }
+      if (stayIds.length > 0) {
+        const { data: stays } = await supabase.from('stays').select('id, title, cover_image').in('id', stayIds);
+        stays?.forEach(s => listingMap[s.id] = s);
+      }
+      if (resortIds.length > 0) {
+        const { data: resorts } = await supabase.from('resorts').select('id, title, cover_image').in('id', resortIds);
+        resorts?.forEach(r => listingMap[r.id] = r);
+      }
+      if (experienceIds.length > 0) {
+        const { data: exps } = await supabase.from('experiences').select('id, title, cover_image').in('id', experienceIds);
+        exps?.forEach(e => listingMap[e.id] = e);
+      }
+      if (carIds.length > 0) {
+        const { data: cars } = await supabase.from('cars').select('id, name, images').in('id', carIds);
+        cars?.forEach(c => listingMap[c.id] = { id: c.id, title: c.name, cover_image: c.images?.[0] });
+      }
+      if (bikeIds.length > 0) {
+        const { data: bikes } = await supabase.from('bikes').select('id, name, images').in('id', bikeIds);
+        bikes?.forEach(b => listingMap[b.id] = { id: b.id, title: b.name, cover_image: b.images?.[0] });
+      }
+
+      return data.map(b => ({
+        ...b,
+        listingDetails: b.listing_id ? listingMap[b.listing_id] : null
+      }));
     }
   });
 
@@ -153,11 +193,18 @@ export default function HubMarketplaceBookings() {
                         <p className="text-xs text-muted-foreground">{b.user?.phone || 'N/A'}</p>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <div className={`h-6 w-6 rounded-lg flex items-center justify-center ${cfg.bg}`}>
-                            <cfg.icon className={`h-3.5 w-3.5 ${cfg.color}`} />
+                        <div className="flex items-center gap-3">
+                          {b.listingDetails?.cover_image ? (
+                            <img src={b.listingDetails.cover_image} alt={cfg.label} className="h-10 w-10 rounded-lg object-cover border border-border/50" />
+                          ) : (
+                            <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${cfg.bg}`}>
+                              <cfg.icon className={`h-5 w-5 ${cfg.color}`} />
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-xs font-semibold text-foreground line-clamp-1">{b.listingDetails?.title || cfg.label}</p>
+                            <span className="text-[10px] font-medium text-muted-foreground">{cfg.label}</span>
                           </div>
-                          <span className="text-xs font-medium">{cfg.label}</span>
                         </div>
                       </TableCell>
                       <TableCell className="text-xs">{b.check_in ? format(new Date(b.check_in), 'dd MMM yy') : '—'}</TableCell>

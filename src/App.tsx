@@ -89,6 +89,7 @@ import AdminWalletManagement from "./pages/Admin/AdminWalletManagement";
 import AdminSecurityDashboard from "./pages/Admin/AdminSecurityDashboard";
 import SEODashboard from "./pages/Admin/SEODashboard";
 import AdminGSTSettings from "./pages/Admin/AdminGSTSettings";
+import AdminCoupons from "./pages/Admin/AdminCoupons";
 import CreatePackage from "./pages/Admin/Packages/CreatePackage";
 import EditPackage from "./pages/Admin/Packages/EditPackage";
 import PackageList from "./pages/Admin/Packages/PackageList";
@@ -117,6 +118,7 @@ import HubReports from "./pages/HubPartner/HubReports";
 import HubEarnings from "./pages/HubPartner/HubEarnings";
 import HubProfile from "./pages/HubPartner/HubProfile";
 import HubSettings from "./pages/HubPartner/HubSettings";
+import HubCoupons from "./pages/HubPartner/HubCoupons";
 import AssignedPackages from "./pages/HubPartner/Packages/AssignedPackages";
 import HubBookingsPackages from "./pages/HubPartner/Packages/HubBookings";
 
@@ -290,6 +292,7 @@ const App = () =>
               <Route path="security" element={<AdminSecurityDashboard />} />
               <Route path="seo" element={<SEODashboard />} />
               <Route path="gst" element={<AdminGSTSettings />} />
+              <Route path="coupons" element={<AdminCoupons />} />
               <Route path="settings" element={<AdminSettings />} />
               
               <Route path="experiences" element={<PackageList />} />
@@ -332,6 +335,7 @@ const App = () =>
               <Route path="map" element={<HubMap />} />
               <Route path="support" element={<HubSupport />} />
               <Route path="reports" element={<HubReports />} />
+              <Route path="coupons" element={<HubCoupons />} />
               <Route path="profile" element={<HubProfile />} />
               <Route path="settings" element={<HubSettings />} />
               

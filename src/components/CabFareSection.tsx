@@ -22,6 +22,8 @@ interface FareData {
   oneWaySuvPrice?: number;
   oneWaySuvDiscountedPrice?: number;
   imageUrl?: string;
+  oneWayBufferKm?: number;
+  roundTripBufferKm?: number;
 }
 
 const emptyFares: Record<State, FareData[]> = { telangana: [], andhra: [], karnataka: [] };
@@ -208,7 +210,7 @@ const splitCodeAndCity = (value: string) => {
 const normalizeFare = (fare: FareData): FareData => {
   let { sedanPrice, sedanDiscountedPrice, suvPrice, suvDiscountedPrice,
         muvPrice, muvDiscountedPrice,
-        oneWaySedanPrice, oneWaySedanDiscountedPrice, oneWaySuvPrice, oneWaySuvDiscountedPrice } = fare;
+        oneWaySedanPrice, oneWaySedanDiscountedPrice, oneWaySuvPrice, oneWaySuvDiscountedPrice, oneWayBufferKm, roundTripBufferKm } = fare;
   if (sedanPrice === 0 && (sedanDiscountedPrice ?? 0) > 0) {
     sedanPrice = sedanDiscountedPrice!; sedanDiscountedPrice = 0;
   }
@@ -227,7 +229,7 @@ const normalizeFare = (fare: FareData): FareData => {
   }
   return { ...fare, sedanPrice, sedanDiscountedPrice, suvPrice, suvDiscountedPrice,
            muvPrice, muvDiscountedPrice,
-           oneWaySedanPrice, oneWaySedanDiscountedPrice, oneWaySuvPrice, oneWaySuvDiscountedPrice };
+           oneWaySedanPrice, oneWaySedanDiscountedPrice, oneWaySuvPrice, oneWaySuvDiscountedPrice, oneWayBufferKm, roundTripBufferKm };
 };
 
 const mapRowToFare = (row: Record<string, string>): FareData => {
@@ -258,6 +260,21 @@ const mapRowToFare = (row: Record<string, string>): FareData => {
   const oneWaySuvPrice = toPrice(pick(row, ["onewaysuv", "onewaysuvprice", "suvoneway", "owsuv"]));
   const oneWaySuvDiscountedPrice = toPrice(pick(row, ["onewaysuvdiscount", "onewaysuvdiscounted", "onewaysuvdi", "owsuvdiscount"]));
   const imageUrl = pick(row, ["imageurl", "image", "imgurl", "photo", "photourl", "imagelink"]);
+  const bufferRaw = String(pick(row, ["owrtbufferkm", "bufferkm", "buffer", "owrtbuffer"])).trim();
+  
+  let oneWayBufferKm = 0;
+  let roundTripBufferKm = 0;
+  if (bufferRaw) {
+    const parts = bufferRaw.split("/");
+    if (parts.length >= 2) {
+      oneWayBufferKm = Number(parts[0].replace(/[^\d.]/g, "")) || 0;
+      roundTripBufferKm = Number(parts[1].replace(/[^\d.]/g, "")) || 0;
+    } else {
+      const val = Number(bufferRaw.replace(/[^\d.]/g, "")) || 0;
+      oneWayBufferKm = val;
+      roundTripBufferKm = val;
+    }
+  }
 
   return normalizeFare({
     fromCode,
@@ -276,6 +293,8 @@ const mapRowToFare = (row: Record<string, string>): FareData => {
     oneWaySuvPrice,
     oneWaySuvDiscountedPrice,
     imageUrl,
+    oneWayBufferKm,
+    roundTripBufferKm,
   });
 };
 
@@ -351,6 +370,8 @@ const parseFareCsv = (csv: string): FareData[] => {
         oneWaySuvPrice,
         oneWaySuvDiscountedPrice,
         imageUrl,
+        oneWayBufferKm: 0,
+        roundTripBufferKm: 0,
       });
     })
     .filter(
@@ -446,6 +467,8 @@ const parseGvizPayload = (payload: any): FareData[] => {
         suvPrice:                   toPrice(extractCell(r, rtUCol)),
         suvDiscountedPrice:         toPrice(extractCell(r, rtUDCol)),
         imageUrl:                   extractCell(r, imgCol),
+        oneWayBufferKm:             0,
+        roundTripBufferKm:          0,
       });
     };
 

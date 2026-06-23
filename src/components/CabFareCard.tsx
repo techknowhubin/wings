@@ -52,6 +52,8 @@ interface CabFareCardProps {
   imageUrl?: string;
   delay?: number;
   variant?: "previous" | "ticket";
+  oneWayBufferKm?: number;
+  roundTripBufferKm?: number;
 }
 
 // Map destination codes to high-quality images for the ticket layout
@@ -131,6 +133,8 @@ const CabFareCard = ({
   imageUrl,
   delay = 0,
   variant = "previous",
+  oneWayBufferKm,
+  roundTripBufferKm,
 }: CabFareCardProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -341,9 +345,9 @@ const CabFareCard = ({
 
   // Distance values
   const numericDistance = parseInt(distance) || 300;
-  const bufferDistance = 50;
+  const bufferDistance = roundTripBufferKm && roundTripBufferKm > 0 ? roundTripBufferKm : 50;
   const oneWayDistance = Math.round(numericDistance / 2);
-  const oneWayBuffer = Math.round(bufferDistance / 2);
+  const oneWayBuffer = oneWayBufferKm && oneWayBufferKm > 0 ? oneWayBufferKm : Math.round(bufferDistance / 2);
   const totalCovered = numericDistance + bufferDistance;
   const minToll = Math.max(150, Math.round((numericDistance * 0.5) / 50) * 50);
   const maxToll = minToll + 150;

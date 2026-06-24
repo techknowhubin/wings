@@ -429,21 +429,28 @@ export default function UserProfile() {
     queryKey: ["my-coupons", user?.id],
     queryFn: async () => {
       if (!user) return [];
-      // Get distinct host IDs from user's bookings
-      const { data: bData } = await supabase
-        .from("bookings")
-        .select("host_id")
-        .eq("user_id", user.id);
-      const hostIds = [...new Set((bData ?? []).map((b: any) => b.host_id).filter(Boolean))];
-      if (!hostIds.length) return [];
-      const { data } = await (supabase as any)
-        .from("host_coupons")
-        .select("id,code,discount_type,discount_value,discount_percent,is_enabled,listing_id,expires_at,ends_at,listing_types,host_id")
-        .in("host_id", hostIds)
-        .eq("is_active", true)
-        .eq("is_enabled", true);
+      // Query 1: New multi-user assignments
+      const { data: data1 } = await supabase
+        .from("host_coupons" as any)
+        .select("*, assignments!inner(user_id)")
+        .eq("assignments.user_id", user.id)
+        .eq("is_active", true);
+
+      // Query 2: Legacy single-user assignments
+      const { data: data2 } = await supabase
+        .from("host_coupons" as any)
+        .select("*")
+        .or(`target_user_id.eq.${user.id},target_email.eq.${user.email},target_phone.eq.${user.phone}`)
+        .eq("is_active", true);
+
+      // Merge and deduplicate
+      const combinedData = [...(data1 || []), ...(data2 || [])];
+      const uniqueDataMap = new Map();
+      combinedData.forEach(c => uniqueDataMap.set(c.id, c));
+      const finalData = Array.from(uniqueDataMap.values());
+
       const now = new Date();
-      return (data ?? []).filter((c: any) => {
+      return finalData.filter((c: any) => {
         const exp = c.expires_at ?? c.ends_at;
         if (exp && new Date(exp) < now) return false;
         return true;
@@ -747,7 +754,7 @@ export default function UserProfile() {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h1 className="text-2xl font-bold text-foreground">My VIP Coupons</h1>
+                    <h1 className="text-2xl font-bold text-foreground">🎁 Your Coupons</h1>
                     <p className="text-sm text-muted-foreground mt-1">Exclusive discounts assigned to your account.</p>
                   </div>
                   <Ticket className="h-8 w-8 text-primary/20" />

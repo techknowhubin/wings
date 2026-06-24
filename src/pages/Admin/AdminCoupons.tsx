@@ -39,8 +39,7 @@ export default function AdminCoupons() {
     setLoading(true);
     const { data } = await supabase
       .from('host_coupons' as any)
-      .select('*, target_user:profiles!target_user_id(full_name, email, phone)')
-      .eq('is_platform_offer', true)
+      .select('*, hub:hubs(business_name, owner_name), assignments:host_coupon_assignments(user_id, profiles(full_name))')
       .order('created_at', { ascending: false });
     
     if (data) {
@@ -113,13 +112,46 @@ export default function AdminCoupons() {
 
   return (
     <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="p-4 text-center">
+            <p className="text-xs text-blue-600 font-semibold mb-1">Total Coupons</p>
+            <p className="text-2xl font-black text-blue-900">{coupons.length}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-emerald-50 border-emerald-200">
+          <CardContent className="p-4 text-center">
+            <p className="text-xs text-emerald-600 font-semibold mb-1">Active</p>
+            <p className="text-2xl font-black text-emerald-900">{coupons.filter(c => c.is_active && (!c.expires_at || new Date(c.expires_at) > new Date())).length}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-rose-50 border-rose-200">
+          <CardContent className="p-4 text-center">
+            <p className="text-xs text-rose-600 font-semibold mb-1">Expired/Inactive</p>
+            <p className="text-2xl font-black text-rose-900">{coupons.filter(c => !c.is_active || (c.expires_at && new Date(c.expires_at) < new Date())).length}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-purple-50 border-purple-200">
+          <CardContent className="p-4 text-center">
+            <p className="text-xs text-purple-600 font-semibold mb-1">Total Redeemed</p>
+            <p className="text-2xl font-black text-purple-900">{coupons.reduce((sum, c) => sum + (c.used_count || 0), 0)}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-amber-50 border-amber-200">
+          <CardContent className="p-4 text-center">
+            <p className="text-xs text-amber-600 font-semibold mb-1">By Hubs</p>
+            <p className="text-2xl font-black text-amber-900">{coupons.filter(c => !c.is_platform_offer).length}</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-foreground">VIP Coupon Management</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Manage global and user-specific platform VIP coupons.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Manage all global and Hub Partner VIP coupons.</p>
         </div>
         <Button onClick={() => setShowForm(!showForm)} className="rounded-xl gap-2">
-          <Plus className="h-4 w-4" /> Create VIP Coupon
+          <Plus className="h-4 w-4" /> Create Platform Coupon
         </Button>
       </div>
 
@@ -232,8 +264,9 @@ export default function AdminCoupons() {
             <TableHeader>
               <TableRow className="bg-muted/10">
                 <TableHead className="text-xs font-semibold">Code</TableHead>
+                <TableHead className="text-xs font-semibold">Creator</TableHead>
                 <TableHead className="text-xs font-semibold">Discount</TableHead>
-                <TableHead className="text-xs font-semibold">Assigned To</TableHead>
+                <TableHead className="text-xs font-semibold">Assigned Travellers</TableHead>
                 <TableHead className="text-xs font-semibold">Usage Limit</TableHead>
                 <TableHead className="text-xs font-semibold">Expiry</TableHead>
                 <TableHead className="text-xs font-semibold">Status</TableHead>
@@ -253,20 +286,36 @@ export default function AdminCoupons() {
                 coupons.map(c => (
                   <TableRow key={c.id}>
                     <TableCell className="font-mono text-sm font-bold text-emerald-600">{c.code}</TableCell>
-                    <TableCell className="font-semibold text-sm">{c.discount_percent ? `${c.discount_percent}% OFF` : `₹${c.discount_value} OFF`}</TableCell>
                     <TableCell>
-                      {c.target_user ? (
-                        <div>
-                          <p className="font-semibold text-sm text-blue-600 flex items-center gap-1"><Users className="h-3 w-3" /> {c.target_user.full_name}</p>
-                          <p className="text-[10px] text-muted-foreground">{c.target_email || c.target_phone}</p>
-                        </div>
+                      {c.is_platform_offer ? (
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 text-[10px]">Platform Admin</Badge>
                       ) : (
-                        <Badge variant="secondary" className="text-[10px] font-medium">Global (All Users)</Badge>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold">{c.hub?.business_name || 'Unknown Hub'}</span>
+                          <span className="text-[10px] text-muted-foreground">{c.hub?.owner_name}</span>
+                        </div>
                       )}
                     </TableCell>
-                    <TableCell className="text-xs">{c.usage_limit ? `${c.usage_count || 0} / ${c.usage_limit}` : 'Unlimited'}</TableCell>
+                    <TableCell className="font-semibold text-sm">{c.discount_percent ? `${c.discount_percent}% OFF` : `₹${c.discount_value} OFF`}</TableCell>
+                    <TableCell>
+                      {c.assignments && c.assignments.length > 0 ? (
+                        <div className="flex flex-col gap-0.5">
+                          <Badge variant="outline" className="text-[10px] w-fit mb-1">{c.assignments.length} Traveller(s)</Badge>
+                          <span className="text-[10px] text-muted-foreground line-clamp-1">
+                            {c.assignments.map((a: any) => a.profiles?.full_name).filter(Boolean).join(", ")}
+                          </span>
+                        </div>
+                      ) : c.target_user_id ? (
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-blue-600">Legacy Assignment</span>
+                        </div>
+                      ) : (
+                        <Badge variant="secondary" className="text-[10px] font-medium bg-gray-100">Global</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs">{c.usage_limit ? `${c.used_count || 0} / ${c.usage_limit}` : 'Unlimited'}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {c.expires_at ? format(new Date(c.expires_at), 'dd MMM yyyy, hh:mm a') : "No Expiry"}
+                      {c.expires_at ? format(new Date(c.expires_at), 'dd MMM yyyy') : "No Expiry"}
                     </TableCell>
                     <TableCell>
                       <Badge variant={c.is_active ? "default" : "destructive"} className="text-[10px]">

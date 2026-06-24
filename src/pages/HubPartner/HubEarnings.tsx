@@ -351,7 +351,7 @@ export default function HubEarnings() {
         </CardHeader>
         <CardContent className="p-0">
           {activeLogTab === "settlements" ? (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto min-w-0 w-full pb-2">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/10">
@@ -390,7 +390,7 @@ export default function HubEarnings() {
               </Table>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto min-w-0 w-full pb-2">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/10">

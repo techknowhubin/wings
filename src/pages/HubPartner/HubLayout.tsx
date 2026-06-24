@@ -13,7 +13,7 @@ import {
   LifeBuoy, BarChart3, Settings, User, LogOut, Menu, X, Bell, Search,
   Building2, PhoneIncoming, HeadphonesIcon, MapPin, Star,
   ShoppingBag, Coins, FileText, ChevronDown, ChevronRight, Truck,
-  Navigation, Mail, Map, Tag
+  Navigation, Mail, Map, Tag, Wallet
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -140,7 +140,7 @@ export default function HubLayout() {
       title: 'Platform',
       items: [
         { label: 'Reports', to: `${baseUrl}/reports`, icon: BarChart3 },
-        { label: 'Coupons & Offers', to: `${baseUrl}/coupons`, icon: Tag },
+        { label: 'VIP Coupons', to: `${baseUrl}/coupons`, icon: Tag },
         { label: 'Support', to: `${baseUrl}/support`, icon: LifeBuoy },
         { label: 'Profile', to: `${baseUrl}/profile`, icon: User },
         { label: 'Settings', to: `${baseUrl}/settings`, icon: Settings },
@@ -312,7 +312,7 @@ export default function HubLayout() {
       </AnimatePresence>
 
       {/* Main Content */}
-      <main className="flex-1 min-h-screen pt-14 lg:pt-0 lg:ml-[240px]">
+      <main className="flex-1 min-h-screen pt-14 lg:pt-0 lg:ml-[240px] w-full lg:w-[calc(100%-240px)] max-w-full min-w-0 flex flex-col overflow-x-hidden">
         {/* Desktop Top Bar */}
         <div className="hidden lg:flex items-center justify-between h-14 px-6 bg-card border-b border-border sticky top-0 z-30">
           <div className="relative w-64">

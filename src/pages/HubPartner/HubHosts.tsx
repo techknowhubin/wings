@@ -140,7 +140,7 @@ export default function HubHosts() {
 
       {/* Table */}
       <Card className="border-border/50 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-w-0 w-full pb-2">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">

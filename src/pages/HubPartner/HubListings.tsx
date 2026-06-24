@@ -167,7 +167,7 @@ function ListingDetailView({ listing, onClose }: { listing: Listing, onClose: ()
       {/* Section 6: Recent Bookings */}
       <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
         <h3 className="font-bold text-sm text-[#059669] flex items-center gap-2"><Calendar className="h-4 w-4" /> Section 6: Recent Bookings</h3>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-w-0 w-full pb-2">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
@@ -326,7 +326,7 @@ export default function HubListings() {
 
       {/* Table */}
       <Card className="border-border/50 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-w-0 w-full pb-2">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">

@@ -14,18 +14,24 @@ import {
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
+import hotelImg from "@/assets/hotel.jpeg";
+import homestayImg from "@/assets/homestay.jpeg";
+import resortImg from "@/assets/resort.jpg";
+import experienceImg from "@/assets/experience.jpeg";
+import carImg from "@/assets/car.jpeg";
+import bikeImg from "@/assets/bike.jpeg";
 
 type Booking = any;
 
 const BOOKING_TYPES = ['All', 'Hotels', 'Homestays', 'Resorts', 'Experiences', 'Rentals'];
 
-const TYPE_CONFIG: Record<string, { icon: React.ElementType; color: string; bg: string; label: string }> = {
-  hotel: { icon: Hotel, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20', label: 'Hotel' },
-  stay: { icon: Home, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20', label: 'Homestay' },
-  resort: { icon: TreePine, color: 'text-teal-600', bg: 'bg-teal-50 dark:bg-teal-900/20', label: 'Resort' },
-  experience: { icon: Backpack, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20', label: 'Experience' },
-  car: { icon: Map, color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-900/20', label: 'Car Rental' },
-  bike: { icon: Bike, color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/20', label: 'Bike Rental' },
+const TYPE_CONFIG: Record<string, { icon: React.ElementType; image: string; color: string; bg: string; label: string }> = {
+  hotel: { icon: Hotel, image: hotelImg, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20', label: 'Hotel' },
+  stay: { icon: Home, image: homestayImg, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20', label: 'Homestay' },
+  resort: { icon: TreePine, image: resortImg, color: 'text-teal-600', bg: 'bg-teal-50 dark:bg-teal-900/20', label: 'Resort' },
+  experience: { icon: Backpack, image: experienceImg, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20', label: 'Experience' },
+  car: { icon: Map, image: carImg, color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-900/20', label: 'Car Rental' },
+  bike: { icon: Bike, image: bikeImg, color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/20', label: 'Bike Rental' },
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -140,14 +146,22 @@ export default function HubMarketplaceBookings() {
       </div>
 
       {/* Summary Tiles */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
         {Object.entries(TYPE_CONFIG).map(([type, cfg]) => {
           const count = (bookings || []).filter((b: Booking) => b.listing_type === type).length;
           return (
-            <div key={type} className={`rounded-xl p-3 ${cfg.bg} border border-border/30`}>
-              <cfg.icon className={`h-5 w-5 ${cfg.color} mb-1.5`} />
-              <p className="text-xl font-black text-foreground">{count}</p>
-              <p className="text-xs font-semibold text-muted-foreground">{cfg.label}s</p>
+            <div key={type} className={`rounded-xl border border-border/30 overflow-hidden flex flex-col bg-card`}>
+              <div className="aspect-video w-full relative">
+                <img src={cfg.image} alt={cfg.label} className="absolute inset-0 w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+              </div>
+              <div className="p-3">
+                <p className="text-sm font-semibold text-foreground mb-1">{cfg.label}s</p>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xl font-black text-foreground">{count}</span>
+                  <span className="text-xs text-muted-foreground">bookings</span>
+                </div>
+              </div>
             </div>
           );
         })}
@@ -175,7 +189,7 @@ export default function HubMarketplaceBookings() {
 
       {/* Table */}
       <Card className="border-border/50 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-w-0 w-full pb-2">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">

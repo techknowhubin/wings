@@ -178,7 +178,7 @@ export default function HubOutstationCabs() {
 
       {/* Table */}
       <Card className="border-border/50 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-w-0 w-full pb-2">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">
@@ -237,10 +237,20 @@ export default function HubOutstationCabs() {
                         <DropdownMenuContent align="end" className="w-52">
                           <DropdownMenuLabel className="text-xs">Trip Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => setDetailBooking(b)}>
+                          <DropdownMenuItem onClick={() => {
+                            console.log("Booking Pickup Address:", b.pickup_location);
+                            console.log("Booking Pickup Latitude:", b.pickup_latitude);
+                            console.log("Booking Pickup Longitude:", b.pickup_longitude);
+                            setDetailBooking(b);
+                          }}>
                             <Eye className="h-4 w-4 mr-2" /> View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setAssigningBooking(b)}>
+                          <DropdownMenuItem onClick={() => {
+                            console.log("Booking Pickup Address:", b.pickup_location);
+                            console.log("Booking Pickup Latitude:", b.pickup_latitude);
+                            console.log("Booking Pickup Longitude:", b.pickup_longitude);
+                            setAssigningBooking(b);
+                          }}>
                             <UserPlus className="h-4 w-4 mr-2 text-blue-600" />
                             {b.driver_id ? 'Reassign Driver' : 'Assign Driver'}
                           </DropdownMenuItem>
@@ -374,28 +384,47 @@ export default function HubOutstationCabs() {
                 ))}
               </div>
               
-              {/* Pickup and Drop Location Map Preview */}
-              {(detailBooking.pickup_latitude && detailBooking.pickup_longitude && detailBooking.drop_latitude && detailBooking.drop_longitude) ? (
+              {/* Customer Location Map Preview */}
+              {(detailBooking.pickup_latitude && detailBooking.pickup_longitude) ? (
                 <div className="mt-4 pt-4 border-t border-border/50">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">📍 Route Map Preview</p>
-                  <p className="text-xs text-foreground mb-3">From: {detailBooking.pickup_location}<br/>To: {detailBooking.drop_location}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">📍 Customer Pickup Location</p>
+                  <p className="text-xs text-foreground mb-3">{detailBooking.pickup_location}</p>
                   <div className="rounded-xl overflow-hidden border border-border/50 bg-muted/30">
                     <iframe 
                       width="100%" 
                       height="200" 
                       style={{ border: 0 }} 
-                      src={`https://maps.google.com/maps?saddr=${detailBooking.pickup_latitude},${detailBooking.pickup_longitude}&daddr=${detailBooking.drop_latitude},${detailBooking.drop_longitude}&output=embed`} 
+                      src={`https://www.google.com/maps?q=${detailBooking.pickup_latitude},${detailBooking.pickup_longitude}&output=embed`} 
                     />
                   </div>
-                  <a 
-                    href={`https://www.google.com/maps/dir/?api=1&origin=${detailBooking.pickup_latitude},${detailBooking.pickup_longitude}&destination=${detailBooking.drop_latitude},${detailBooking.drop_longitude}`} 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    className="inline-flex w-full items-center justify-center gap-2 mt-3 py-2 px-4 bg-muted hover:bg-muted/80 text-foreground font-semibold rounded-lg text-sm transition-colors"
-                  >
-                    <MapPin className="h-4 w-4" />
-                    Open Route in Google Maps
-                  </a>
+                  <div className="flex flex-col sm:flex-row gap-2 mt-3">
+                    <a 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        const url = `https://www.google.com/maps?q=${detailBooking.pickup_latitude},${detailBooking.pickup_longitude}`;
+                        console.log("Generated Map URL:", url);
+                        window.open(url, '_blank');
+                      }}
+                      href={`https://www.google.com/maps?q=${detailBooking.pickup_latitude},${detailBooking.pickup_longitude}`} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="flex-1 inline-flex items-center justify-center gap-2 py-2 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg text-sm transition-colors"
+                    >
+                      <MapPin className="h-4 w-4" />
+                      Open in Google Maps
+                    </a>
+                    {detailBooking.driver_id && (
+                      <a 
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${detailBooking.pickup_latitude},${detailBooking.pickup_longitude}`} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="flex-1 inline-flex items-center justify-center gap-2 py-2 px-4 bg-muted hover:bg-muted/80 text-foreground font-semibold rounded-lg text-sm transition-colors"
+                      >
+                        <Navigation className="h-4 w-4" />
+                        Open Route
+                      </a>
+                    )}
+                  </div>
                 </div>
               ) : detailBooking.map_url ? (
                 <div className="mt-4 pt-4 border-t border-border/50">

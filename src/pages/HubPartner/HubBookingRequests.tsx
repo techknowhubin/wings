@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import {
   Search, Loader2, CalendarCheck, Car, Eye, Check, X, UserPlus,
-  Phone, MessageCircle, ArrowRight, MoreHorizontal, Filter, MapPin
+  Phone, MessageCircle, ArrowRight, MoreHorizontal, Filter, MapPin, Copy
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -127,7 +127,7 @@ export default function HubBookingRequests() {
     queryKey: ['hub-drivers-list', uuid],
     enabled: !!uuid,
     queryFn: async () => {
-      const { data } = await supabase.from('hub_drivers').select('id, driver_name, mobile, status').eq('hub_uuid', uuid).eq('status', 'active');
+      const { data } = await supabase.from('hub_drivers').select('id, driver_name, mobile, status, vehicle_assigned').eq('hub_uuid', uuid).eq('status', 'active');
       return data || [];
     }
   });
@@ -234,7 +234,8 @@ export default function HubBookingRequests() {
 
       {/* Table */}
       <Card className="border-border/50 overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto min-w-0 w-full">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">
@@ -359,6 +360,72 @@ export default function HubBookingRequests() {
             </TableBody>
           </Table>
         </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden flex flex-col divide-y divide-border/50">
+          {isLoading ? (
+            <div className="h-32 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="h-32 flex flex-col items-center justify-center text-muted-foreground">
+              <CalendarCheck className="h-8 w-8 mb-2 opacity-30" />
+              <p className="text-sm">No bookings found</p>
+            </div>
+          ) : (
+            filtered.map((b: Booking) => (
+              <div key={b.booking_id} className="p-4 space-y-3 hover:bg-muted/30 transition-colors">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-mono text-xs text-muted-foreground mb-1">
+                      #{b.booking_id ? String(b.booking_id).slice(-8).toUpperCase() : 'N/A'}
+                    </p>
+                    <p className="font-bold text-sm text-foreground">{b.traveller?.full_name || 'N/A'}</p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <Phone className="h-3 w-3" />{b.traveller?.phone || 'N/A'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-sm">₹{(b.fare_amount || 0).toLocaleString('en-IN')}</p>
+                    <div className="mt-1">
+                      <StatusBadge status={b.booking_status || 'Pending'} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-muted/30 rounded-lg p-2.5 space-y-1.5">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Service</span>
+                    <span className="font-medium">
+                      {b.booking_source === 'airport_transfer' ? '✈ Airport Transfer'
+                        : b.booking_source === 'local_4hrs' ? '🕒 4HRS Local Rental'
+                        : b.booking_source === 'local_8hrs' ? '🕒 8HRS Local Rental'
+                        : b.booking_source === 'outstation_cab' ? '🚗 Outstation Cab'
+                        : b.booking_type || 'Cab Booking'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Date</span>
+                    <span className="font-medium">{b.travel_date ? format(new Date(b.travel_date), 'dd MMM yy') : 'TBD'}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Route</span>
+                    <span className="font-medium text-right max-w-[60%] truncate">{b.pickup_location || '—'} → {b.drop_location || '—'}</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => setDetailBooking(b)}>
+                    <Eye className="h-4 w-4 mr-1.5" /> Details
+                  </Button>
+                  <Button size="sm" className="flex-1 text-xs" onClick={() => setAssigningBooking(b)}>
+                    <UserPlus className="h-4 w-4 mr-1.5" /> Assign
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </Card>
 
       {/* View Details Dialog */}
@@ -382,8 +449,8 @@ export default function HubBookingRequests() {
                     : detailBooking.booking_type || 'Cab Booking'],
                   ['Traveller', detailBooking.traveller?.full_name || 'N/A'],
                   ['Mobile', detailBooking.traveller?.phone || 'N/A'],
-                  ['Pickup', detailBooking.pickup_location || 'N/A'],
-                  ['Drop', detailBooking.drop_location || 'N/A'],
+                  ['Pickup Address', detailBooking.pickup_location || 'N/A'],
+                  ['Drop Address', detailBooking.drop_location || 'N/A'],
                   ['Travel Date', safeFormatDate(detailBooking.travel_date, 'dd MMM yyyy, HH:mm')],
                   ['Vehicle Type', detailBooking.cab_type || 'Any'],
                   ['Fare Amount', `₹${Number(detailBooking.fare_amount || 0).toLocaleString('en-IN')}`],
@@ -399,29 +466,73 @@ export default function HubBookingRequests() {
                   </div>
                 ))}
               </div>
+
+              {/* Status Timeline */}
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Workflow Timeline</p>
+                <div className="flex flex-col gap-3 text-xs">
+                  <div className={`flex items-center gap-2 ${detailBooking.booking_id ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`h-2 w-2 rounded-full ${detailBooking.booking_id ? 'bg-primary' : 'bg-muted'}`} /> Booking Created
+                  </div>
+                  <div className={`flex items-center gap-2 ${detailBooking.hub_partner_id ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`h-2 w-2 rounded-full ${detailBooking.hub_partner_id ? 'bg-primary' : 'bg-muted'}`} /> Hub Partner Notified
+                  </div>
+                  <div className={`flex items-center gap-2 ${detailBooking.driver_id ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`h-2 w-2 rounded-full ${detailBooking.driver_id ? 'bg-primary' : 'bg-muted'}`} /> Driver Assigned
+                  </div>
+                  <div className={`flex items-center gap-2 ${detailBooking.trip_status === 'Driver Accepted' || detailBooking.trip_status === 'Started' || detailBooking.trip_status === 'Completed' ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`h-2 w-2 rounded-full ${detailBooking.trip_status === 'Driver Accepted' || detailBooking.trip_status === 'Started' || detailBooking.trip_status === 'Completed' ? 'bg-primary' : 'bg-muted'}`} /> Driver Accepted
+                  </div>
+                  <div className={`flex items-center gap-2 ${detailBooking.trip_status === 'Started' || detailBooking.trip_status === 'Completed' ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`h-2 w-2 rounded-full ${detailBooking.trip_status === 'Started' || detailBooking.trip_status === 'Completed' ? 'bg-primary' : 'bg-muted'}`} /> Ride Started
+                  </div>
+                  <div className={`flex items-center gap-2 ${detailBooking.trip_status === 'Completed' || detailBooking.booking_status?.toLowerCase() === 'completed' ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`h-2 w-2 rounded-full ${detailBooking.trip_status === 'Completed' || detailBooking.booking_status?.toLowerCase() === 'completed' ? 'bg-primary' : 'bg-muted'}`} /> Ride Completed
+                  </div>
+                </div>
+              </div>
               
-              {/* Pickup and Drop Location Map Preview */}
-              {(detailBooking.pickup_latitude && detailBooking.pickup_longitude && detailBooking.drop_latitude && detailBooking.drop_longitude) ? (
+              {/* Customer Location Map Preview */}
+              {(detailBooking.pickup_latitude && detailBooking.pickup_longitude) ? (
                 <div className="mt-4 pt-4 border-t border-border/50">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">📍 Route Map Preview</p>
-                  <p className="text-xs text-foreground mb-3">From: {detailBooking.pickup_location}<br/>To: {detailBooking.drop_location}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">📍 Customer Pickup Location</p>
+                  <p className="text-xs text-foreground mb-3">{detailBooking.pickup_location}</p>
                   <div className="rounded-xl overflow-hidden border border-border/50 bg-muted/30">
                     <iframe 
                       width="100%" 
                       height="200" 
                       style={{ border: 0 }} 
-                      src={`https://maps.google.com/maps?saddr=${detailBooking.pickup_latitude},${detailBooking.pickup_longitude}&daddr=${detailBooking.drop_latitude},${detailBooking.drop_longitude}&output=embed`} 
+                      src={`https://maps.google.com/maps?q=${detailBooking.pickup_latitude},${detailBooking.pickup_longitude}&output=embed`} 
                     />
                   </div>
-                  <a 
-                    href={`https://www.google.com/maps/dir/?api=1&origin=${detailBooking.pickup_latitude},${detailBooking.pickup_longitude}&destination=${detailBooking.drop_latitude},${detailBooking.drop_longitude}`} 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    className="inline-flex w-full items-center justify-center gap-2 mt-3 py-2 px-4 bg-muted hover:bg-muted/80 text-foreground font-semibold rounded-lg text-sm transition-colors"
-                  >
-                    <MapPin className="h-4 w-4" />
-                    Open Route in Google Maps
-                  </a>
+                  <div className="flex flex-col sm:flex-row gap-2 mt-3">
+                    <a 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        const url = `https://www.google.com/maps?q=${detailBooking.pickup_latitude},${detailBooking.pickup_longitude}`;
+                        console.log("Generated Map URL:", url);
+                        window.open(url, '_blank');
+                      }}
+                      href={`https://www.google.com/maps?q=${detailBooking.pickup_latitude},${detailBooking.pickup_longitude}`} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="flex-1 inline-flex items-center justify-center gap-2 py-2 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg text-sm transition-colors"
+                    >
+                      <MapPin className="h-4 w-4" />
+                      Open in Google Maps
+                    </a>
+                    {detailBooking.driver_id && (
+                      <a 
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${detailBooking.pickup_latitude},${detailBooking.pickup_longitude}`} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="flex-1 inline-flex items-center justify-center gap-2 py-2 px-4 bg-muted hover:bg-muted/80 text-foreground font-semibold rounded-lg text-sm transition-colors"
+                      >
+                        <ArrowRight className="h-4 w-4" />
+                        Open Route
+                      </a>
+                    )}
+                  </div>
                 </div>
               ) : detailBooking.map_url ? (
                 <div className="mt-4 pt-4 border-t border-border/50">
@@ -459,26 +570,34 @@ export default function HubBookingRequests() {
                 <p className="font-semibold">{assigningBooking.traveller?.full_name}</p>
                 <p className="text-muted-foreground text-xs mt-0.5">{assigningBooking.pickup_location} → {assigningBooking.drop_location}</p>
                 
-                {(assigningBooking.pickup_latitude && assigningBooking.pickup_longitude && assigningBooking.drop_latitude && assigningBooking.drop_longitude) && (
+                {(assigningBooking.pickup_latitude && assigningBooking.pickup_longitude) && (
                   <div className="mt-3 pt-3 border-t border-border/50">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">📍 Route Preview</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">📍 Customer Location Preview</p>
                     <div className="rounded-xl overflow-hidden border border-border/50 bg-background">
                       <iframe 
                         width="100%" 
-                        height="120" 
+                        height="140" 
                         style={{ border: 0 }} 
-                        src={`https://maps.google.com/maps?saddr=${assigningBooking.pickup_latitude},${assigningBooking.pickup_longitude}&daddr=${assigningBooking.drop_latitude},${assigningBooking.drop_longitude}&output=embed`} 
+                        src={`https://maps.google.com/maps?q=${assigningBooking.pickup_latitude},${assigningBooking.pickup_longitude}&output=embed`} 
                       />
                     </div>
-                    <a 
-                      href={`https://www.google.com/maps/dir/?api=1&origin=${assigningBooking.pickup_latitude},${assigningBooking.pickup_longitude}&destination=${assigningBooking.drop_latitude},${assigningBooking.drop_longitude}`} 
-                      target="_blank" 
-                      rel="noreferrer" 
-                      className="inline-flex w-full items-center justify-center gap-2 mt-2 py-2 px-4 bg-background border border-border/50 hover:bg-muted text-foreground font-semibold rounded-lg text-xs transition-colors"
-                    >
-                      <MapPin className="h-3 w-3" />
-                      Open Route in Google Maps
-                    </a>
+                    <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                      <a 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const url = `https://www.google.com/maps?q=${assigningBooking.pickup_latitude},${assigningBooking.pickup_longitude}`;
+                          console.log("Generated Map URL:", url);
+                          window.open(url, '_blank');
+                        }}
+                        href={`https://www.google.com/maps?q=${assigningBooking.pickup_latitude},${assigningBooking.pickup_longitude}`} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="flex-1 inline-flex items-center justify-center gap-2 py-2 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg text-xs transition-colors"
+                      >
+                        <MapPin className="h-3 w-3" />
+                        Open in Google Maps
+                      </a>
+                    </div>
                   </div>
                 )}
               </div>
@@ -490,7 +609,7 @@ export default function HubBookingRequests() {
                 <SelectContent>
                   {(drivers || []).map((d: any) => (
                     <SelectItem key={d.id} value={d.id}>
-                      {d.driver_name} — {d.mobile}
+                      {d.driver_name} — {d.mobile} — {d.vehicle_assigned || 'No Vehicle'} — {d.status || 'Unknown'}
                     </SelectItem>
                   ))}
                   {drivers?.length === 0 && <SelectItem value="none" disabled>No active drivers</SelectItem>}

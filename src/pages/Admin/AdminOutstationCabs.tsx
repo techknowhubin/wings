@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow, format } from 'date-fns';
+import { Car, CheckCircle2, TrendingUp, Clock, MapPin, User, FileText, IndianRupee } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Car, MapPin, User, IndianRupee } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { safeDecrypt } from '@/lib/crypto';
 
@@ -20,23 +20,19 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-700',
 };
 
-export default function AdminCabBookings() {
-  const [typeFilter, setTypeFilter] = useState('');
+export default function AdminOutstationCabs() {
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
 
   const { data: bookings, isLoading } = useQuery({
-    queryKey: ['admin', 'cab-bookings', typeFilter, statusFilter],
+    queryKey: ['admin', 'outstation-cabs', statusFilter],
     queryFn: async () => {
       let query = supabase
         .from('cab_bookings')
         .select('*, bookings(notes)')
-        .not('booking_type', 'ilike', '%Outstation%')
+        .ilike('booking_type', '%Outstation%')
         .order('created_at', { ascending: false });
 
-      if (typeFilter && typeFilter !== 'all') {
-        query = query.ilike('booking_type', `%${typeFilter}%`);
-      }
       if (statusFilter && statusFilter !== 'all') {
         query = query.eq('booking_status', statusFilter);
       }
@@ -93,27 +89,64 @@ export default function AdminCabBookings() {
     },
   });
 
+  const totalBookings = bookings?.length || 0;
+  const activeTrips = bookings?.filter(b => b.booking_status === 'confirmed' || b.booking_status === 'In Progress').length || 0;
+  const completedTrips = bookings?.filter(b => b.booking_status === 'completed').length || 0;
+  const revenueGenerated = bookings?.filter(b => b.booking_status === 'completed' || b.payment_status === 'paid')
+                                   .reduce((sum, b) => sum + Number(b.fare_amount || 0), 0) || 0;
+  const avgBookingValue = completedTrips > 0 ? revenueGenerated / completedTrips : 0;
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
-          <Car className="h-6 w-6 text-[#013220]" /> Airport & Local Rentals
+          <Car className="h-6 w-6 text-[#013220]" /> Outstation Cabs
         </h1>
-        <p className="text-muted-foreground text-sm mt-1">Monitor all Airport and Local Rental Cab bookings.</p>
+        <p className="text-muted-foreground text-sm mt-1">Monitor all Outstation Cab bookings.</p>
+      </div>
+
+      {/* Analytics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-6 flex items-center gap-4">
+            <div className="bg-[#013220]/10 p-3 rounded-xl"><Car className="h-5 w-5 text-[#013220]" /></div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Bookings</p>
+              <h3 className="text-2xl font-black">{totalBookings}</h3>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6 flex items-center gap-4">
+            <div className="bg-amber-100 p-3 rounded-xl"><Clock className="h-5 w-5 text-amber-600" /></div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Trips</p>
+              <h3 className="text-2xl font-black">{activeTrips}</h3>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6 flex items-center gap-4">
+            <div className="bg-blue-100 p-3 rounded-xl"><Car className="h-5 w-5 text-blue-600" /></div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Avg. Booking Value</p>
+              <h3 className="text-2xl font-black">₹{Math.round(avgBookingValue).toLocaleString('en-IN')}</h3>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6 flex items-center gap-4">
+            <div className="bg-emerald-100 p-3 rounded-xl"><TrendingUp className="h-5 w-5 text-emerald-600" /></div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Revenue</p>
+              <h3 className="text-2xl font-black">₹{revenueGenerated.toLocaleString('en-IN')}</h3>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-48"><SelectValue placeholder="Booking Type" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="Airport">Airport Transfer</SelectItem>
-            <SelectItem value="4 Hours">4HRS Local Rental</SelectItem>
-            <SelectItem value="8 Hours">8HRS Local Rental</SelectItem>
-          </SelectContent>
-        </Select>
-
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
@@ -125,8 +158,8 @@ export default function AdminCabBookings() {
           </SelectContent>
         </Select>
 
-        {(typeFilter && typeFilter !== 'all' || statusFilter && statusFilter !== 'all') && (
-          <Button variant="ghost" size="sm" onClick={() => { setTypeFilter(''); setStatusFilter(''); }}>
+        {statusFilter && statusFilter !== 'all' && (
+          <Button variant="ghost" size="sm" onClick={() => { setStatusFilter(''); }}>
             Clear filters
           </Button>
         )}
@@ -141,41 +174,54 @@ export default function AdminCabBookings() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Booking ID</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Pickup</TableHead>
-                  <TableHead>Drop</TableHead>
-                  <TableHead>Vehicle</TableHead>
-                  <TableHead>Hub Partner</TableHead>
-                  <TableHead>Driver</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Traveller</TableHead>
+                  <TableHead>Trip Details</TableHead>
+                  <TableHead>Pickup & Drop</TableHead>
+                  <TableHead>Vehicle & Hub</TableHead>
+                  <TableHead>Amount & Status</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {(bookings ?? []).length === 0 && (
-                  <TableRow><TableCell colSpan={12} className="text-center py-10 text-muted-foreground">No cab bookings match the current filters.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center py-10 text-muted-foreground">No outstation bookings match the current filters.</TableCell></TableRow>
                 )}
                 {(bookings ?? []).map((b: any) => (
                   <TableRow key={b.booking_id}>
-                    <TableCell><code className="text-xs font-mono text-muted-foreground">XPA-{b.booking_id?.slice(0, 6).toUpperCase()}</code></TableCell>
-                    <TableCell className="text-xs font-medium">
+                    <TableCell><code className="text-xs font-mono text-muted-foreground">XPO-{b.booking_id?.slice(0, 6).toUpperCase()}</code></TableCell>
+                    <TableCell>
                       <div className="flex flex-col">
-                        <span>{b.customer_name || b.traveller?.full_name || '—'}</span>
+                        <span className="text-sm font-medium">{b.customer_name || b.traveller?.full_name || '—'}</span>
                         <span className="text-[10px] text-muted-foreground">{b.customer_phone || b.traveller?.phone || ''}</span>
                         <span className="text-[10px] text-muted-foreground">{b.customer_email || b.traveller?.email || ''}</span>
                       </div>
                     </TableCell>
-                    <TableCell><Badge variant="outline" className="text-[10px] capitalize">{b.booking_type || 'Cab'}</Badge></TableCell>
-                    <TableCell className="text-xs max-w-[150px] truncate" title={b.pickup_location}>{b.pickup_location ?? '—'}</TableCell>
-                    <TableCell className="text-xs max-w-[150px] truncate" title={b.drop_location}>{b.drop_location ?? '—'}</TableCell>
-                    <TableCell className="text-xs">{b.cab_type ?? '—'}</TableCell>
-                    <TableCell className="text-xs">{b.hub_partner?.full_name ?? <span className="text-muted-foreground italic">Unassigned</span>}</TableCell>
-                    <TableCell className="text-xs">{b.driver?.driver_name ?? <span className="text-muted-foreground italic">Unassigned</span>}</TableCell>
-                    <TableCell className="text-xs font-semibold">₹{Number(b.fare_amount ?? 0).toLocaleString('en-IN')}</TableCell>
-                    <TableCell><Badge variant="outline" className={`text-[10px] capitalize ${STATUS_COLORS[b.booking_status]}`}>{b.booking_status}</Badge></TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <Badge variant="outline" className="w-max text-[10px]">{b.trip_type || 'One Way'}</Badge>
+                        <span className="text-xs font-medium">{b.travel_date ? format(new Date(b.travel_date), 'dd MMM yyyy') : '—'}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-[200px]">
+                      <div className="flex flex-col gap-1 text-xs">
+                        <div className="flex gap-1 items-start"><span className="text-green-500 font-bold shrink-0">P:</span><span className="truncate" title={b.pickup_location}>{b.pickup_location ?? '—'}</span></div>
+                        <div className="flex gap-1 items-start"><span className="text-red-500 font-bold shrink-0">D:</span><span className="truncate" title={b.drop_location}>{b.drop_location ?? '—'}</span></div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1 text-xs">
+                        <span className="font-semibold">{b.cab_type ?? '—'}</span>
+                        <span className="text-muted-foreground">Hub: {b.hub_partner?.full_name ?? 'Unassigned'}</span>
+                        <span className="text-muted-foreground">Driver: {b.driver?.driver_name ?? 'Unassigned'}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                       <div className="flex flex-col gap-1">
+                        <span className="text-sm font-bold">₹{Number(b.fare_amount ?? 0).toLocaleString('en-IN')}</span>
+                        <Badge variant="outline" className={`w-max text-[10px] capitalize ${STATUS_COLORS[b.booking_status]}`}>{b.booking_status}</Badge>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(b.created_at), { addSuffix: true })}</TableCell>
                     <TableCell>
                        <Button variant="outline" size="sm" className="text-xs" onClick={() => setSelectedBooking(b)}>View Details</Button>
@@ -196,7 +242,7 @@ export default function AdminCabBookings() {
               Cab Booking Details
             </DialogTitle>
             <DialogDescription>
-              Booking ID: XPA-{selectedBooking?.booking_id?.slice(0, 8).toUpperCase()}
+              Booking ID: XPO-{selectedBooking?.booking_id?.slice(0, 8).toUpperCase()}
             </DialogDescription>
           </DialogHeader>
           
@@ -219,7 +265,7 @@ export default function AdminCabBookings() {
                     <Car className="h-4 w-4 text-muted-foreground" /> Trip Information
                   </h4>
                   <div className="text-sm space-y-1">
-                    <p><span className="text-muted-foreground">Trip Type:</span> {selectedBooking.booking_type || 'Cab'}</p>
+                    <p><span className="text-muted-foreground">Trip Type:</span> {selectedBooking.trip_type || 'One Way'}</p>
                     <p><span className="text-muted-foreground">Vehicle:</span> {selectedBooking.cab_type || '—'}</p>
                     <p><span className="text-muted-foreground">Travel Date:</span> {selectedBooking.travel_date ? format(new Date(selectedBooking.travel_date), 'dd MMM yyyy, hh:mm a') : '—'}</p>
                     {selectedBooking.return_date && (
@@ -245,6 +291,10 @@ export default function AdminCabBookings() {
                   <div className="flex gap-2">
                     <span className="text-muted-foreground">Distance:</span>
                     <span className="font-medium">{selectedBooking.distance_km ? `${selectedBooking.distance_km} km` : '—'}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-muted-foreground">Buffer Included:</span>
+                    <span className="font-medium">+{selectedBooking.trip_type === 'Round Trip' ? 50 : 25} km</span>
                   </div>
                 </div>
                 {selectedBooking.pickup_latitude && selectedBooking.pickup_longitude && (

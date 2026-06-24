@@ -61,18 +61,27 @@ export default function HubMarketplaceBookings() {
           user:profiles!bookings_user_id_fkey(full_name, phone, email)
         `)
         .in('listing_type', ['hotel', 'stay', 'resort', 'experience', 'car', 'bike'])
+        .eq('hub_id', uuid)
         .order('created_at', { ascending: false })
         .limit(200);
       
       if (error) throw error;
       if (!data || data.length === 0) return [];
 
-      const hotelIds = data.filter(b => b.listing_type === 'hotel').map(b => b.listing_id).filter(Boolean);
-      const stayIds = data.filter(b => b.listing_type === 'stay').map(b => b.listing_id).filter(Boolean);
-      const resortIds = data.filter(b => b.listing_type === 'resort').map(b => b.listing_id).filter(Boolean);
-      const experienceIds = data.filter(b => b.listing_type === 'experience').map(b => b.listing_id).filter(Boolean);
-      const carIds = data.filter(b => b.listing_type === 'car').map(b => b.listing_id).filter(Boolean);
-      const bikeIds = data.filter(b => b.listing_type === 'bike').map(b => b.listing_id).filter(Boolean);
+      // Exclude bookings that are actually cab bookings
+      const bookingIds = data.map(b => b.id);
+      const { data: cabData } = await supabase.from('cab_bookings').select('booking_id').in('booking_id', bookingIds);
+      const cabBookingIds = new Set((cabData || []).map(cb => cb.booking_id));
+      
+      const filteredData = data.filter(b => !cabBookingIds.has(b.id));
+      if (filteredData.length === 0) return [];
+
+      const hotelIds = filteredData.filter(b => b.listing_type === 'hotel').map(b => b.listing_id).filter(Boolean);
+      const stayIds = filteredData.filter(b => b.listing_type === 'stay').map(b => b.listing_id).filter(Boolean);
+      const resortIds = filteredData.filter(b => b.listing_type === 'resort').map(b => b.listing_id).filter(Boolean);
+      const experienceIds = filteredData.filter(b => b.listing_type === 'experience').map(b => b.listing_id).filter(Boolean);
+      const carIds = filteredData.filter(b => b.listing_type === 'car').map(b => b.listing_id).filter(Boolean);
+      const bikeIds = filteredData.filter(b => b.listing_type === 'bike').map(b => b.listing_id).filter(Boolean);
 
       const listingMap: Record<string, any> = {};
 
@@ -101,7 +110,7 @@ export default function HubMarketplaceBookings() {
         bikes?.forEach(b => listingMap[b.id] = { id: b.id, title: b.name, cover_image: b.images?.[0] });
       }
 
-      return data.map(b => ({
+      return filteredData.map(b => ({
         ...b,
         listingDetails: b.listing_id ? listingMap[b.listing_id] : null
       }));
@@ -184,16 +193,16 @@ export default function HubMarketplaceBookings() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">
-                {['Booking ID', 'Traveller', 'Type', 'Check-in', 'Check-out', 'Amount', 'Payment', 'Status', 'Actions'].map(h => (
+                {['Booking ID', 'Listing', 'Traveller', 'Dates', 'Total Amt', 'Host Earning', 'Status', 'Actions'].map(h => (
                   <TableHead key={h} className="text-xs font-semibold uppercase tracking-wider">{h}</TableHead>
                 ))}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={9} className="h-32 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" /></TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="h-32 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" /></TableCell></TableRow>
               ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                   <ShoppingBag className="h-8 w-8 mx-auto mb-2 opacity-30" /><p>No marketplace bookings found</p>
                 </TableCell></TableRow>
               ) : (
@@ -202,10 +211,6 @@ export default function HubMarketplaceBookings() {
                   return (
                     <TableRow key={b.id} className="hover:bg-muted/30 transition-colors">
                       <TableCell className="font-mono text-xs text-muted-foreground">#{b.id?.slice(-8).toUpperCase()}</TableCell>
-                      <TableCell>
-                        <p className="font-semibold text-sm">{b.user?.full_name || 'N/A'}</p>
-                        <p className="text-xs text-muted-foreground">{b.user?.phone || 'N/A'}</p>
-                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           {b.listingDetails?.cover_image ? (
@@ -221,14 +226,17 @@ export default function HubMarketplaceBookings() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs">{b.check_in ? format(new Date(b.check_in), 'dd MMM yy') : '—'}</TableCell>
-                      <TableCell className="text-xs">{b.check_out ? format(new Date(b.check_out), 'dd MMM yy') : '—'}</TableCell>
-                      <TableCell className="font-semibold text-sm">₹{(b.total_price || 0).toLocaleString('en-IN')}</TableCell>
                       <TableCell>
-                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${b.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {b.payment_status || 'Pending'}
-                        </span>
+                        <p className="font-semibold text-sm">{b.user?.full_name || 'N/A'}</p>
+                        <p className="text-xs text-muted-foreground">{b.user?.phone || 'N/A'}</p>
                       </TableCell>
+                      <TableCell className="text-xs">
+                        {b.check_in ? format(new Date(b.check_in), 'dd MMM yy') : '—'}
+                        <br />
+                        {b.check_out ? format(new Date(b.check_out), 'dd MMM yy') : '—'}
+                      </TableCell>
+                      <TableCell className="font-semibold text-sm">₹{(b.total_price || 0).toLocaleString('en-IN')}</TableCell>
+                      <TableCell className="text-xs font-semibold text-blue-600">₹{((b.total_price || 0) * 0.9).toLocaleString('en-IN')}</TableCell>
                       <TableCell>
                         <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[b.booking_status] || 'bg-muted text-muted-foreground'}`}>
                           {b.booking_status || 'Pending'}
@@ -286,6 +294,7 @@ export default function HubMarketplaceBookings() {
                 ['Type', TYPE_CONFIG[viewBooking.listing_type]?.label || viewBooking.listing_type],
                 ['Traveller', viewBooking.user?.full_name || 'N/A'],
                 ['Phone', viewBooking.user?.phone || 'N/A'],
+                ['Email', viewBooking.user?.email || 'N/A'],
                 ['Check-in', viewBooking.check_in ? format(new Date(viewBooking.check_in), 'dd MMM yyyy') : 'N/A'],
                 ['Check-out', viewBooking.check_out ? format(new Date(viewBooking.check_out), 'dd MMM yyyy') : 'N/A'],
                 ['Total Amount', `₹${(viewBooking.total_price || 0).toLocaleString('en-IN')}`],

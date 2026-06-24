@@ -529,6 +529,9 @@ const ConfirmAndPay = () => {
       car: "car",
       bike: "bike",
       experience: "experience",
+      cab: "cab",
+      outstation: "outstation",
+      package: "package"
     };
 
     let rawType = "stay";
@@ -539,7 +542,17 @@ const ConfirmAndPay = () => {
     } else if (booking.listingType === "experience") {
       rawType = "experience";
     } else if (booking.listingType === "vehicle") {
-      rawType = booking.listingCouponType === "bikes" ? "bike" : "car";
+      if (booking.listingCouponType === "cabs") {
+        rawType = booking.cabDetails?.booking_source === "outstation_cab" ? "outstation" : "cab";
+      } else {
+        rawType = booking.listingCouponType === "bikes" ? "bike" : "car";
+      }
+    } else if (booking.listingType === "outstation_cab") {
+      rawType = "outstation";
+    } else if (booking.listingType === "airport_cab") {
+      rawType = "cab";
+    } else if (booking.listingType === "tour_package") {
+      rawType = "package";
     }
     const dbListingType = listingTypeMap[rawType] ?? "stay";
 

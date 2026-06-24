@@ -11,7 +11,7 @@ import NotificationBell from '@/components/NotificationBell';
 import {
   LayoutDashboard, ShieldCheck, CheckSquare, Store, Users,
   CalendarCheck, Building2, Wallet, BarChart3, Settings,
-  LogOut, FileText, Menu, X, Bell, Search, Mail, Lock, QrCode, Map, Globe, Receipt, Tag
+  LogOut, FileText, Menu, X, Bell, Search, Mail, Lock, QrCode, Map, Globe, Receipt, Tag, Car, ShoppingBag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,6 +59,8 @@ export default function AdminLayout() {
         { label: 'Hosts', to: '/admin/providers', icon: Store, badge: metrics?.pendingListingTypesCount },
         { label: 'Travelers', to: '/admin/users', icon: Users },
         { label: 'All Bookings', to: '/admin/bookings', icon: CalendarCheck },
+        { label: 'Marketplace Bookings', to: '/admin/marketplace-bookings', icon: ShoppingBag },
+        { label: 'Outstation Cabs', to: '/admin/outstation-cabs', icon: Car },
         { label: 'Airport & Local Rentals', to: '/admin/cab-bookings', icon: CalendarCheck },
         { label: 'Hub Partners', to: '/admin/hubs', icon: Building2 },
         { label: 'Referrals', to: '/admin/referrals', icon: QrCode },
@@ -82,6 +84,7 @@ export default function AdminLayout() {
         { label: 'Wing Credits', to: '/admin/wing-credits', icon: Store },
         { label: 'Tax & GST', to: '/admin/gst', icon: Receipt },
         { label: 'Revenue Analytics', to: '/admin/analytics', icon: BarChart3 },
+        { label: 'Listing Revenue', to: '/admin/listing-revenue', icon: Wallet },
       ],
     },
     {
@@ -175,7 +178,7 @@ export default function AdminLayout() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-2">
+      <nav className="flex-1 overflow-y-auto hide-scrollbar py-2">
         {sections.map((section) => renderNavGroup(section))}
       </nav>
 

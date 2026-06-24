@@ -235,7 +235,7 @@ export default function AdminWalletManagement() {
             {/* Search Panel */}
             <Card className="lg:col-span-1 h-fit">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2"><Users className="h-5 w-5 text-primary" /> Search User</CardTitle>
+                <CardTitle className="text-lg flex items-center gap-2"><Users className="h-5 w-5 text-[#013220]" /> Search User</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Input 
@@ -298,7 +298,7 @@ export default function AdminWalletManagement() {
                         <div className="grid grid-cols-3 gap-4 mb-6">
                           <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
                             <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">Balance</p>
-                            <p className="text-2xl font-bold text-primary">{INR(userWallet.balance)}</p>
+                            <p className="text-2xl font-bold text-[#013220]">{INR(userWallet.balance)}</p>
                           </div>
                           <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
                             <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">Lifetime Earned</p>

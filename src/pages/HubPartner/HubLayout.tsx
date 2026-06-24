@@ -96,7 +96,7 @@ export default function HubLayout() {
       ],
     },
     {
-      title: 'Operations',
+      title: 'Bookings',
       items: [
         { label: 'Booking Requests', to: `${baseUrl}/booking-requests`, icon: CalendarCheck, badge: pendingCount && pendingCount > 0 ? String(pendingCount) : undefined },
         { label: 'Outstation Cabs', to: `${baseUrl}/outstation-cabs`, icon: Car },
@@ -131,7 +131,9 @@ export default function HubLayout() {
     {
       title: 'Finance',
       items: [
-        { label: 'Earnings & Settlements', to: `${baseUrl}/earnings`, icon: Coins },
+        { label: 'Hub Earnings', to: `${baseUrl}/earnings`, icon: Coins },
+        { label: 'Listing Revenue', to: `${baseUrl}/listing-revenue`, icon: Wallet },
+        { label: 'Payouts', to: `${baseUrl}/payouts`, icon: FileText },
       ],
     },
     {
@@ -226,7 +228,7 @@ export default function HubLayout() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-2 px-1">
+      <nav className="flex-1 overflow-y-auto hide-scrollbar py-2 px-1">
         {sections.map((section) => renderNavGroup(section))}
       </nav>
 

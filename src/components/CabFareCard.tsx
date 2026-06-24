@@ -143,7 +143,7 @@ const CabFareCard = ({
   const [selectedCabType, setSelectedCabType] = useState<"Sedan" | "MUV" | "SUV">("Sedan");
   const [pickedVehicle, setPickedVehicle] = useState<"Sedan" | "MUV" | "SUV" | null>(null);
   const [travelTime, setTravelTime] = useState("06:00");
-  const [selectedTripType, setSelectedTripType] = useState<"One Way" | "Round Trip">("One Way");
+  const [selectedTripType, setSelectedTripType] = useState<"One Way" | "Round Trip">("Round Trip");
   const [travelDate, setTravelDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
   const [returnDate, setReturnDate] = useState(format(addDays(new Date(), 2), "yyyy-MM-dd"));
   const [customerName, setCustomerName] = useState("");
@@ -343,12 +343,13 @@ const CabFareCard = ({
   const displayMuvRoundOrig = Math.round(effectiveMuvRound * 1.15 / 10) * 10;
   const displayMuvOneWayOrig = Math.round(effectiveMuvOneWay * 1.15 / 10) * 10;
 
-  // Distance values
-  const numericDistance = parseInt(distance) || 300;
+  // Distance values — sheet KM column stores ONE-WAY distance
+  const numericDistance = parseInt(distance) || 300;        // one-way km from sheet
+  const roundTripDistance = numericDistance * 2;             // round trip = one-way × 2
+  const oneWayDistance = numericDistance;                    // one-way = as-is from sheet
   const bufferDistance = roundTripBufferKm && roundTripBufferKm > 0 ? roundTripBufferKm : 50;
-  const oneWayDistance = Math.round(numericDistance / 2);
-  const oneWayBuffer = oneWayBufferKm && oneWayBufferKm > 0 ? oneWayBufferKm : Math.round(bufferDistance / 2);
-  const totalCovered = numericDistance + bufferDistance;
+  const oneWayBuffer = oneWayBufferKm && oneWayBufferKm > 0 ? oneWayBufferKm : bufferDistance;
+  const totalCovered = roundTripDistance + bufferDistance;
   const minToll = Math.max(150, Math.round((numericDistance * 0.5) / 50) * 50);
   const maxToll = minToll + 150;
 
@@ -367,7 +368,7 @@ const CabFareCard = ({
   const buildWhatsAppUrl = (vehicleType: string) => {
     const fare = getFareForType(vehicleType, selectedTripType);
     const formattedPickupDate = travelDate ? format(new Date(travelDate), "dd MMM yyyy") : "—";
-    const tripDist = selectedTripType === "One Way" ? `${oneWayDistance} km` : distance;
+    const tripDist = selectedTripType === "One Way" ? `${oneWayDistance} km` : `${roundTripDistance} km`;
 
     let message = `Hi Xplorwing! I would like to book a Cab.\n\n` +
       `🚗 *Booking Details:*\n` +
@@ -431,7 +432,7 @@ const CabFareCard = ({
         cab_type: selectedCabType,
         fare_amount: fare,
         state: stateStr,
-        distance_km: numericDistance,
+        distance_km: selectedTripType === "Round Trip" ? roundTripDistance : oneWayDistance,
       }
     };
 
@@ -542,7 +543,7 @@ const CabFareCard = ({
 
               <div className="rounded-2xl border border-[#e2e8f0] p-4 bg-white space-y-3 text-sm shadow-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Route</span><span className="font-semibold text-right text-[#013220]">{fromCity} → {toCity}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Distance</span><span className="font-semibold text-[#013220]">{selectedTripType === "One Way" ? `${oneWayDistance} km` : `${distance}`}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Distance</span><span className="font-semibold text-[#013220]">{selectedTripType === "One Way" ? `${oneWayDistance} km` : `${roundTripDistance} km`}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Buffer Included</span><span className="font-semibold text-[#013220]">{selectedTripType === "One Way" ? `+ ${oneWayBuffer} km` : `+ ${bufferDistance} km`}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Vehicle</span><span className="font-semibold text-[#013220]">{pickedVehicle}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Trip</span><span className="font-semibold text-[#013220]">{selectedTripType}</span></div>
@@ -725,7 +726,7 @@ const CabFareCard = ({
                 </span>
               </div>
               <button
-                onClick={(e) => { e.stopPropagation(); openVehicleSelect("One Way"); }}
+                onClick={(e) => { e.stopPropagation(); openVehicleSelect("Round Trip"); }}
                 className="w-full px-2 md:px-4 py-1 md:py-1.5 bg-[#E5F76E] text-gray-900 text-[9px] md:text-xs font-bold rounded-full hover:bg-[#d4e85e] transition-colors whitespace-nowrap"
               >
                 Book Now
@@ -807,7 +808,7 @@ const CabFareCard = ({
                   <div className="rdot"></div>
                 </div>
                 <span className="dist-chip-rt">
-                  Round Trip · {numericDistance} km <span className="dist-buf">+{bufferDistance}</span>
+                  Round Trip · {roundTripDistance} km <span className="dist-buf">+{bufferDistance}</span>
                 </span>
               </div>
               <div className="city-block right" style={{ alignSelf: "flex-end" }}>

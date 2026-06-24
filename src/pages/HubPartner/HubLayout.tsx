@@ -13,7 +13,7 @@ import {
   LifeBuoy, BarChart3, Settings, User, LogOut, Menu, X, Bell, Search,
   Building2, PhoneIncoming, HeadphonesIcon, MapPin, Star,
   ShoppingBag, Coins, FileText, ChevronDown, ChevronRight, Truck,
-  Navigation, Mail, Map, Tag
+  Navigation, Mail, Map, Tag, Wallet
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

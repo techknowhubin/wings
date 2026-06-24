@@ -78,11 +78,14 @@ import ListingApprovals from "./pages/Admin/ListingApprovals";
 import AdminProviders from "./pages/Admin/AdminProviders";
 import AdminUsers from "./pages/Admin/AdminUsers";
 import AdminBookings from "@/pages/Admin/AdminBookings";
+import AdminMarketplaceBookings from "@/pages/Admin/AdminMarketplaceBookings";
 import AdminCabBookings from "@/pages/Admin/AdminCabBookings";
+import AdminOutstationCabs from "@/pages/Admin/AdminOutstationCabs";
 import AdminHubs from "./pages/Admin/AdminHubs";
 import AdminReferrals from "./pages/Admin/AdminReferrals";
 import AdminPayouts from "./pages/Admin/AdminPayouts";
 import AdminAnalytics from "./pages/Admin/AdminAnalytics";
+import AdminListingRevenue from "./pages/Admin/AdminListingRevenue";
 import AdminSettings from "./pages/Admin/AdminSettings";
 import AdminBlogPosts from "./pages/Admin/AdminBlogPosts";
 import AdminWalletManagement from "./pages/Admin/AdminWalletManagement";
@@ -116,6 +119,8 @@ import HubMap from "./pages/HubPartner/HubMap";
 import HubSupport from "./pages/HubPartner/HubSupport";
 import HubReports from "./pages/HubPartner/HubReports";
 import HubEarnings from "./pages/HubPartner/HubEarnings";
+import HubListingRevenue from "./pages/HubPartner/HubListingRevenue";
+import HubPayouts from "./pages/HubPartner/HubPayouts";
 import HubProfile from "./pages/HubPartner/HubProfile";
 import HubSettings from "./pages/HubPartner/HubSettings";
 import HubCoupons from "./pages/HubPartner/HubCoupons";
@@ -282,11 +287,14 @@ const App = () =>
               <Route path="providers" element={<AdminProviders />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="bookings" element={<AdminBookings />} />
+              <Route path="marketplace-bookings" element={<AdminMarketplaceBookings />} />
+              <Route path="outstation-cabs" element={<AdminOutstationCabs />} />
               <Route path="cab-bookings" element={<AdminCabBookings />} />
               <Route path="hubs" element={<AdminHubs />} />
               <Route path="referrals" element={<AdminReferrals />} />
               <Route path="payouts" element={<AdminPayouts />} />
               <Route path="analytics" element={<AdminAnalytics />} />
+              <Route path="listing-revenue" element={<AdminListingRevenue />} />
               <Route path="wing-credits" element={<AdminWalletManagement />} />
               <Route path="blog-posts" element={<AdminBlogPosts />} />
               <Route path="security" element={<AdminSecurityDashboard />} />
@@ -330,6 +338,8 @@ const App = () =>
               <Route path="reviews" element={<HubReviews />} />
               {/* Finance */}
               <Route path="earnings" element={<HubEarnings />} />
+              <Route path="listing-revenue" element={<HubListingRevenue />} />
+              <Route path="payouts" element={<HubPayouts />} />
               {/* Platform */}
               <Route path="bookings" element={<HubBookingRequests />} /> {/* backwards compat */}
               <Route path="map" element={<HubMap />} />

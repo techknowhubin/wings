@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAdminTeam } from '@/hooks/useAdmin';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import {
   AlertCircle, CreditCard, Bell, Lock, FileText, Tag,
   DollarSign, QrCode, CheckCircle2,
 } from 'lucide-react';
+import { SecurityCard } from '@/components/SecurityCard';
 
 // ─── Default settings (used when DB row doesn't exist yet) ───────────────────
 const DEFAULTS = {
@@ -42,6 +44,7 @@ const DEFAULTS = {
   same_day_restrictions_enabled: false,
   min_advance_hours: 4,
   districts: [] as string[],
+  force_2fa_roles: [] as string[],
 };
 
 type Settings = typeof DEFAULTS;
@@ -81,6 +84,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdminSettings() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const { data: admins, isLoading: aLoading, refetch } = useAdminTeam();
 
@@ -152,6 +156,7 @@ export default function AdminSettings() {
         same_day_restrictions_enabled: Boolean(data.same_day_restrictions_enabled ?? DEFAULTS.same_day_restrictions_enabled),
         min_advance_hours:             Number(data.min_advance_hours            ?? DEFAULTS.min_advance_hours),
         districts:                     Array.isArray(data.districts) ? data.districts : DEFAULTS.districts,
+        force_2fa_roles:               Array.isArray(data.force_2fa_roles) ? data.force_2fa_roles : DEFAULTS.force_2fa_roles,
       });
     }
     // data is null → table exists but no row yet; defaults are fine
@@ -555,18 +560,48 @@ ON CONFLICT (id) DO NOTHING;`}
       </SettingSection>
 
       {/* ── 7. Security Settings ─────────────────────────────────────────── */}
-      <SettingSection icon={Lock} title="Security"
+      <SettingSection icon={Lock} title="Session Security"
         description="Session and authentication security settings." loading={loading}>
         <Field label="Session Timeout (hours)" hint="How long before an inactive session expires">
           <Input type="number" min={1} value={settings.session_timeout_hours}
             onChange={(e) => set('session_timeout_hours', Number(e.target.value))} />
         </Field>
+        
+        <div className="space-y-3 pt-4 border-t border-border">
+          <h4 className="text-sm font-semibold">Force 2FA Policy</h4>
+          <p className="text-xs text-muted-foreground">Select which roles are required to enroll in Two-Factor Authentication.</p>
+          <div className="grid grid-cols-2 gap-3 mt-2">
+            {['admin', 'host', 'hub_partner'].map((role) => (
+              <div key={role} className="flex items-center space-x-2 p-2 border border-border rounded-lg">
+                <Switch 
+                  id={`force-2fa-${role}`}
+                  checked={settings.force_2fa_roles.includes(role)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      set('force_2fa_roles', [...settings.force_2fa_roles, role]);
+                    } else {
+                      set('force_2fa_roles', settings.force_2fa_roles.filter(r => r !== role));
+                    }
+                  }} 
+                />
+                <Label htmlFor={`force-2fa-${role}`} className="capitalize">{role.replace('_', ' ')}</Label>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <Button disabled={saving.security} className="bg-[#013220] text-white hover:bg-[#013220]/90"
-          onClick={() => save('security', { session_timeout_hours: settings.session_timeout_hours }, 'Security settings saved')}>
+          onClick={() => save('security', { 
+            session_timeout_hours: settings.session_timeout_hours,
+            force_2fa_roles: settings.force_2fa_roles
+          }, 'Security settings saved')}>
           {saving.security ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
           Save Security Settings
         </Button>
       </SettingSection>
+
+      {/* ── Two-Factor Authentication ────────────────────────────────────── */}
+      {user && <SecurityCard userId={user.id} />}
 
       {/* ── 8. Blog Settings ─────────────────────────────────────────────── */}
       <SettingSection icon={FileText} title="Blog Settings"

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { calculateHostBookingAmounts, createNotification } from '@/lib/supabase-helpers';
+import { safeDecrypt } from '@/lib/crypto';
 
 // ─── Helper: generate unique WingID ─────────────────────────────────────────
 async function generateUniqueWingId(): Promise<string> {
@@ -32,13 +33,22 @@ async function safeCount(fn: () => Promise<{ count: number | null; error: any }>
 }
 
 // ─── Helper: resolve profile names for user IDs ─────────────────────────────
-async function resolveProfileNames(userIds: string[]): Promise<Map<string, { full_name: string; phone: string | null }>> {
-  const map = new Map<string, { full_name: string; phone: string | null }>();
+async function resolveProfileNames(userIds: string[]): Promise<Map<string, { full_name: string; phone: string | null; email: string | null }>> {
+  const map = new Map<string, { full_name: string; phone: string | null; email: string | null }>();
   if (userIds.length === 0) return map;
   const unique = [...new Set(userIds.filter(Boolean))];
   if (unique.length === 0) return map;
-  const { data } = await supabase.from('profiles').select('id, full_name, phone').in('id', unique);
-  (data ?? []).forEach((p: any) => map.set(p.id, { full_name: p.full_name ?? '—', phone: p.phone }));
+  const { data } = await supabase.from('profiles').select('id, full_name, phone, email_encrypted').in('id', unique);
+  
+  if (data) {
+    for (const p of data) {
+      let decryptedEmail = null;
+      if (p.email_encrypted) {
+        decryptedEmail = await safeDecrypt(p.email_encrypted, { table: 'profiles', column: 'email', recordId: p.id });
+      }
+      map.set(p.id, { full_name: p.full_name ?? '—', phone: p.phone, email: decryptedEmail });
+    }
+  }
   return map;
 }
 

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,11 +19,13 @@ import {
   Loader2, Plus, Trash2, ShieldAlert, Key, Smartphone, Clock, Eye, AlertCircle
 } from "lucide-react";
 import { format } from "date-fns";
+import { SecurityCard } from "@/components/SecurityCard";
 
 const ROLES = ['Operations Manager', 'Booking Executive', 'Driver Manager', 'Finance Executive', 'Support Executive'];
 const PERMISSIONS = ['View', 'Create', 'Edit', 'Delete'];
 
 export default function HubSettings() {
+  const { user } = useAuth();
   const { uuid } = useParams<{ uuid: string }>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -578,16 +581,7 @@ export default function HubSettings() {
             <Card className="border-border/50">
               <CardHeader className="border-b border-border/50 py-4"><CardTitle className="text-base font-bold">Security Settings</CardTitle></CardHeader>
               <CardContent className="p-6 space-y-6">
-                <div className="flex items-center justify-between p-4 bg-muted/20 border border-border/50 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <Smartphone className="h-5 w-5 text-emerald-600 shrink-0" />
-                    <div>
-                      <h4 className="text-xs font-bold">Enable Two-Factor Authentication (2FA)</h4>
-                      <p className="text-[10px] text-muted-foreground">Provide verification codes from your mobile app when signing in</p>
-                    </div>
-                  </div>
-                  <Switch checked={false} onCheckedChange={() => toast({ title: "2FA Integration", description: "Two-Factor authentication is configured via the central auth system settings page." })} />
-                </div>
+                {user && <SecurityCard userId={user.id} />}
 
                 <div className="space-y-3 pt-2">
                   <h3 className="text-sm font-bold flex items-center gap-1.5"><Clock className="h-4 w-4 text-primary" /> Active Login Sessions</h3>

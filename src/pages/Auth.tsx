@@ -182,6 +182,16 @@ const Auth = () => {
   // Guard: only route once per login event, ignore subsequent flickers
   const hasRoutedRef = useRef(false);
 
+  // 2FA State
+  const [checking2FA, setChecking2FA] = useState(false);
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [twoFAVerified, setTwoFAVerified] = useState(false);
+  const [twoFAUserId, setTwoFAUserId] = useState<string | null>(null);
+  const [twoFASecret, setTwoFASecret] = useState<string | null>(null);
+  const [twoFACode, setTwoFACode] = useState("");
+  const [twoFARecoveryMode, setTwoFARecoveryMode] = useState(false);
+  const [twoFARecoveryCode, setTwoFARecoveryCode] = useState("");
+
   const isHostSignupPath = location.pathname === "/host/signup";
   const isHostSigninPath = location.pathname === "/host/signin";
 
@@ -321,63 +331,87 @@ const Auth = () => {
 
     hasRoutedRef.current = true;
 
-    // If the user clicked "Sign in with Google" (login mode), check whether they actually
-    // have a registered account by querying user_roles. A real user always has a role
-    // (assigned during onboarding). Checking created_at timing is unreliable — role presence is not.
-    const googleMode = localStorage.getItem("google_auth_mode");
-    if (googleMode === "login") {
-      localStorage.removeItem("google_auth_mode");
+    const handleGoogleLoginCheck = async () => {
+      // Call the edge function (service-role key → bypasses RLS, checks user_roles):
+      try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (currentSession?.access_token) {
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://uhtwkajqpuazxpnbaojx.supabase.co";
+          const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVodHdrYWpxcHVhenhwbmJhb2p4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE2NzY1NTcsImV4cCI6MjA3NzI1MjU1N30.RPdeJk13uqnFssQXUyA0acsf53xgceR-59VLzoB7Wfg";
+          const resp = await fetch(`${supabaseUrl}/functions/v1/delete-unregistered-user`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${currentSession.access_token}`,
+              apikey: anonKey,
+            },
+          });
 
-      const handleGoogleLoginCheck = async () => {
-        // Call the edge function (service-role key → bypasses RLS, checks user_roles):
-        //   403 → registered user (has role row) → sign in
-        //   200 → unregistered, account deleted → show error
-        //   anything else (404, 500, network) → fail OPEN → sign in
-        //   (don't block legitimate users if the function isn't deployed / has errors)
-        try {
-          const { data: { session: currentSession } } = await supabase.auth.getSession();
-          if (currentSession?.access_token) {
-            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://uhtwkajqpuazxpnbaojx.supabase.co";
-            const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVodHdrYWpxcHVhenhwbmJhb2p4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE2NzY1NTcsImV4cCI6MjA3NzI1MjU1N30.RPdeJk13uqnFssQXUyA0acsf53xgceR-59VLzoB7Wfg";
-            const resp = await fetch(`${supabaseUrl}/functions/v1/delete-unregistered-user`, {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${currentSession.access_token}`,
-                apikey: anonKey,
-              },
+          if (resp.status === 200) {
+            await signOut();
+            hasRoutedRef.current = false;
+            toast({
+              variant: "destructive",
+              title: "No account found",
+              description: "No account found for this Google email. Please sign up first.",
             });
-
-            if (resp.status === 200) {
-              // Account was deleted — definitively not registered.
-              await signOut();
-              hasRoutedRef.current = false;
-              toast({
-                variant: "destructive",
-                title: "No account found",
-                description: "No account found for this Google email. Please sign up first.",
-              });
-              return;
-            }
-
-            // 403 = registered, or any other status = fail open.
-            // Either way, let the user through.
+            return;
           }
-        } catch {
-          // Network/fetch error — fail open, don't block the user.
         }
+      } catch {
+        // Network/fetch error — fail open, don't block the user.
+      }
 
+      handleSuccessRoleRouting(user);
+    };
+
+    const runAuthFlow = async () => {
+      if (!twoFAVerified && !requires2FA && !checking2FA) {
+        setChecking2FA(true);
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('two_factor_enabled, two_factor_secret_encrypted')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (profile?.two_factor_enabled) {
+            setRequires2FA(true);
+            setTwoFAUserId(user.id);
+            setChecking2FA(false);
+            
+            // Background decrypt secret
+            if (profile.two_factor_secret_encrypted) {
+              import('@/lib/crypto').then(({ decryptField }) => {
+                decryptField(profile.two_factor_secret_encrypted, {
+                  table: 'profiles',
+                  column: 'two_factor_secret_encrypted',
+                  recordId: user.id
+                }).then(setTwoFASecret).catch(console.error);
+              });
+            }
+            return; // HALT ROUTING
+          }
+        } catch (err) {
+          console.error("Failed to check 2FA", err);
+        }
+        setChecking2FA(false);
+      }
+
+      if (requires2FA && !twoFAVerified) return;
+
+      const googleMode = localStorage.getItem("google_auth_mode");
+      if (googleMode === "login") {
+        localStorage.removeItem("google_auth_mode");
+        await handleGoogleLoginCheck();
+      } else {
+        localStorage.removeItem("google_auth_mode");
         handleSuccessRoleRouting(user);
-      };
+      }
+    };
 
-      handleGoogleLoginCheck();
-      return;
-    } else {
-      localStorage.removeItem("google_auth_mode");
-    }
-
-    handleSuccessRoleRouting(user);
+    runAuthFlow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, verificationPending, confirmationSuccess, location.hash, location.search, location.pathname]);
+  }, [user, verificationPending, confirmationSuccess, location.hash, location.search, location.pathname, twoFAVerified]);
 
   /* ─── Success Countdown ─── */
   useEffect(() => {
@@ -756,6 +790,70 @@ const Auth = () => {
     }
   };
 
+  /* ─── 2FA Handlers ─── */
+  const submit2FA = async (e: React.FormEvent, codeOverride?: string) => {
+    e.preventDefault();
+    if (!twoFAUserId || !twoFASecret) return;
+    setLoading(true);
+
+    try {
+      const { checkOTPLockout, recordFailedOTP, resetOTPAttempts, verifyTOTP } = await import('@/lib/totp');
+      const lockout = await checkOTPLockout(twoFAUserId);
+      
+      if (lockout.locked && lockout.lockedUntil) {
+        toast({ variant: "destructive", title: "Account Locked", description: `Too many failed attempts. Try again at ${lockout.lockedUntil.toLocaleTimeString()}` });
+        setLoading(false);
+        return;
+      }
+
+      if (twoFARecoveryMode) {
+        // Check recovery codes
+        const { data } = await supabase.from('profiles').select('recovery_codes_encrypted').eq('id', twoFAUserId).single();
+        if (data?.recovery_codes_encrypted) {
+          const { decryptField, encryptField } = await import('@/lib/crypto');
+          const decrypted = await decryptField(data.recovery_codes_encrypted, {
+            table: 'profiles',
+            column: 'recovery_codes_encrypted',
+            recordId: twoFAUserId
+          });
+          const codes: string[] = JSON.parse(decrypted);
+          
+          const targetCode = codeOverride || twoFARecoveryCode;
+          if (codes.includes(targetCode)) {
+            // Valid recovery code - consume it
+            const newCodes = codes.filter(c => c !== targetCode);
+            const newEncrypted = await encryptField(JSON.stringify(newCodes));
+            await supabase.from('profiles').update({ recovery_codes_encrypted: newEncrypted }).eq('id', twoFAUserId);
+            
+            await resetOTPAttempts(twoFAUserId);
+            hasRoutedRef.current = false;
+            setTwoFAVerified(true);
+            toast({ title: "Verification Success", description: "Recovery code accepted." });
+          } else {
+            const fail = await recordFailedOTP(twoFAUserId);
+            toast({ variant: "destructive", title: "Invalid Code", description: `Recovery code incorrect. ${fail.remainingAttempts} attempts remaining.` });
+          }
+        }
+      } else {
+        // Normal TOTP Verification
+        const targetCode = codeOverride || twoFACode;
+        const isValid = verifyTOTP(twoFASecret, targetCode);
+        if (isValid) {
+          await resetOTPAttempts(twoFAUserId);
+          hasRoutedRef.current = false;
+          setTwoFAVerified(true);
+        } else {
+          const fail = await recordFailedOTP(twoFAUserId);
+          toast({ variant: "destructive", title: "Invalid Code", description: `Verification code incorrect. ${fail.remainingAttempts} attempts remaining.` });
+        }
+      }
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Verification Failed", description: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   /* ─── helpers ─── */
   const countdownPercent = countdown / 60;
   const circumference = 2 * Math.PI * 18;
@@ -891,7 +989,8 @@ const Auth = () => {
                   : "text-[1.5rem] font-extrabold text-[#115f10] tracking-tight leading-tight"
               }
             >
-              {authMethod === "whatsapp"
+              {requires2FA && !twoFAVerified ? "Two-Factor Authentication"
+                : authMethod === "whatsapp"
                 ? (isOtpSent ? "Enter verification code" : "Sign in with WhatsApp")
                 : emailPhase === 'enter' || emailPhase === 'checking' ? "Sign in or create account"
                 : emailPhase === 'login' ? "Welcome back!"
@@ -905,7 +1004,8 @@ const Auth = () => {
                   : "text-[#115f10] mt-1.5 text-[13px] leading-relaxed max-w-[260px] mx-auto"
               }
             >
-              {authMethod === "whatsapp"
+              {requires2FA && !twoFAVerified ? "Protecting your account with an extra layer of security"
+                : authMethod === "whatsapp"
                 ? (isOtpSent
                   ? "A 6-digit code was sent to your WhatsApp."
                   : "Enter your mobile number to get a secure verification code.")
@@ -919,16 +1019,85 @@ const Auth = () => {
           </div>
 
           {/* Main form area — CSS transition instead of AnimatePresence */}
-          <div className="relative overflow-hidden" style={{ minHeight: authMethod === "email" ? 250 : 200 }}>
+          <div className="relative overflow-hidden" style={{ minHeight: requires2FA && !twoFAVerified ? 250 : authMethod === "email" ? 250 : 200 }}>
+            {/* 2FA view */}
+            <div
+              className="auth-view"
+              style={{
+                opacity: requires2FA && !twoFAVerified ? 1 : 0,
+                transform: requires2FA && !twoFAVerified ? "translateY(0)" : "translateY(8px)",
+                pointerEvents: requires2FA && !twoFAVerified ? "auto" : "none",
+                position: requires2FA && !twoFAVerified ? "relative" : "absolute",
+                inset: requires2FA && !twoFAVerified ? undefined : 0,
+              }}
+            >
+              <div className="space-y-6">
+                <form onSubmit={submit2FA} className="space-y-4">
+                  {twoFARecoveryMode ? (
+                    <div className="space-y-3">
+                      <div className="relative">
+                        <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-gray-400" />
+                        <input
+                          type="text"
+                          value={twoFARecoveryCode}
+                          onChange={(e) => setTwoFARecoveryCode(e.target.value)}
+                          className="auth-input font-mono tracking-wider text-center"
+                          style={{ paddingLeft: "3rem" }}
+                          placeholder="Recovery Code"
+                          maxLength={8}
+                          required
+                          autoFocus
+                        />
+                      </div>
+                      <button type="submit" disabled={loading || !twoFARecoveryCode} className="auth-btn auth-btn-primary w-full">
+                        {loading ? "Verifying…" : "Verify Recovery Code"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex justify-center mb-4">
+                        <InputOTP
+                          maxLength={6}
+                          value={twoFACode}
+                          onChange={(val) => { 
+                            setTwoFACode(val); 
+                            if (val.length === 6) submit2FA({ preventDefault: () => {} } as React.FormEvent, val); 
+                          }}
+                          disabled={loading || !twoFASecret}
+                        >
+                          <InputOTPGroup className="gap-2">
+                            {[0, 1, 2, 3, 4, 5].map((i) => (
+                              <InputOTPSlot key={i} index={i} className="w-11 h-[3.25rem] text-lg rounded-xl border-[1.5px] border-gray-200/80 bg-white/50 focus-within:border-gray-400" />
+                            ))}
+                          </InputOTPGroup>
+                        </InputOTP>
+                      </div>
+                      <button type="submit" disabled={loading || twoFACode.length !== 6 || !twoFASecret} className="auth-btn auth-btn-primary w-full">
+                        {loading ? "Verifying…" : "Verify Code"}
+                      </button>
+                    </div>
+                  )}
+                </form>
+                <div className="text-center pt-2">
+                  <button 
+                    onClick={() => { setTwoFARecoveryMode(!twoFARecoveryMode); setTwoFACode(''); setTwoFARecoveryCode(''); }} 
+                    className="text-xs font-semibold text-[#115f10] hover:opacity-80 transition-opacity"
+                  >
+                    {twoFARecoveryMode ? "Use Authenticator App instead" : "Lost access? Use a recovery code"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* WhatsApp view */}
             <div
               className="auth-view"
               style={{
-                opacity: authMethod === "whatsapp" ? 1 : 0,
-                transform: authMethod === "whatsapp" ? "translateY(0)" : "translateY(8px)",
-                pointerEvents: authMethod === "whatsapp" ? "auto" : "none",
-                position: authMethod === "whatsapp" ? "relative" : "absolute",
-                inset: authMethod === "whatsapp" ? undefined : 0,
+                opacity: authMethod === "whatsapp" && (!requires2FA || twoFAVerified) ? 1 : 0,
+                transform: authMethod === "whatsapp" && (!requires2FA || twoFAVerified) ? "translateY(0)" : "translateY(8px)",
+                pointerEvents: authMethod === "whatsapp" && (!requires2FA || twoFAVerified) ? "auto" : "none",
+                position: authMethod === "whatsapp" && (!requires2FA || twoFAVerified) ? "relative" : "absolute",
+                inset: authMethod === "whatsapp" && (!requires2FA || twoFAVerified) ? undefined : 0,
               }}
             >
               {renderWhatsAppInput()}
@@ -938,11 +1107,11 @@ const Auth = () => {
             <div
               className="auth-view"
               style={{
-                opacity: authMethod === "email" ? 1 : 0,
-                transform: authMethod === "email" ? "translateY(0)" : "translateY(8px)",
-                pointerEvents: authMethod === "email" ? "auto" : "none",
-                position: authMethod === "email" ? "relative" : "absolute",
-                inset: authMethod === "email" ? undefined : 0,
+                opacity: authMethod === "email" && (!requires2FA || twoFAVerified) ? 1 : 0,
+                transform: authMethod === "email" && (!requires2FA || twoFAVerified) ? "translateY(0)" : "translateY(8px)",
+                pointerEvents: authMethod === "email" && (!requires2FA || twoFAVerified) ? "auto" : "none",
+                position: authMethod === "email" && (!requires2FA || twoFAVerified) ? "relative" : "absolute",
+                inset: authMethod === "email" && (!requires2FA || twoFAVerified) ? undefined : 0,
               }}
             >
               {confirmationSuccess ? (
@@ -1286,6 +1455,13 @@ const Auth = () => {
                 <Link to="/privacy" className="underline underline-offset-2 hover:opacity-80 font-bold">Privacy Policy</Link>
               </p>
             </>
+          )}
+          {requires2FA && !twoFAVerified && (
+            <div className="text-center mt-6">
+              <button onClick={() => { signOut(); setRequires2FA(false); setTwoFAVerified(false); }} className="text-xs text-gray-400 hover:text-gray-700 font-semibold transition-colors">
+                Cancel and sign out
+              </button>
+            </div>
           )}
         </div>
       </div>

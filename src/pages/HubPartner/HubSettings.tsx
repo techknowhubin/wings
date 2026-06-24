@@ -522,7 +522,7 @@ export default function HubSettings() {
                 </Button>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto min-w-0 w-full pb-2">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/10">

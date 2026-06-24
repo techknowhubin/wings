@@ -9,10 +9,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Search, Loader2, MapPin, History, Phone, Mail, Calendar,
-  TrendingUp, Car, MoreHorizontal, IndianRupee, Send, User, Tag, ArrowUpDown
+  TrendingUp, Car, MoreHorizontal, IndianRupee, Send, User, Tag, ArrowUpDown, Plus
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
+import { useToast } from "@/components/ui/use-toast";
 
 type Traveller = any;
 
@@ -22,6 +23,11 @@ export default function HubTravellers() {
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
   const [viewTraveller, setViewTraveller] = useState<Traveller | null>(null);
   const [travBookings, setTravBookings] = useState<any[]>([]);
+  
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createForm, setCreateForm] = useState({ fullName: '', phone: '', email: '', password: '' });
+  const [creating, setCreating] = useState(false);
+  const { toast } = useToast();
 
   const { data: travellers, isLoading } = useQuery({
     queryKey: ['hub-travellers'],
@@ -63,6 +69,42 @@ export default function HubTravellers() {
     t.wing_id?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleCreateTraveller = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createForm.fullName || !createForm.phone || !createForm.email || !createForm.password) {
+      toast({ title: "Validation Error", description: "All fields are required.", variant: "destructive" });
+      return;
+    }
+    setCreating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-traveller", {
+        body: {
+          fullName: createForm.fullName,
+          phone: createForm.phone,
+          email: createForm.email,
+          password: createForm.password,
+        }
+      });
+      if (error) throw error;
+      
+      toast({ 
+        title: "Traveller Created Successfully", 
+        description: `Name: ${createForm.fullName}\nMobile: ${createForm.phone}\nEmail: ${createForm.email}`,
+      });
+      
+      setShowCreateForm(false);
+      setCreateForm({ fullName: '', phone: '', email: '', password: '' });
+      // Force refresh data if refetch was available, but using location.reload for simplicity 
+      // or we can wait for query cache invalidation if queryClient was available.
+      window.location.reload();
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: "Failed to create traveller", description: err.message || "An error occurred", variant: "destructive" });
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -74,6 +116,9 @@ export default function HubTravellers() {
           <MapPin className="h-4 w-4" />
           <span>{travellers?.length || 0} registered travellers</span>
         </div>
+        <Button onClick={() => setShowCreateForm(true)} className="rounded-xl whitespace-nowrap bg-emerald-600 hover:bg-emerald-700">
+          <Plus className="h-4 w-4 mr-2" /> Create Traveller
+        </Button>
       </div>
 
       <div className="flex items-center justify-between">
@@ -91,7 +136,7 @@ export default function HubTravellers() {
 
       {/* Table */}
       <Card className="border-border/50 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-w-0 w-full pb-2">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">
@@ -245,6 +290,59 @@ export default function HubTravellers() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Traveller Dialog */}
+      <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Traveller</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateTraveller} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground">Full Name *</label>
+              <Input 
+                required 
+                placeholder="E.g. Sriram" 
+                value={createForm.fullName} 
+                onChange={e => setCreateForm(p => ({ ...p, fullName: e.target.value }))} 
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground">Mobile Number *</label>
+              <Input 
+                required 
+                placeholder="+91XXXXXXXXXX" 
+                value={createForm.phone} 
+                onChange={e => setCreateForm(p => ({ ...p, phone: e.target.value }))} 
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground">Email Address *</label>
+              <Input 
+                required 
+                type="email"
+                placeholder="sriram@example.com" 
+                value={createForm.email} 
+                onChange={e => setCreateForm(p => ({ ...p, email: e.target.value }))} 
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground">Password *</label>
+              <Input 
+                required 
+                type="password"
+                placeholder="Enter password" 
+                value={createForm.password} 
+                onChange={e => setCreateForm(p => ({ ...p, password: e.target.value }))} 
+              />
+            </div>
+            <Button type="submit" disabled={creating} className="w-full bg-emerald-600 hover:bg-emerald-700">
+              {creating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+              Create Traveller
+            </Button>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

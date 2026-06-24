@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow, format } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Car } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-700',
@@ -19,6 +21,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function AdminCabBookings() {
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [detailBooking, setDetailBooking] = useState<any>(null);
 
   const { data: bookings, isLoading } = useQuery({
     queryKey: ['admin', 'cab-bookings', typeFilter, statusFilter],
@@ -124,6 +127,7 @@ export default function AdminCabBookings() {
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -148,6 +152,9 @@ export default function AdminCabBookings() {
                     <TableCell className="text-xs font-semibold">₹{Number(b.fare_amount ?? 0).toLocaleString('en-IN')}</TableCell>
                     <TableCell><Badge variant="outline" className={`text-[10px] capitalize ${STATUS_COLORS[b.booking_status]}`}>{b.booking_status}</Badge></TableCell>
                     <TableCell className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(b.created_at), { addSuffix: true })}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" onClick={() => setDetailBooking(b)}>View</Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -155,6 +162,62 @@ export default function AdminCabBookings() {
           )}
         </CardContent>
       </Card>
+
+      {/* View Details Dialog */}
+      <Dialog open={!!detailBooking} onOpenChange={() => setDetailBooking(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Car className="h-5 w-5 text-primary" />
+              Booking Workflow Timeline
+            </DialogTitle>
+          </DialogHeader>
+          {detailBooking && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm py-2">
+                {[
+                  ['Booking ID', detailBooking.booking_id ? String(detailBooking.booking_id).slice(0, 8) + '...' : 'N/A'],
+                  ['Traveller', detailBooking.customer_name || 'N/A'],
+                  ['Pickup Address', detailBooking.pickup_location || 'N/A'],
+                  ['Hub Partner', detailBooking.hub_partner?.full_name || 'Unassigned'],
+                  ['Assigned Driver', detailBooking.driver?.driver_name || 'Unassigned'],
+                  ['Status', detailBooking.booking_status || 'N/A'],
+                ].map(([label, value], idx) => (
+                  <div key={String(label) + idx}>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{String(label)}</p>
+                    <p className="font-semibold text-sm truncate">{String(value)}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Status Timeline */}
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Workflow Timeline</p>
+                <div className="flex flex-col gap-3 text-xs">
+                  <div className={`flex items-center gap-2 ${detailBooking.booking_id ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`h-2 w-2 rounded-full ${detailBooking.booking_id ? 'bg-primary' : 'bg-muted'}`} /> Booking Created
+                  </div>
+                  <div className={`flex items-center gap-2 ${detailBooking.hub_partner_id ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`h-2 w-2 rounded-full ${detailBooking.hub_partner_id ? 'bg-primary' : 'bg-muted'}`} /> Hub Partner Notified
+                  </div>
+                  <div className={`flex items-center gap-2 ${detailBooking.driver_id ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`h-2 w-2 rounded-full ${detailBooking.driver_id ? 'bg-primary' : 'bg-muted'}`} /> Driver Assigned
+                  </div>
+                  <div className={`flex items-center gap-2 ${detailBooking.trip_status === 'Driver Accepted' || detailBooking.trip_status === 'Started' || detailBooking.trip_status === 'Completed' ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`h-2 w-2 rounded-full ${detailBooking.trip_status === 'Driver Accepted' || detailBooking.trip_status === 'Started' || detailBooking.trip_status === 'Completed' ? 'bg-primary' : 'bg-muted'}`} /> Driver Accepted
+                  </div>
+                  <div className={`flex items-center gap-2 ${detailBooking.trip_status === 'Started' || detailBooking.trip_status === 'Completed' ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`h-2 w-2 rounded-full ${detailBooking.trip_status === 'Started' || detailBooking.trip_status === 'Completed' ? 'bg-primary' : 'bg-muted'}`} /> Ride Started
+                  </div>
+                  <div className={`flex items-center gap-2 ${detailBooking.trip_status === 'Completed' || detailBooking.booking_status?.toLowerCase() === 'completed' ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`h-2 w-2 rounded-full ${detailBooking.trip_status === 'Completed' || detailBooking.booking_status?.toLowerCase() === 'completed' ? 'bg-primary' : 'bg-muted'}`} /> Ride Completed
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

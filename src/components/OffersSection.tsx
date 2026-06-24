@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, X, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 const categoryColorMap: Record<string, any> = {
   Stay: { cardBg: "bg-[#f7d6da]", badgeBg: "bg-[#9B1B30]", badgeText: "text-white", title: "text-[#4a0a14]", validity: "text-[#7a2030]", couponBorder: "border-[#9B1B30]", couponText: "text-[#9B1B30]" },
@@ -33,6 +34,7 @@ interface OffersSectionProps {
 
 
 const OffersSection = ({ variant = "default" }: OffersSectionProps) => {
+  const { user } = useAuth();
   const [activeFilter, setActiveFilter] = useState("All");
   const [selectedOffer, setSelectedOffer] = useState<any | null>(null);
   const [offers, setOffers] = useState<any[]>([]);
@@ -81,24 +83,42 @@ const OffersSection = ({ variant = "default" }: OffersSectionProps) => {
         };
       };
 
-      // Fetch ALL active host coupons visible to the public.
-      const { data, error } = await supabase
+      // Query 1: Platform Offers
+      const { data: platformData, error: err1 } = await supabase
         .from('host_coupons' as any)
         .select('id,code,discount_percent,discount_type,discount_value,listing_types,is_active,ends_at,usage_limit,used_count,is_platform_offer,title,emoji,terms')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('is_platform_offer', true);
 
-      console.log("OffersSection DB result:", { data, error });
+      let data1: any[] = [];
+      let data2: any[] = [];
 
-      if (error) {
-        console.error("OffersSection fetch error:", error.message);
-        setLoading(false);
-        return;
+      // Only fetch VIP coupons if user is logged in
+      if (user) {
+        const { data: assignmentsData } = await supabase
+          .from('host_coupons' as any)
+          .select('id,code,discount_percent,discount_type,discount_value,listing_types,is_active,ends_at,usage_limit,used_count,is_platform_offer,title,emoji,terms, assignments!inner(user_id)')
+          .eq('is_active', true)
+          .eq('assignments.user_id', user.id);
+        
+        const { data: legacyData } = await supabase
+          .from('host_coupons' as any)
+          .select('id,code,discount_percent,discount_type,discount_value,listing_types,is_active,ends_at,usage_limit,used_count,is_platform_offer,title,emoji,terms')
+          .eq('is_active', true)
+          .or(`target_user_id.eq.${user.id},target_email.eq.${user.email},target_phone.eq.${user.phone}`);
+          
+        data1 = assignmentsData || [];
+        data2 = legacyData || [];
       }
 
-      console.log("Raw coupons from DB:", data?.length, data);
+      // Merge and deduplicate
+      const combinedData = [...(platformData || []), ...data1, ...data2];
+      const uniqueDataMap = new Map();
+      combinedData.forEach(c => uniqueDataMap.set(c.id, c));
+      const finalData = Array.from(uniqueDataMap.values());
 
       const seen = new Set<string>();
-      const valid = (data ?? []).filter((c: any) => {
+      const valid = finalData.filter((c: any) => {
         if (seen.has(c.id)) return false;
         seen.add(c.id);
         if (c.ends_at && new Date(c.ends_at) < new Date()) return false;
@@ -121,7 +141,9 @@ const OffersSection = ({ variant = "default" }: OffersSectionProps) => {
     <section className="container mx-auto px-4 py-8 md:py-12">
       <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} viewport={{ once: true }}>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-3xl font-bold text-foreground">Offers for you</h2>
+          <h2 className="text-3xl font-bold text-foreground">
+            {user ? "🎁 Available Coupons" : "Offers for you"}
+          </h2>
           <Link to="/offers" className="flex items-center gap-1 text-sm font-medium text-primary-text hover:underline">
             View more <ChevronRight className="h-4 w-4" />
           </Link>

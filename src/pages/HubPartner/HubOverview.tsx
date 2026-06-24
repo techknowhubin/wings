@@ -215,7 +215,7 @@ function HubOverviewContent() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         {kpis.map((k, i) => <KPICard key={i} {...k} />)}
       </div>
 
@@ -229,7 +229,7 @@ function HubOverviewContent() {
               <span className="text-xs text-muted-foreground">Last 7 days</span>
             </div>
           </CardHeader>
-          <CardContent className="h-[220px] pt-0">
+          <CardContent className="h-[220px] pt-0 min-w-0 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={stats?.chartData || []} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                 <defs>

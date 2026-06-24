@@ -18,6 +18,7 @@ import type { CouponOffer } from "@/lib/discounts";
 import { getReferralCode, clearReferral } from "@/lib/referral";
 
 import { createNotification } from "@/lib/supabase-helpers";
+import LocationAutocomplete, { LocationData } from "@/components/LocationAutocomplete";
 
 type ConfirmAndPayState = {
   booking?: BookingDetails;
@@ -30,6 +31,7 @@ interface HostedCoupon extends CouponOffer {
   usageLimit?: number | null;
   usedCount?: number;
   oneTimePerUser?: boolean;
+  assignments?: any[];
 }
 
 interface ExtraGuest {
@@ -89,7 +91,7 @@ const ConfirmAndPay = () => {
   const [phone, setPhone] = useState("");
   const [pickupAddress, setPickupAddress] = useState(booking?.cabDetails?.pickup_location || "");
   const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [mapLoading, setMapLoading] = useState(false);
+  const [pickupPlaceId, setPickupPlaceId] = useState<string>("");
 
   // Additional guests
   const [extraGuests, setExtraGuests] = useState<ExtraGuest[]>([]);
@@ -255,14 +257,31 @@ const ConfirmAndPay = () => {
   useEffect(() => {
     const fetchCoupons = async () => {
       if (!booking?.hostId) return;
-      const { data } = await supabase
+      // Query 1: New multi-user assignments
+      const { data: data1 } = await supabase
+        .from("host_coupons" as any)
+        .select(
+          "id,code,discount_type,discount_value,discount_percent,is_enabled,listing_id,starts_at,ends_at,expires_at,usage_limit,used_count,one_time_per_user,listing_types,target_user_id,target_email,target_phone,is_platform_offer, assignments!inner(user_id)"
+        )
+        .eq("assignments.user_id", user?.id)
+        .eq("is_active", true);
+
+      // Query 2: Legacy single-user assignments
+      const { data: data2 } = await supabase
         .from("host_coupons" as any)
         .select(
           "id,code,discount_type,discount_value,discount_percent,is_enabled,listing_id,starts_at,ends_at,expires_at,usage_limit,used_count,one_time_per_user,listing_types,target_user_id,target_email,target_phone,is_platform_offer"
         )
-        .or(`host_id.eq.${booking.hostId},is_platform_offer.eq.true`)
+        .or(`target_user_id.eq.${user?.id},target_email.eq.${user?.email},target_phone.eq.${user?.phone}`)
         .eq("is_active", true);
-      const filtered = (data ?? []).filter((item: any) => {
+
+      // Merge and deduplicate
+      const combinedData = [...(data1 || []), ...(data2 || [])];
+      const uniqueDataMap = new Map();
+      combinedData.forEach(c => uniqueDataMap.set(c.id, c));
+      const finalData = Array.from(uniqueDataMap.values());
+
+      const filtered = finalData.filter((item: any) => {
         if (!item.is_enabled) return false;
         if (booking.listingCouponType && Array.isArray(item.listing_types) && item.listing_types.length > 0) {
           if (!item.listing_types.includes(booking.listingCouponType)) return false;
@@ -291,9 +310,17 @@ const ConfirmAndPay = () => {
             targetUserId: item.target_user_id ?? null,
             targetEmail: item.target_email ?? null,
             targetPhone: item.target_phone ?? null,
+            assignments: item.assignments ?? [],
           };
         })
       );
+      
+      console.log("=== VIP COUPONS DEBUG ===");
+      console.log("Logged In User ID:", user?.id);
+      console.log("Coupons Returned (Assignments Query):", data1);
+      console.log("Coupons Returned (Legacy Query):", data2);
+      console.log("Filtered Final Coupons:", filtered);
+      console.log("=========================");
     };
     void fetchCoupons();
   }, [booking]);
@@ -433,14 +460,22 @@ const ConfirmAndPay = () => {
     
     // Validate User-Specific constraints
     const matchAsAny = match as any;
-    if (matchAsAny.targetUserId || matchAsAny.targetEmail || matchAsAny.targetPhone) {
+    if (matchAsAny.targetUserId || matchAsAny.targetEmail || matchAsAny.targetPhone || (match.assignments && match.assignments.length > 0)) {
       if (!user) { toast.error("You must be logged in to use this coupon."); return; }
+      
+      let isAssigned = false;
+      if (match.assignments && match.assignments.length > 0) {
+        isAssigned = match.assignments.some((a: any) => a.user_id === user.id);
+      }
+      
       const isUserMatch = 
+        isAssigned ||
         (matchAsAny.targetUserId && matchAsAny.targetUserId === user.id) ||
         (matchAsAny.targetEmail && matchAsAny.targetEmail.toLowerCase() === user.email?.toLowerCase()) ||
         (matchAsAny.targetPhone && matchAsAny.targetPhone === user.phone);
+        
       if (!isUserMatch) {
-        toast.error("This coupon is not applicable to your account."); return;
+        toast.error("This VIP coupon is not applicable to your account."); return;
       }
     }
 
@@ -634,7 +669,7 @@ const ConfirmAndPay = () => {
             customer_phone: phone,
             pickup_latitude: pickupCoords?.lat,
             pickup_longitude: pickupCoords?.lng,
-            pickup_place_id: booking.cabDetails.pickup_place_id,
+            pickup_place_id: pickupPlaceId || booking.cabDetails.pickup_place_id,
             drop_latitude: booking.cabDetails.drop_latitude,
             drop_longitude: booking.cabDetails.drop_longitude,
             drop_place_id: booking.cabDetails.drop_place_id
@@ -898,156 +933,51 @@ const ConfirmAndPay = () => {
                 </div>
                 {booking.cabDetails && (
                   <div className="space-y-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="pickup-address">Pickup Address *</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="pickup-address"
-                          className="h-11 rounded-xl bg-white dark:bg-background flex-1"
-                          value={pickupAddress}
-                          onChange={(e) => { setPickupAddress(e.target.value); setPickupCoords(null); }}
-                          placeholder="Enter your exact pickup address"
-                          required
-                        />
-                        <button
-                          type="button"
-                          disabled={!pickupAddress.trim() || mapLoading}
-                          onClick={async () => {
-                            if (!pickupAddress.trim()) return;
-                            setMapLoading(true);
-                            try {
-                              const res = await fetch(
-                                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(pickupAddress)}&format=json&addressdetails=1&limit=1`,
-                                { headers: { "Accept-Language": "en" } }
-                              );
-                              const data = await res.json();
-                              if (data && data[0]) {
-                                setPickupCoords({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) });
-                                toast.success("Address found on map.");
-                              } else {
-                                // Fallback: open Google Maps search directly
-                                window.open(`https://www.google.com/maps/search/${encodeURIComponent(pickupAddress)}`, "_blank");
-                              }
-                            } catch {
-                              window.open(`https://www.google.com/maps/search/${encodeURIComponent(pickupAddress)}`, "_blank");
-                            } finally {
-                              setMapLoading(false);
-                            }
-                          }}
-                          className="h-11 px-3 rounded-xl border border-border bg-white hover:bg-muted/50 transition-colors text-xs font-semibold text-[#064e3b] whitespace-nowrap shrink-0 disabled:opacity-40"
-                        >
-                          {mapLoading ? (
-                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                            </svg>
-                          ) : "🗺️ Show on Map"}
-                        </button>
-                      </div>
-                    </div>
-                    {/* Select on Maps */}
-                    <div className="space-y-1.5">
-                      <Label>Or select on map</Label>
-                      <button
-                        type="button"
-                        disabled={mapLoading}
-                        onClick={async () => {
-                          if (!navigator.geolocation) {
-                            toast.error("Geolocation is not supported by your browser.");
-                            return;
-                          }
-                          setMapLoading(true);
-                          navigator.geolocation.getCurrentPosition(
-                            async (pos) => {
-                              const { latitude, longitude } = pos.coords;
-                              try {
-                                const res = await fetch(
-                                  `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1&zoom=18`,
-                                  { headers: { "Accept-Language": "en" } }
-                                );
-                                const data = await res.json();
-                                const a = data.address || {};
-                                // Build precise address: building → house no → road → suburb → city → state → pincode
-                                const parts = [
-                                  a.building || a.amenity || a.shop || a.office || a.tourism,
-                                  a.house_number ? `No. ${a.house_number}` : null,
-                                  a.road || a.pedestrian || a.footway,
-                                  a.neighbourhood || a.suburb || a.quarter,
-                                  a.city || a.town || a.village || a.county,
-                                  a.state,
-                                  a.postcode,
-                                ].filter(Boolean).join(", ");
-                                setPickupAddress(parts || data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-                                setPickupCoords({ lat: latitude, lng: longitude });
-                                toast.success("Location detected successfully.");
-                              } catch {
-                                setPickupAddress(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-                              } finally {
-                                setMapLoading(false);
-                              }
-                            },
-                            (err) => {
-                              setMapLoading(false);
-                              toast.error("Could not get your location. Please allow location access.");
-                            },
-                            { enableHighAccuracy: true, timeout: 10000 }
-                          );
-                        }}
-                        className="flex items-center gap-2 w-full h-11 px-4 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary/60 transition-all text-sm font-medium text-[#064e3b] disabled:opacity-60"
-                      >
-                        {mapLoading ? (
-                          <>
-                            <svg className="animate-spin h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                            </svg>
-                            Detecting your location…
-                          </>
-                        ) : (
-                          <>
-                            <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <circle cx="12" cy="12" r="3" />
-                              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
-                              <path d="M12 8a4 4 0 100 8 4 4 0 000-8z" fill="currentColor" opacity=".15" />
-                            </svg>
-                            📍 Use My Current Location (via GPS)
-                          </>
-                        )}
-                      </button>
-                      <p className="text-[10px] text-muted-foreground">
-                        Allows browser to detect your precise location and auto-fill the address above.
-                      </p>
+                    <LocationAutocomplete
+                      label="Pickup Address *"
+                      value={pickupAddress}
+                      placeholder="Search for your exact pickup location..."
+                      onChange={(data: LocationData) => {
+                        setPickupAddress(data.address);
+                        setPickupCoords({ lat: data.lat, lng: data.lng });
+                        if (data.placeId) setPickupPlaceId(data.placeId);
+                        
+                        console.log("Selected Address:", data.address);
+                        console.log("Selected Latitude:", data.lat);
+                        console.log("Selected Longitude:", data.lng);
+                        console.log("Place ID:", data.placeId);
+                      }}
+                    />
 
-                      {/* Coordinates display — shown after detection */}
-                      {pickupCoords && (
-                        <div className="mt-2 rounded-xl border border-border bg-muted/30 p-3 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-foreground">📌 GPS Coordinates</span>
-                            <a
-                              href={`https://www.google.com/maps?q=${pickupCoords.lat},${pickupCoords.lng}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[10px] font-semibold text-[#064e3b] underline underline-offset-2 hover:opacity-80"
-                            >
-                              Open in Google Maps ↗
-                            </a>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="rounded-lg border bg-white px-3 py-2">
-                              <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Latitude</p>
-                              <p className="text-sm font-mono font-semibold text-foreground">{pickupCoords.lat.toFixed(6)}</p>
-                            </div>
-                            <div className="rounded-lg border bg-white px-3 py-2">
-                              <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Longitude</p>
-                              <p className="text-sm font-mono font-semibold text-foreground">{pickupCoords.lng.toFixed(6)}</p>
-                            </div>
-                          </div>
-                          <p className="text-[9px] text-muted-foreground">
-                            Share these coordinates with your cab driver to navigate directly to your location.
-                          </p>
+                    {/* Coordinates display — shown after detection */}
+                    {pickupCoords && (
+                      <div className="mt-2 rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-foreground">📌 GPS Coordinates</span>
+                          <a
+                            href={`https://www.google.com/maps?q=${pickupCoords.lat},${pickupCoords.lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] font-semibold text-[#064e3b] underline underline-offset-2 hover:opacity-80"
+                          >
+                            Open in Google Maps ↗
+                          </a>
                         </div>
-                      )}
-                    </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="rounded-lg border bg-white px-3 py-2">
+                            <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Latitude</p>
+                            <p className="text-sm font-mono font-semibold text-foreground">{pickupCoords.lat.toFixed(6)}</p>
+                          </div>
+                          <div className="rounded-lg border bg-white px-3 py-2">
+                            <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Longitude</p>
+                            <p className="text-sm font-mono font-semibold text-foreground">{pickupCoords.lng.toFixed(6)}</p>
+                          </div>
+                        </div>
+                        <p className="text-[9px] text-muted-foreground">
+                          Share these coordinates with your cab driver to navigate directly to your location.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </form>
@@ -1219,32 +1149,41 @@ const ConfirmAndPay = () => {
             ) : null}
 
             {/* Available Coupons */}
-            {user && availableCoupons.filter((c: any) => 
-               (!c.targetUserId && !c.targetEmail && !c.targetPhone) ||
-               (c.targetUserId === user.id || (c.targetEmail && c.targetEmail.toLowerCase() === user.email?.toLowerCase()) || c.targetPhone === user.phone)
-            ).length > 0 && !appliedCoupon && (
+            {user && availableCoupons.length > 0 && !appliedCoupon && (
               <div className="mb-4">
-                <p className="text-xs font-semibold text-muted-foreground mb-2">Available Coupons</p>
-                <div className="flex flex-wrap gap-2">
-                  {availableCoupons.filter((c: any) => 
-                    (!c.targetUserId && !c.targetEmail && !c.targetPhone) ||
-                    (c.targetUserId === user.id || (c.targetEmail && c.targetEmail.toLowerCase() === user.email?.toLowerCase()) || c.targetPhone === user.phone)
-                  ).map((coupon: any) => (
+                <p className="text-xs font-semibold text-muted-foreground mb-2">🎁 Available Coupons</p>
+                <div className="flex flex-col gap-2">
+                  {availableCoupons.map((coupon: any) => (
                     <div 
                       key={coupon.id} 
-                      onClick={() => {
-                        setPromoCode(coupon.code);
-                        handleApplyCoupon(coupon.code);
-                      }}
-                      className="cursor-pointer flex items-center gap-2 bg-emerald-50 border border-emerald-200 hover:border-emerald-500 rounded-md px-3 py-1.5 transition-colors"
+                      className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2.5"
                     >
-                      <Ticket className="h-4 w-4 text-emerald-600" />
-                      <div>
-                        <p className="text-xs font-bold text-emerald-800 tracking-wide">{coupon.code}</p>
-                        <p className="text-[10px] text-emerald-600 font-medium">
-                          Save {coupon.type === "flat" ? `₹${coupon.value}` : `${coupon.value}%`}
-                        </p>
+                      <div className="flex items-center gap-2">
+                        <Ticket className="h-5 w-5 text-emerald-600" />
+                        <div>
+                          <p className="text-sm font-bold text-emerald-800 tracking-wide">{coupon.code}</p>
+                          <p className="text-xs text-emerald-600 font-medium">
+                            {coupon.type === "flat" ? `₹${coupon.value} OFF` : `${coupon.value}% OFF`}
+                          </p>
+                          {(coupon.endsAt || coupon.expiresAt) && (
+                            <p className="text-[10px] text-emerald-600/70 mt-0.5">
+                              Expires: {new Date(coupon.endsAt || coupon.expiresAt).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
                       </div>
+                      <Button
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-3 text-xs rounded-full"
+                        onClick={() => {
+                          setAppliedCoupon({ code: coupon.code, type: coupon.type, value: coupon.value });
+                          setPromoCode(coupon.code);
+                          console.log("Applied Coupon:", coupon.code);
+                          handleApplyCoupon(coupon.code);
+                        }}
+                      >
+                        Apply
+                      </Button>
                     </div>
                   ))}
                 </div>

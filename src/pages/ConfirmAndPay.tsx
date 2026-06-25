@@ -90,8 +90,36 @@ const ConfirmAndPay = () => {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [pickupAddress, setPickupAddress] = useState(booking?.cabDetails?.pickup_location || "");
-  const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [pickupPlaceId, setPickupPlaceId] = useState<string>("");
+  const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(() => {
+    if (booking?.cabDetails?.pickup_latitude && booking?.cabDetails?.pickup_longitude) {
+      return {
+        lat: Number(booking.cabDetails.pickup_latitude),
+        lng: Number(booking.cabDetails.pickup_longitude),
+      };
+    }
+    return null;
+  });
+  const [pickupPlaceId, setPickupPlaceId] = useState<string>(() => {
+    return booking?.cabDetails?.pickup_place_id || "";
+  });
+
+  // Keep coords and place ID in sync if booking updates
+  useEffect(() => {
+    if (booking?.cabDetails) {
+      if (booking.cabDetails.pickup_location) {
+        setPickupAddress(booking.cabDetails.pickup_location);
+      }
+      if (booking.cabDetails.pickup_latitude && booking.cabDetails.pickup_longitude) {
+        setPickupCoords({
+          lat: Number(booking.cabDetails.pickup_latitude),
+          lng: Number(booking.cabDetails.pickup_longitude),
+        });
+      }
+      if (booking.cabDetails.pickup_place_id) {
+        setPickupPlaceId(booking.cabDetails.pickup_place_id);
+      }
+    }
+  }, [booking]);
 
   // Additional guests
   const [extraGuests, setExtraGuests] = useState<ExtraGuest[]>([]);
@@ -103,9 +131,7 @@ const ConfirmAndPay = () => {
   const [appliedCoupon, setAppliedCoupon] = useState<HostedCoupon | null>(null);
   const [globalCoupons, setGlobalCoupons] = useState<HostedCoupon[]>([]);
   const [bookingFeeRate, setBookingFeeRate] = useState(10);
-  const [referralCode, setReferralCode] = useState(() => getReferralCode() ?? "");
-  const [referralPartner, setReferralPartner] = useState<{ id: string; business_name: string; commission_rate: number } | null>(null);
-  const [referralValidating, setReferralValidating] = useState(false);
+
 
   // Wing Credits
   const [walletBalance, setWalletBalance] = useState(0);
@@ -282,7 +308,7 @@ const ConfirmAndPay = () => {
       const finalData = Array.from(uniqueDataMap.values());
 
       const filtered = finalData.filter((item: any) => {
-        if (!item.is_enabled) return false;
+        if (!item.is_enabled && !item.is_active) return false;
         if (booking.listingCouponType && Array.isArray(item.listing_types) && item.listing_types.length > 0) {
           if (!item.listing_types.includes(booking.listingCouponType)) return false;
         }
@@ -325,33 +351,7 @@ const ConfirmAndPay = () => {
     void fetchCoupons();
   }, [booking]);
 
-  const handleValidateReferral = async () => {
-    const code = referralCode.trim().toUpperCase();
-    if (!code) return;
-    setReferralValidating(true);
-    try {
-      const { data, error } = await supabase
-        .from("hub_partners" as any)
-        .select("id, business_name, commission_rate, is_active")
-        .eq("referral_id", code)
-        .maybeSingle();
-      if (error || !data) { toast.error("Referral code not found."); setReferralPartner(null); return; }
-      if (!(data as any).is_active) { toast.error("This referral code is no longer active."); setReferralPartner(null); return; }
-      setReferralPartner(data as any);
-      toast.success(`Referral from ${(data as any).business_name} applied!`);
-    } catch {
-      toast.error("Could not validate referral code.");
-    } finally {
-      setReferralValidating(false);
-    }
-  };
 
-  useEffect(() => {
-    if (referralCode && !referralPartner) {
-      void handleValidateReferral();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const stayDates = useMemo(() => {
     if (!booking) return "";
@@ -739,8 +739,7 @@ const ConfirmAndPay = () => {
               razorpay_signature: response.razorpay_signature,
               booking_id: pendingBookingId,
               coupon_id: appliedCoupon?.id,
-              referral_code: referralPartner ? referralCode.trim().toUpperCase() : undefined,
-              referral_partner_id: referralPartner?.id ?? undefined,
+              referral_code: getReferralCode() || undefined,
               used_wing_credits: wingCreditsDiscountAmount,
             }
           });
@@ -755,7 +754,7 @@ const ConfirmAndPay = () => {
             return;
           }
 
-          if (referralPartner) clearReferral();
+          clearReferral();
           toast.success("Booking confirmed securely!");
           setIsProcessing(false);
           navigate("/booking-confirmation", {
@@ -1203,33 +1202,7 @@ const ConfirmAndPay = () => {
               </div>
             )}
 
-            {/* Referral Code */}
-            <div className="mb-4">
-              <p className="text-xs font-semibold text-muted-foreground mb-1.5">Referral Code <span className="font-normal">(from QR scan)</span></p>
-              <div className="flex gap-2">
-                <Input
-                  value={referralCode}
-                  onChange={(e) => { setReferralCode(e.target.value.toUpperCase()); setReferralPartner(null); }}
-                  className="h-10 rounded-lg bg-background font-mono text-sm"
-                  placeholder="HUB-XXXXXXXX"
-                  disabled={!!referralPartner}
-                />
-                {referralPartner ? (
-                  <Button type="button" variant="ghost" className="h-10 text-red-500 hover:bg-red-50 px-3" onClick={() => { setReferralPartner(null); setReferralCode(""); clearReferral(); }}>
-                    Remove
-                  </Button>
-                ) : (
-                  <Button type="button" variant="outline" className="h-10 rounded-lg" onClick={handleValidateReferral} disabled={referralValidating || !referralCode.trim()}>
-                    {referralValidating ? "…" : "Apply"}
-                  </Button>
-                )}
-              </div>
-              {referralPartner && (
-                <p className="text-xs text-green-600 font-medium mt-1.5 flex items-center gap-1">
-                  <span>✓</span> Referred by {referralPartner.business_name}
-                </p>
-              )}
-            </div>
+
 
             {/* Price Breakdown */}
             <div className="space-y-2 text-sm border-t border-border pt-4">

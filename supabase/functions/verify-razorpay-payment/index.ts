@@ -58,7 +58,6 @@ Deno.serve(async (req) => {
       booking_id,
       coupon_id,
       referral_code,
-      referral_partner_id,
       used_wing_credits,
     } = await req.json();
 
@@ -176,16 +175,17 @@ Deno.serve(async (req) => {
     });
 
     // ── Referral tracking (non-fatal) ─────────────────────────
-    if (referral_code && referral_partner_id && updatedBooking) {
+    if (referral_code && updatedBooking) {
       try {
+        // Resolve partner from the referral code (backend-only lookup)
         const { data: partner } = await admin
           .from("hub_partners")
           .select("id, commission_rate, is_active, total_referrals, total_revenue, total_commission")
-          .eq("id", referral_partner_id)
-          .eq("qr_tracking_id", referral_code)
-          .single();
+          .or(`qr_tracking_id.eq.${referral_code},referral_id.eq.${referral_code}`)
+          .eq("is_active", true)
+          .maybeSingle();
 
-        if (partner?.is_active) {
+        if (partner) {
           const amount     = updatedBooking.total_price ?? 0;
           const pct        = partner.commission_rate ?? 5;
           const commission = Math.round((amount * pct / 100) * 100) / 100;
@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
           await admin.from("referral_transactions").insert({
             booking_id,
             user_id:             updatedBooking.user_id,
-            partner_id:          referral_partner_id,
+            partner_id:          partner.id,
             referral_code,
             booking_amount:      amount,
             commission_percentage: pct,
@@ -205,7 +205,7 @@ Deno.serve(async (req) => {
             total_revenue:    (partner.total_revenue    ?? 0) + amount,
             total_commission: (partner.total_commission ?? 0) + commission,
             updated_at:       new Date().toISOString(),
-          }).eq("id", referral_partner_id);
+          }).eq("id", partner.id);
         }
       } catch (refErr) {
         console.error("[Referral] Non-fatal error:", refErr);

@@ -77,16 +77,40 @@ export default function HubTravellers() {
     }
     setCreating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("create-traveller", {
-        body: {
-          fullName: createForm.fullName,
-          phone: createForm.phone,
-          email: createForm.email,
-          password: createForm.password,
+      // Save the current hub partner session before signing up the new user
+      const { data: sessionData } = await supabase.auth.getSession();
+      const currentSession = sessionData?.session;
+
+      // Create the new traveller account
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: createForm.email,
+        password: createForm.password,
+        options: {
+          data: {
+            full_name: createForm.fullName,
+            phone: createForm.phone,
+          }
         }
       });
-      if (error) throw error;
-      
+
+      if (signUpError) throw signUpError;
+
+      // Restore the hub partner's session immediately
+      if (currentSession) {
+        await supabase.auth.setSession({
+          access_token: currentSession.access_token,
+          refresh_token: currentSession.refresh_token,
+        });
+      }
+
+      // Update profile with phone number if user was created
+      if (signUpData?.user?.id) {
+        await supabase.from('profiles').update({
+          full_name: createForm.fullName,
+          phone: createForm.phone,
+        }).eq('id', signUpData.user.id);
+      }
+
       toast({ 
         title: "Traveller Created Successfully", 
         description: `Name: ${createForm.fullName}\nMobile: ${createForm.phone}\nEmail: ${createForm.email}`,
@@ -94,8 +118,6 @@ export default function HubTravellers() {
       
       setShowCreateForm(false);
       setCreateForm({ fullName: '', phone: '', email: '', password: '' });
-      // Force refresh data if refetch was available, but using location.reload for simplicity 
-      // or we can wait for query cache invalidation if queryClient was available.
       window.location.reload();
     } catch (err: any) {
       console.error(err);

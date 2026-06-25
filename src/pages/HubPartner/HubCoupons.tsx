@@ -152,6 +152,8 @@ export default function HubCoupons() {
       host_id: hubId,
       is_platform_offer: false,
       is_active: true,
+      is_enabled: true,
+      discount_type: discountType === "flat" ? "flat" : "percentage",
       discount_value: discountType === "flat" ? Number(discountValue) : 0,
       discount_percent: discountType === "percent" ? Number(discountValue) : 0,
       usage_limit: finalLimit,
@@ -202,12 +204,19 @@ export default function HubCoupons() {
       resetForm();
       loadCoupons(hubId);
     } catch (err: any) {
-      toast({ title: "Failed to save coupon", description: err.message, variant: "destructive" });
+      let friendlyMessage = err.message;
+      if (err.message?.includes("host_coupons_host_id_code_idx") || err.code === "23505") {
+        friendlyMessage = "A coupon with this code already exists. Please use a unique coupon code.";
+      }
+      toast({ title: "Failed to save coupon", description: friendlyMessage, variant: "destructive" });
     }
   };
 
   const handleToggleStatus = async (id: string, currentStatus: boolean) => {
-    const { error } = await supabase.from('host_coupons' as any).update({ is_active: !currentStatus }).eq('id', id);
+    const { error } = await supabase.from('host_coupons' as any).update({ 
+      is_active: !currentStatus,
+      is_enabled: !currentStatus 
+    }).eq('id', id);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     else {
       toast({ title: `Coupon ${!currentStatus ? 'Activated' : 'Disabled'}` });

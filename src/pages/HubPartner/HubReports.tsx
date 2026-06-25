@@ -497,10 +497,10 @@ export default function HubReports() {
 
           {/* Revenue Top Level Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print:hidden mb-6">
-            <Card className="border-border/50 shadow-sm bg-primary/5 border-primary/20">
+            <Card className="border-border/50 shadow-sm bg-teal-50 border-teal-200">
               <CardContent className="p-4 flex items-center justify-between">
-                <div><p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Gross Revenue</p><p className="text-2xl font-black text-primary">₹{analytics?.grossRevenue?.toLocaleString()}</p></div>
-                <div className="h-10 w-10 bg-primary/20 text-primary rounded-full flex items-center justify-center"><CreditCard className="h-5 w-5" /></div>
+                <div><p className="text-xs font-semibold text-teal-700 uppercase tracking-wider mb-1">Gross Revenue</p><p className="text-2xl font-black text-teal-800">₹{analytics?.grossRevenue?.toLocaleString()}</p></div>
+                <div className="h-10 w-10 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center"><CreditCard className="h-5 w-5" /></div>
               </CardContent>
             </Card>
             <Card className="border-border/50 shadow-sm bg-emerald-500/5 border-emerald-500/20">

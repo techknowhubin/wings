@@ -4,15 +4,16 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { format, addDays } from "date-fns";
 import sedanImg from "@/assets/sedan-dzire.jpeg";
 import muvImg from "@/assets/MUV-Ertiga.jpeg";
 import suvImg from "@/assets/SUV-Innova.jpeg";
 import { useAuth } from "@/hooks/useAuth";
-import { Check } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import LocationAutocomplete, { LocationData } from "@/components/LocationAutocomplete";
+import { getGoogleRouteDistance, haversineDistance, DEFAULT_AIRPORTS, AirportConfig } from "@/lib/googleMaps";
 
 
 type BookingType = "Airport Transfer" | "4 Hours Local" | "8 Hours Local";
@@ -47,21 +48,39 @@ const VEHICLES = [
   { type: "SUV" as const, img: suvImg, desc: "7 seats · Premium" },
 ];
 
-const FIXED_AIRPORT_DROP = "Rajiv Gandhi International Airport (HYD), Shamshabad, Hyderabad";
-const FIXED_AIRPORT_LAT = 17.2403;
-const FIXED_AIRPORT_LNG = 78.4294;
-
 export default function LocalAirportCabsSection() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // Airports configuration
+  const [airports, setAirports] = useState<AirportConfig[]>(DEFAULT_AIRPORTS);
+  const [detectedAirport, setDetectedAirport] = useState<AirportConfig | null>(null);
+
+  // Booking states
   const [activeBookingType, setActiveBookingType] = useState<BookingType | null>(null);
   const [isVehicleSelectOpen, setIsVehicleSelectOpen] = useState(false);
   const [pickedVehicle, setPickedVehicle] = useState<"Sedan" | "MUV" | "SUV" | null>(null);
 
   const [travelTime, setTravelTime] = useState("08:00");
   const [travelDate, setTravelDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
-  const [pickupLocation, setPickupLocation] = useState("");
+  
+  // Locations details
+  const [pickupAddress, setPickupAddress] = useState("");
+  const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [pickupPlaceId, setPickupPlaceId] = useState("");
+
+  const [dropAddress, setDropAddress] = useState("");
+  const [dropCoords, setDropCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [dropPlaceId, setDropPlaceId] = useState("");
+
+  const [isAirportPickup, setIsAirportPickup] = useState(false);
+
+  // Route distance states
+  const [distanceKm, setDistanceKm] = useState<number | null>(null);
+  const [durationMins, setDurationMins] = useState<number | null>(null);
+  const [isCalculatingDistance, setIsCalculatingDistance] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -75,6 +94,29 @@ export default function LocalAirportCabsSection() {
     const index = Math.round(scrollLeft / clientWidth);
     setActiveIndex(index);
   };
+
+  // Fetch customizable airports list from Supabase
+  useEffect(() => {
+    const fetchAirports = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("airports")
+          .select("*");
+        if (!error && data && data.length > 0) {
+          const parsed = data.map((item: any) => ({
+            ...item,
+            base_fares: typeof item.base_fares === 'string' ? JSON.parse(item.base_fares) : item.base_fares,
+            extra_km_rates: typeof item.extra_km_rates === 'string' ? JSON.parse(item.extra_km_rates) : item.extra_km_rates,
+          }));
+          setAirports(parsed);
+          console.log("Configured airports fetched:", parsed);
+        }
+      } catch (err) {
+        console.warn("Error loading airports from database. Falling back to default list.", err);
+      }
+    };
+    fetchAirports();
+  }, []);
 
   useEffect(() => {
     const fetchAdminId = async () => {
@@ -111,22 +153,165 @@ export default function LocalAirportCabsSection() {
     setActiveBookingType(type);
     setPickedVehicle(null);
     setTravelTime("08:00");
-    setPickupLocation("");
+    
+    // Reset location states
+    setPickupAddress("");
+    setPickupCoords(null);
+    setPickupPlaceId("");
+    setDropAddress("");
+    setDropCoords(null);
+    setDropPlaceId("");
+    setIsAirportPickup(false);
+    setDetectedAirport(null);
+    setDistanceKm(null);
+    setDurationMins(null);
+    setRouteError(null);
+    
     setSpecialInstructions("");
     setIsVehicleSelectOpen(true);
   };
 
-  // Compute the drop location string based on booking type
-  const getDropLocation = () => {
-    if (!activeBookingType) return "";
-    if (activeBookingType === "Airport Transfer") return FIXED_AIRPORT_DROP;
-    return pickupLocation || "Same as Pickup Location";
+  // Helper: Geofence and Place ID Airport Detector
+  const detectAirport = (coords: { lat: number; lng: number }, placeId?: string): AirportConfig | null => {
+    for (const airport of airports) {
+      if (placeId && placeId === airport.place_id) {
+        return airport;
+      }
+      const distanceMeters = haversineDistance(coords, { lat: airport.latitude, lng: airport.longitude });
+      if (distanceMeters <= (airport.geofence_radius_meters || 3000)) {
+        return airport;
+      }
+    }
+    return null;
+  };
+
+  const handlePickupChange = (data: LocationData) => {
+    setPickupAddress(data.address);
+    setPickupCoords({ lat: data.lat, lng: data.lng });
+    setPickupPlaceId(data.placeId || "");
+    setRouteError(null);
+
+    if (activeBookingType === "Airport Transfer") {
+      const airport = detectAirport({ lat: data.lat, lng: data.lng }, data.placeId);
+      if (airport) {
+        // Scenario B: Selected Pickup IS an Airport
+        setIsAirportPickup(true);
+        setDetectedAirport(airport);
+        
+        // Reset drop so the user can search destination manually
+        setDropAddress("");
+        setDropCoords(null);
+        setDropPlaceId("");
+        setDistanceKm(null);
+        setDurationMins(null);
+      } else {
+        // Scenario A: Selected Pickup is NOT an Airport
+        setIsAirportPickup(false);
+        
+        // Find closest airport based on straight-line distance
+        const airportsList = airports.length > 0 ? airports : DEFAULT_AIRPORTS;
+        let closest = airportsList[0];
+        let minDistance = Infinity;
+        for (const ap of airportsList) {
+          const dist = haversineDistance({ lat: data.lat, lng: data.lng }, { lat: ap.latitude, lng: ap.longitude });
+          if (dist < minDistance) {
+            minDistance = dist;
+            closest = ap;
+          }
+        }
+
+        setDetectedAirport(closest);
+        setDropAddress(closest.name);
+        setDropCoords({ lat: closest.latitude, lng: closest.longitude });
+        setDropPlaceId(closest.place_id);
+      }
+    } else {
+      // Local Rental: Drop matches pickup
+      setDropAddress(data.address);
+      setDropCoords({ lat: data.lat, lng: data.lng });
+      setDropPlaceId(data.placeId || "");
+    }
+  };
+
+  const handleDropChange = (data: LocationData) => {
+    setDropAddress(data.address);
+    setDropCoords({ lat: data.lat, lng: data.lng });
+    setDropPlaceId(data.placeId || "");
+    setRouteError(null);
+  };
+
+  // Perform route distance matrix calculation dynamically on coordinate changes
+  useEffect(() => {
+    if (!pickupCoords || !dropCoords) {
+      setDistanceKm(null);
+      setDurationMins(null);
+      return;
+    }
+
+    if (activeBookingType !== "Airport Transfer") {
+      setDistanceKm(null);
+      setDurationMins(null);
+      return;
+    }
+
+    setIsCalculatingDistance(true);
+    setRouteError(null);
+
+    getGoogleRouteDistance(pickupCoords, dropCoords)
+      .then((info) => {
+        setDistanceKm(info.distanceKm);
+        setDurationMins(info.durationMins);
+      })
+      .catch((err) => {
+        console.error("Distance Matrix error:", err);
+        setRouteError("Unable to calculate road route. Please verify addresses.");
+        setDistanceKm(null);
+        setDurationMins(null);
+      })
+      .finally(() => {
+        setIsCalculatingDistance(false);
+      });
+  }, [pickupCoords, dropCoords, activeBookingType]);
+
+  // Pricing calculations
+  const getAirportFares = (vehicle: "Sedan" | "MUV" | "SUV") => {
+    const airport = detectedAirport || airports[0] || DEFAULT_AIRPORTS[0];
+    const baseFare = airport.base_fares[vehicle] ?? (vehicle === "Sedan" ? 1099 : vehicle === "MUV" ? 1699 : 2299);
+    const includedDistance = airport.included_distance_km ?? 35;
+    const perKmRate = airport.extra_km_rates[vehicle] ?? (vehicle === "Sedan" ? 14 : vehicle === "MUV" ? 18 : 24);
+
+    const actualDistance = distanceKm || 0;
+    let extraDistance = 0;
+    let extraCharges = 0;
+
+    if (actualDistance > includedDistance) {
+      extraDistance = Number((actualDistance - includedDistance).toFixed(1));
+      extraCharges = parseFloat((extraDistance * perKmRate).toFixed(2));
+    }
+
+    const totalFare = parseFloat((baseFare + extraCharges).toFixed(2));
+
+    return {
+      baseFare,
+      includedDistance,
+      actualDistance,
+      extraDistance,
+      extraCharges,
+      totalFare,
+    };
+  };
+
+  const getBookingFare = (vehicle: "Sedan" | "MUV" | "SUV") => {
+    if (activeBookingType === "Airport Transfer") {
+      return getAirportFares(vehicle).totalFare;
+    }
+    return PRICING[activeBookingType!].prices[vehicle];
   };
 
   const buildWhatsAppUrl = () => {
     if (!pickedVehicle || !activeBookingType) return "";
-    const fare = PRICING[activeBookingType].prices[pickedVehicle];
-    const dropLocStr = getDropLocation();
+    const isAirport = activeBookingType === "Airport Transfer";
+    const fare = isAirport ? getAirportFares(pickedVehicle).totalFare : PRICING[activeBookingType].prices[pickedVehicle];
     const formattedDate = travelDate ? format(new Date(travelDate), "dd MMM yyyy") : "—";
 
     let message = `Hi Xplorwing! I would like to book a Cab.\n\n` +
@@ -134,8 +319,10 @@ export default function LocalAirportCabsSection() {
       (customerName ? `• *Customer Name:* ${customerName.trim()}\n` : "") +
       (customerPhone ? `• *Mobile Number:* ${customerPhone.trim()}\n` : "") +
       `• *Booking Type:* ${activeBookingType}\n` +
-      `• *Pickup Location:* ${pickupLocation}\n` +
-      `• *Drop Location:* ${dropLocStr}\n` +
+      `• *Pickup Location:* ${pickupAddress}\n` +
+      `• *Drop Location:* ${dropAddress}\n` +
+      (isAirport && distanceKm ? `• *Estimated Distance:* ${distanceKm} KM\n` : "") +
+      (isAirport && durationMins ? `• *Estimated Duration:* ${durationMins} mins\n` : "") +
       `• *Date:* ${formattedDate}\n` +
       `• *Time:* ${travelTime}\n` +
       `• *Vehicle Type:* ${pickedVehicle}\n` +
@@ -147,13 +334,12 @@ export default function LocalAirportCabsSection() {
   };
 
   const handleOnlinePayment = () => {
-    if (!travelDate || !pickedVehicle || !activeBookingType || !pickupLocation) return;
+    if (!travelDate || !pickedVehicle || !activeBookingType || !pickupAddress) return;
 
-    const fare = PRICING[activeBookingType].prices[pickedVehicle];
-    const distanceIncluded = PRICING[activeBookingType].distance;
-    const dropLocStr = getDropLocation();
+    const isAirport = activeBookingType === "Airport Transfer";
+    const fare = isAirport ? getAirportFares(pickedVehicle).totalFare : PRICING[activeBookingType].prices[pickedVehicle];
+    const distanceIncluded = isAirport ? `${getAirportFares(pickedVehicle).includedDistance} KM` : PRICING[activeBookingType].distance;
 
-    // Determine the exact booking source from the active booking type
     const bookingSourceMap: Record<BookingType, 'airport_transfer' | 'local_4hrs' | 'local_8hrs'> = {
       "Airport Transfer": "airport_transfer",
       "4 Hours Local": "local_4hrs",
@@ -174,25 +360,29 @@ export default function LocalAirportCabsSection() {
       quantity: 1,
       startDate: new Date(travelDate).toISOString(),
       endDate: new Date(travelDate).toISOString(),
-      description: `${pickupLocation} → ${dropLocStr} · ${distanceIncluded}`,
+      description: `${pickupAddress} → ${dropAddress} · ${distanceIncluded}`,
       subtotal: fare,
       discount: 0,
       serviceFee: 0,
       total: fare,
       bookingSource,
       cabDetails: {
-        pickup_location: pickupLocation,
-        drop_location: dropLocStr,
+        pickup_location: pickupAddress,
+        drop_location: dropAddress,
         travel_date: travelDate,
         pickup_time: travelTime,
         cab_type: pickedVehicle,
         fare_amount: fare,
         state: "Local",
-        distance_km: parseInt(distanceIncluded),
+        distance_km: isAirport ? distanceKm : parseInt(distanceIncluded),
         special_instructions: specialInstructions,
         booking_source: bookingSource,
-        drop_latitude: activeBookingType === "Airport Transfer" ? FIXED_AIRPORT_LAT : undefined,
-        drop_longitude: activeBookingType === "Airport Transfer" ? FIXED_AIRPORT_LNG : undefined,
+        pickup_latitude: pickupCoords?.lat,
+        pickup_longitude: pickupCoords?.lng,
+        pickup_place_id: pickupPlaceId,
+        drop_latitude: dropCoords?.lat,
+        drop_longitude: dropCoords?.lng,
+        drop_place_id: dropPlaceId,
       },
     };
 
@@ -209,6 +399,13 @@ export default function LocalAirportCabsSection() {
       return { value: `${hh}:${m}`, label: `${String(h12).padStart(2, "0")}:${m} ${ampm}` };
     });
   };
+
+  // Button disabled status checker
+  const isAirport = activeBookingType === "Airport Transfer";
+  const isDistanceLoading = isAirport && isCalculatingDistance;
+  const hasRouteError = isAirport && !!routeError;
+  const isLocationEmpty = !pickupAddress || (isAirport && isAirportPickup && !dropAddress);
+  const isBookDisabled = isDistanceLoading || hasRouteError || isLocationEmpty || !pickedVehicle;
 
   const vehicleSelectDialog = (
     <Dialog
@@ -229,7 +426,7 @@ export default function LocalAirportCabsSection() {
           <div className="grid grid-cols-3 gap-3 pt-2">
             {VEHICLES.map(({ type, img, desc }) => {
               const isSelected = pickedVehicle === type;
-              const fare = PRICING[activeBookingType].prices[type];
+              const fare = getBookingFare(type);
               return (
                 <button
                   key={type}
@@ -254,7 +451,7 @@ export default function LocalAirportCabsSection() {
           </div>
         )}
 
-        {/* Form — slides in after vehicle is picked */}
+        {/* Form Details */}
         <AnimatePresence>
           {pickedVehicle && activeBookingType && (
             <motion.div
@@ -264,26 +461,34 @@ export default function LocalAirportCabsSection() {
               transition={{ duration: 0.3 }}
               className="mt-4 space-y-4 overflow-hidden"
             >
-              {/* ── Pickup Location ── */}
+              {/* Pickup Location input using Google Places Autocomplete */}
               <div className="space-y-1.5">
-                <Label className="text-sm font-semibold text-[#013220]">Pickup Location *</Label>
-                <Input
-                  value={pickupLocation}
-                  onChange={(e) => setPickupLocation(e.target.value)}
-                  placeholder="Enter your pickup address"
-                  className="h-10 text-sm rounded-xl border-[#e2e8f0]"
+                <LocationAutocomplete
+                  label="Pickup Location *"
+                  value={pickupAddress}
+                  placeholder="Search for pickup address..."
+                  onChange={handlePickupChange}
                 />
               </div>
 
-              {/* ── Drop Location (dynamic based on booking type) ── */}
+              {/* Destination (Editable dynamically based on Scenario) */}
               <div className="space-y-1.5">
                 {activeBookingType === "Airport Transfer" ? (
-                  <>
-                    <Label className="text-sm font-semibold text-[#013220]">✈ Destination</Label>
-                    <div className="flex items-center gap-2 px-3 h-10 rounded-xl border border-[#e2e8f0] bg-muted/50 text-sm text-muted-foreground font-medium">
-                      ✈ {FIXED_AIRPORT_DROP}
-                    </div>
-                  </>
+                  isAirportPickup ? (
+                    <LocationAutocomplete
+                      label="Destination *"
+                      value={dropAddress}
+                      placeholder="Search for drop address..."
+                      onChange={handleDropChange}
+                    />
+                  ) : (
+                    <>
+                      <Label className="text-sm font-semibold text-[#013220]">✈ Destination</Label>
+                      <div className="flex items-center gap-2 px-3 h-10 rounded-xl border border-[#e2e8f0] bg-muted/50 text-sm text-muted-foreground font-medium">
+                        ✈ {dropAddress || "Rajiv Gandhi International Airport (HYD)"}
+                      </div>
+                    </>
+                  )
                 ) : (
                   <>
                     <Label className="text-sm font-semibold text-[#013220]">
@@ -296,7 +501,7 @@ export default function LocalAirportCabsSection() {
                 )}
               </div>
 
-              {/* ── Date & Time ── */}
+              {/* Date & Time */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-sm font-semibold text-[#013220]">
@@ -307,7 +512,7 @@ export default function LocalAirportCabsSection() {
                     value={travelDate}
                     onChange={(e) => setTravelDate(e.target.value)}
                     min={format(new Date(), "yyyy-MM-dd")}
-                    className="h-10 text-sm rounded-xl border-[#e2e8f0]"
+                    className="h-10 text-sm rounded-xl border-[#e2e8f0] bg-white text-foreground"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -328,7 +533,7 @@ export default function LocalAirportCabsSection() {
                 </div>
               </div>
 
-              {/* ── Traveller Details ── */}
+              {/* Traveller Details */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-sm font-semibold text-[#013220]">Traveller Name</Label>
@@ -360,51 +565,119 @@ export default function LocalAirportCabsSection() {
                 />
               </div>
 
-              {/* ── Live Price Summary ── */}
-              <div className="rounded-2xl border border-[#e2e8f0] p-4 bg-muted/20 space-y-2.5 text-sm shadow-sm">
-                <p className="font-bold text-[#013220] mb-1">Price Summary</p>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Booking Type</span>
-                  <span className="font-semibold text-right text-[#013220]">{activeBookingType}</span>
+              {/* Price & Fare Summary UI */}
+              {activeBookingType === "Airport Transfer" ? (
+                <div className="rounded-2xl border border-[#e2e8f0] p-4 bg-muted/20 space-y-2 text-sm shadow-sm">
+                  <p className="font-bold text-[#013220] mb-1">Fare Breakdown</p>
+                  
+                  {isCalculatingDistance ? (
+                    <div className="flex items-center justify-center py-4 gap-2 text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin text-[#013220]" />
+                      <span>Calculating distance and fares...</span>
+                    </div>
+                  ) : routeError ? (
+                    <p className="text-sm font-semibold text-destructive text-center py-2">
+                      ⚠️ {routeError}
+                    </p>
+                  ) : !pickupCoords ? (
+                    <p className="text-xs text-muted-foreground text-center py-2">
+                      Search and select pickup address to load fares.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Base Fare</span>
+                        <span className="font-semibold text-[#013220]">
+                          ₹{getAirportFares(pickedVehicle).baseFare}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Included Distance</span>
+                        <span className="font-semibold text-[#013220]">
+                          {getAirportFares(pickedVehicle).includedDistance} km
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Actual Distance</span>
+                        <span className="font-semibold text-[#013220]">
+                          {getAirportFares(pickedVehicle).actualDistance} km
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-amber-800 bg-amber-50 px-2 py-0.5 rounded text-xs font-semibold">
+                        <span>Extra Distance</span>
+                        <span>{getAirportFares(pickedVehicle).extraDistance} km</span>
+                      </div>
+                      <div className="flex justify-between text-amber-800 bg-amber-50 px-2 py-0.5 rounded text-xs font-semibold">
+                        <span>Extra Charges</span>
+                        <span>₹{getAirportFares(pickedVehicle).extraCharges}</span>
+                      </div>
+                      {durationMins && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Estimated Duration</span>
+                          <span className="font-semibold text-[#013220]">{durationMins} mins</span>
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-between border-t border-[#e2e8f0] pt-2.5 mt-1 bg-gradient-to-r from-emerald-50/50 to-teal-50/50 px-2 py-1 rounded">
+                        <span className="font-bold text-base text-[#013220]">Total Payable</span>
+                        <span className="font-bold text-xl text-[#013220]">
+                          ₹{getAirportFares(pickedVehicle).totalFare}
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Vehicle</span>
-                  <span className="font-semibold text-[#013220]">{pickedVehicle}</span>
+              ) : (
+                <div className="rounded-2xl border border-[#e2e8f0] p-4 bg-muted/20 space-y-2.5 text-sm shadow-sm">
+                  <p className="font-bold text-[#013220] mb-1">Price Summary</p>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Booking Type</span>
+                    <span className="font-semibold text-right text-[#013220]">{activeBookingType}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Vehicle</span>
+                    <span className="font-semibold text-[#013220]">{pickedVehicle}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Included Distance</span>
+                    <span className="font-semibold text-[#013220]">{PRICING[activeBookingType].distance}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Base Fare</span>
+                    <span className="font-semibold text-[#013220]">₹{PRICING[activeBookingType].prices[pickedVehicle]}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Extra KM</span>
+                    <span className="text-xs text-amber-600 font-semibold">Additional charges apply</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Extra Waiting</span>
+                    <span className="text-xs text-amber-600 font-semibold">Additional charges apply Rs. 100/Hour</span>
+                  </div>
+                  <div className="flex justify-between border-t border-[#e2e8f0] pt-2.5 mt-1">
+                    <span className="font-bold text-base text-[#013220]">Estimated Total</span>
+                    <span className="font-bold text-xl text-[#013220]">
+                      ₹{PRICING[activeBookingType].prices[pickedVehicle]}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Included Distance</span>
-                  <span className="font-semibold text-[#013220]">{PRICING[activeBookingType].distance}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Base Fare</span>
-                  <span className="font-semibold text-[#013220]">₹{PRICING[activeBookingType].prices[pickedVehicle]}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Extra KM</span>
-                  <span className="text-xs text-amber-600 font-semibold">Additional charges apply</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Extra Waiting</span>
-                  <span className="text-xs text-amber-600 font-semibold">Additional charges apply Rs. 100/Hour</span>
-                </div>
-                <div className="flex justify-between border-t border-[#e2e8f0] pt-2.5 mt-1">
-                  <span className="font-bold text-base text-[#013220]">Estimated Total</span>
-                  <span className="font-bold text-xl text-[#013220]">
-                    ₹{PRICING[activeBookingType].prices[pickedVehicle]}
-                  </span>
-                </div>
-              </div>
+              )}
 
+              {/* Verification & route helper warnings */}
+              {routeError && (
+                <p className="text-xs font-semibold text-center text-red-600 mt-1">
+                  ⚠️ {routeError}
+                </p>
+              )}
+
+              {/* Action Buttons */}
               <div className="flex gap-3 pt-2">
                 <Button
                   type="button"
                   variant="outline"
-                  className="flex-1 h-12 text-sm font-bold border-[#25D366] text-[#25D366] rounded-xl hover:bg-[#25D366]/10 hover:text-[#25D366]"
+                  disabled={isBookDisabled}
+                  className="flex-1 h-12 text-sm font-bold border-[#25D366] text-[#25D366] rounded-xl hover:bg-[#25D366]/10 hover:text-[#25D366] disabled:opacity-50 disabled:pointer-events-none"
                   onClick={() => {
-                    if (!pickupLocation.trim()) {
-                      alert("Please enter a Pickup Location.");
-                      return;
-                    }
                     window.open(buildWhatsAppUrl(), "_blank");
                     setIsVehicleSelectOpen(false);
                   }}
@@ -413,12 +686,9 @@ export default function LocalAirportCabsSection() {
                 </Button>
                 <Button
                   type="button"
-                  className="flex-1 h-12 text-sm font-bold bg-[#013220] text-white rounded-xl hover:bg-[#013220]/90 shadow-md"
+                  disabled={isBookDisabled}
+                  className="flex-1 h-12 text-sm font-bold bg-[#013220] text-white rounded-xl hover:bg-[#013220]/90 shadow-md disabled:opacity-50 disabled:pointer-events-none"
                   onClick={() => {
-                    if (!pickupLocation.trim()) {
-                      alert("Please enter a Pickup Location.");
-                      return;
-                    }
                     setIsVehicleSelectOpen(false);
                     handleOnlinePayment();
                   }}
@@ -535,3 +805,4 @@ export default function LocalAirportCabsSection() {
     </section>
   );
 }
+

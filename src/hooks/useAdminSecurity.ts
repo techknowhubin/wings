@@ -70,7 +70,10 @@ export function useAuditLogs(filters?: {
       if (filters?.action) q = q.eq('action', filters.action);
 
       const { data, error } = await q;
-      if (error) throw error;
+      if (error) {
+        console.warn("Audit logs unavailable:", error.message);
+        return [] as AuditLog[];
+      }
       return (data ?? []) as AuditLog[];
     },
   });

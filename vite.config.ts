@@ -18,4 +18,5 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     include: ["react", "react-dom", "leaflet"],
   },
+  build: { sourcemap: true }
 }));

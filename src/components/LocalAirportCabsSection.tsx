@@ -123,6 +123,29 @@ export default function LocalAirportCabsSection() {
     return pickupLocation || "Same as Pickup Location";
   };
 
+  const buildWhatsAppUrl = () => {
+    if (!pickedVehicle || !activeBookingType) return "";
+    const fare = PRICING[activeBookingType].prices[pickedVehicle];
+    const dropLocStr = getDropLocation();
+    const formattedDate = travelDate ? format(new Date(travelDate), "dd MMM yyyy") : "—";
+
+    let message = `Hi Xplorwing! I would like to book a Cab.\n\n` +
+      `🚗 *Booking Details:*\n` +
+      (customerName ? `• *Customer Name:* ${customerName.trim()}\n` : "") +
+      (customerPhone ? `• *Mobile Number:* ${customerPhone.trim()}\n` : "") +
+      `• *Booking Type:* ${activeBookingType}\n` +
+      `• *Pickup Location:* ${pickupLocation}\n` +
+      `• *Drop Location:* ${dropLocStr}\n` +
+      `• *Date:* ${formattedDate}\n` +
+      `• *Time:* ${travelTime}\n` +
+      `• *Vehicle Type:* ${pickedVehicle}\n` +
+      (specialInstructions ? `• *Special Instructions:* ${specialInstructions}\n` : "") +
+      `• *Total Fare:* ₹${fare.toLocaleString()}*\n\n` +
+      `Please confirm availability. Thank you!`;
+
+    return `https://wa.me/916362986420?text=${encodeURIComponent(message)}`;
+  };
+
   const handleOnlinePayment = () => {
     if (!travelDate || !pickedVehicle || !activeBookingType || !pickupLocation) return;
 
@@ -372,19 +395,37 @@ export default function LocalAirportCabsSection() {
                 </div>
               </div>
 
-              <Button
-                className="w-full h-12 text-sm font-bold bg-gradient-to-r from-[#013220] to-[#064e3b] hover:from-[#064e3b] hover:to-[#013220] text-white rounded-xl shadow-md"
-                onClick={() => {
-                  if (!pickupLocation.trim()) {
-                    alert("Please enter a Pickup Location.");
-                    return;
-                  }
-                  setIsVehicleSelectOpen(false);
-                  handleOnlinePayment();
-                }}
-              >
-                Continue To Booking →
-              </Button>
+              <div className="flex gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 h-12 text-sm font-bold border-[#25D366] text-[#25D366] rounded-xl hover:bg-[#25D366]/10 hover:text-[#25D366]"
+                  onClick={() => {
+                    if (!pickupLocation.trim()) {
+                      alert("Please enter a Pickup Location.");
+                      return;
+                    }
+                    window.open(buildWhatsAppUrl(), "_blank");
+                    setIsVehicleSelectOpen(false);
+                  }}
+                >
+                  Book via WhatsApp
+                </Button>
+                <Button
+                  type="button"
+                  className="flex-1 h-12 text-sm font-bold bg-[#013220] text-white rounded-xl hover:bg-[#013220]/90 shadow-md"
+                  onClick={() => {
+                    if (!pickupLocation.trim()) {
+                      alert("Please enter a Pickup Location.");
+                      return;
+                    }
+                    setIsVehicleSelectOpen(false);
+                    handleOnlinePayment();
+                  }}
+                >
+                  Book Now (Pay Online)
+                </Button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

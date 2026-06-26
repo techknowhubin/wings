@@ -6,14 +6,24 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") ?? "https://xplorwing.com";
+// Production origin + localhost variants for local dev
+const PRIMARY_ORIGIN = (Deno.env.get("ALLOWED_ORIGIN") ?? "https://xplorwing.com").split(",")[0].trim();
+const ALLOWED_ORIGINS = new Set<string>([
+  ...((Deno.env.get("ALLOWED_ORIGIN") ?? "https://xplorwing.com").split(",").map((s) => s.trim())),
+  "http://localhost:8080",
+  "http://localhost:5173",
+  "http://localhost:3000",
+]);
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin":  ALLOWED_ORIGIN,
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "X-Content-Type-Options":       "nosniff",
-};
+function buildCorsHeaders(requestOrigin: string): Record<string, string> {
+  const origin = ALLOWED_ORIGINS.has(requestOrigin) ? requestOrigin : PRIMARY_ORIGIN;
+  return {
+    "Access-Control-Allow-Origin":  origin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "X-Content-Type-Options":       "nosniff",
+  };
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -51,35 +61,58 @@ async function sendWhatsAppOtp(phone: string, otp: string): Promise<void> {
     return;
   }
 
-  const apiKey      = Deno.env.get("AISENSY_API_KEY");
-  const campaignName = Deno.env.get("AISENSY_CAMPAIGN_NAME");
+  const apiKey     = Deno.env.get("AUTHKEY_API_KEY");
+  const templateId = Deno.env.get("AUTHKEY_TEMPLATE_ID");
 
-  if (!apiKey || !campaignName) {
-    throw new Error("AiSensy credentials not configured.");
+  if (!apiKey || !templateId) {
+    throw new Error("Authkey credentials not configured.");
   }
 
-  const destination = phone.replace(/^\+/, "");
-  const res = await fetch("https://backend.aisensy.com/campaign/t1/api/v2", {
+  // Authkey expects the 10-digit mobile number without country code
+  const mobile = phone.replace(/\D/g, "").slice(-10);
+
+  // Authentication / copy_code template: OTP goes in both bodyValues and buttonValues
+  const payload = {
+    country_code: "91",
+    mobile,
+    wid: templateId,
+    type: "authentication",
+    bodyValues: { "1": otp },
+    buttonValues: { "0": otp },
+  };
+  console.log(`[Authkey] Sending to mobile=${mobile}, wid=${templateId}`);
+
+  const res = await fetch("https://console.authkey.io/restapi/requestjson.php", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      apiKey,
-      campaignName,
-      destination,
-      userName: "Xplorwing",
-      templateParams: [otp],
-      source: "xplorwing-auth",
-      media: {},
-      buttons: [{ type: "button", sub_type: "url", index: 0, parameters: [{ type: "text", text: otp }] }],
-      carouselCards: [],
-      location: {},
-      attributes: {},
-      paramsFallbackValue: { FirstName: "User" },
-    }),
+    headers: {
+      "Authorization": `Basic ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
   });
 
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`AiSensy [${res.status}]: ${JSON.stringify(body)}`);
+  const rawText = await res.text();
+  console.log(`[Authkey] HTTP ${res.status} — raw response: ${rawText}`);
+
+  let body: Record<string, unknown> = {};
+  try { body = JSON.parse(rawText); } catch { /* non-JSON response */ }
+
+  if (!res.ok) {
+    throw new Error(`Authkey [${res.status}]: ${rawText}`);
+  }
+  // Authkey can return HTTP 200 with an error payload (status:false/0, error, code!=200, etc.)
+  const statusVal = body?.status;
+  const isError =
+    statusVal === false ||
+    statusVal === 0 ||
+    statusVal === "false" ||
+    !!body?.error ||
+    (typeof body?.code === "number" && body.code !== 200);
+  if (isError) {
+    throw new Error(`Authkey rejected: ${rawText}`);
+  }
+
+  console.log(`[Authkey] Message dispatched to ${mobile}`);
 }
 
 function getClientIp(req: Request): string {
@@ -94,6 +127,8 @@ function getClientIp(req: Request): string {
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
+  const corsHeaders = buildCorsHeaders(req.headers.get("origin") ?? "");
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

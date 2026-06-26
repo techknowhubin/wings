@@ -1433,10 +1433,11 @@ const Auth = () => {
                 {/* WhatsApp toggle */}
                 <button
                   onClick={() => {
-                    toast({
-                      title: "Coming Soon",
-                      description: "WhatsApp login is currently under development.",
-                    });
+                    setAuthMethod("whatsapp");
+                    setIsOtpSent(false);
+                    setOtpValue("");
+                    setWaNumber("");
+                    setWaAccountExists(null);
                   }}
                   className="social-btn"
                   title="WhatsApp"

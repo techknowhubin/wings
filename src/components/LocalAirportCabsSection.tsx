@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { format, addDays } from "date-fns";
-import sedanImg from "@/assets/sedan-dzire.jpeg";
-import muvImg from "@/assets/MUV-Ertiga.jpeg";
-import suvImg from "@/assets/SUV-Innova.jpeg";
+import sedanImg from "@/assets/sedan.png";
+import muvImg from "@/assets/muv.png";
+import suvImg from "@/assets/suv.png";
+import airportCabsImg from "@/assets/airport-cabs1.png";
+import airportCabsOriginalImg from "@/assets/airport-cabs.png";
 import { useAuth } from "@/hooks/useAuth";
 import { Check, Loader2 } from "lucide-react";
 import LocationAutocomplete, { LocationData } from "@/components/LocationAutocomplete";
@@ -63,7 +65,7 @@ export default function LocalAirportCabsSection() {
 
   const [travelTime, setTravelTime] = useState("08:00");
   const [travelDate, setTravelDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
-  
+
   // Locations details
   const [pickupAddress, setPickupAddress] = useState("");
   const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -153,7 +155,7 @@ export default function LocalAirportCabsSection() {
     setActiveBookingType(type);
     setPickedVehicle(null);
     setTravelTime("08:00");
-    
+
     // Reset location states
     setPickupAddress("");
     setPickupCoords(null);
@@ -166,7 +168,7 @@ export default function LocalAirportCabsSection() {
     setDistanceKm(null);
     setDurationMins(null);
     setRouteError(null);
-    
+
     setSpecialInstructions("");
     setIsVehicleSelectOpen(true);
   };
@@ -197,7 +199,7 @@ export default function LocalAirportCabsSection() {
         // Scenario B: Selected Pickup IS an Airport
         setIsAirportPickup(true);
         setDetectedAirport(airport);
-        
+
         // Reset drop so the user can search destination manually
         setDropAddress("");
         setDropCoords(null);
@@ -207,7 +209,7 @@ export default function LocalAirportCabsSection() {
       } else {
         // Scenario A: Selected Pickup is NOT an Airport
         setIsAirportPickup(false);
-        
+
         // Find closest airport based on straight-line distance
         const airportsList = airports.length > 0 ? airports : DEFAULT_AIRPORTS;
         let closest = airportsList[0];
@@ -417,9 +419,37 @@ export default function LocalAirportCabsSection() {
     >
       <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">{activeBookingType} Booking</DialogTitle>
+          <DialogTitle className="text-xl font-bold">
+            {activeBookingType === "Airport Transfer" ? "Airport Transfer Booking" : "Local Rental Booking"}
+          </DialogTitle>
           <DialogDescription>Select a vehicle and fill in your details to proceed.</DialogDescription>
         </DialogHeader>
+
+        {/* Toggle for Local Rentals */}
+        {(activeBookingType === "4 Hours Local" || activeBookingType === "8 Hours Local") && (
+          <div className="flex justify-center gap-2 pt-2 pb-1">
+            <button
+              type="button"
+              className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${activeBookingType === "4 Hours Local"
+                ? "bg-[#013220] text-white shadow-md"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              onClick={() => setActiveBookingType("4 Hours Local")}
+            >
+              4 Hours Local
+            </button>
+            <button
+              type="button"
+              className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${activeBookingType === "8 Hours Local"
+                ? "bg-[#013220] text-white shadow-md"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              onClick={() => setActiveBookingType("8 Hours Local")}
+            >
+              8 Hours Local
+            </button>
+          </div>
+        )}
 
         {/* Vehicle Selection */}
         {activeBookingType && (
@@ -439,7 +469,7 @@ export default function LocalAirportCabsSection() {
                   <img
                     src={img}
                     alt={type}
-                    className="h-14 md:h-20 w-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                    className={`h-14 md:h-20 w-full object-contain mix-blend-multiply dark:mix-blend-normal transition-transform ${type === 'MUV' || type === 'SUV' ? 'scale-[1.3] md:scale-[1.4] mt-1' : ''}`}
                   />
                   <p className={`font-bold text-sm ${isSelected ? "text-[#064e3b]" : "text-foreground"}`}>{type}</p>
                   <p className="font-bold text-[#064e3b]">₹{fare}</p>
@@ -569,7 +599,7 @@ export default function LocalAirportCabsSection() {
               {activeBookingType === "Airport Transfer" ? (
                 <div className="rounded-2xl border border-[#e2e8f0] p-4 bg-muted/20 space-y-2 text-sm shadow-sm">
                   <p className="font-bold text-[#013220] mb-1">Fare Breakdown</p>
-                  
+
                   {isCalculatingDistance ? (
                     <div className="flex items-center justify-center py-4 gap-2 text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin text-[#013220]" />
@@ -617,7 +647,7 @@ export default function LocalAirportCabsSection() {
                           <span className="font-semibold text-[#013220]">{durationMins} mins</span>
                         </div>
                       )}
-                      
+
                       <div className="flex justify-between border-t border-[#e2e8f0] pt-2.5 mt-1 bg-gradient-to-r from-emerald-50/50 to-teal-50/50 px-2 py-1 rounded">
                         <span className="font-bold text-base text-[#013220]">Total Payable</span>
                         <span className="font-bold text-xl text-[#013220]">
@@ -720,74 +750,42 @@ export default function LocalAirportCabsSection() {
 
         {vehicleSelectDialog}
 
-        <div 
-          ref={scrollContainerRef}
-          onScroll={handleScroll}
-          className="flex overflow-x-auto snap-x snap-mandatory md:grid md:grid-cols-3 gap-6 md:gap-8 pb-4 md:pb-0 hide-scrollbar scroll-smooth"
-        >
-          {(Object.keys(PRICING) as BookingType[]).map((type, i) => {
-            const data = PRICING[type];
-            return (
-              <motion.div
-                key={type}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: i * 0.1 }}
-                className="snap-center shrink-0 w-full max-w-full md:w-auto bg-white dark:bg-card border border-[#e2e8f0] dark:border-border rounded-[24px] overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_12px_30px_-8px_rgba(0,0,0,0.15)] transition-all duration-300 hover:-translate-y-1 group flex flex-col"
-              >
-                <div className="p-6 flex-grow flex flex-col items-center">
-                  <div className="w-full flex justify-between items-center mb-6">
-                    <span className="bg-[#013220] text-[#E5F76E] text-xs font-bold px-3 py-1.5 rounded-full tracking-wider">
-                      {data.badge}
-                    </span>
-                    <span className="bg-[#E5F76E]/20 text-[#013220] text-xs font-bold px-3 py-1.5 rounded-full border border-[#E5F76E]/50">
-                      {data.vehicleBadge}
-                    </span>
-                  </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 w-full px-4 md:px-0">
+          <div className="flex flex-col gap-4 items-center group">
+            <div className="relative w-full transition-transform duration-300">
+              <img 
+                src={airportCabsOriginalImg} 
+                alt="Airport Transfer Cabs" 
+                className="w-full h-auto rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] group-hover:shadow-[0_8px_30px_rgb(0,0,0,0.16)] transition-shadow object-contain border-[6px] border-white" 
+              />
+            </div>
+            <button
+              onClick={() => openBookingFor("Airport Transfer")}
+              className="relative overflow-hidden w-full px-8 py-3.5 rounded-full font-bold text-white shadow-[0_10px_20px_rgba(1,50,32,0.2)] hover:shadow-[0_15px_30px_rgba(1,50,32,0.3)] transition-all duration-300 hover:-translate-y-1 bg-gradient-to-r from-[#013220] via-[#035939] to-[#013220] bg-[length:200%_auto] hover:bg-right"
+            >
+              <span className="flex items-center justify-center text-base sm:text-lg">
+                Book Airport Transfer
+              </span>
+            </button>
+          </div>
 
-                  <div className="h-32 w-full flex items-center justify-center mb-6">
-                    <img
-                      src={data.img}
-                      alt={type}
-                      className="max-h-full max-w-[80%] object-contain mix-blend-multiply dark:mix-blend-normal group-hover:scale-105 transition-transform duration-500"
-                    />
-                  </div>
-
-                  <div className="text-center mb-6">
-                    <p className="text-sm text-muted-foreground font-medium mb-1">Starts From</p>
-                    <h3 className="text-3xl font-extrabold text-[#013220]">₹{data.prices.Sedan}</h3>
-                    <p className="text-sm font-semibold text-muted-foreground mt-2 bg-muted/50 px-4 py-1 rounded-full inline-block">
-                      Upto {data.distance}
-                    </p>
-                  </div>
-
-                  <div className="w-full space-y-2 mt-auto text-sm text-left px-2">
-                    <div className="flex items-center gap-2 text-muted-foreground font-medium">
-                      <div className="bg-[#25D366]/20 p-0.5 rounded-full shrink-0">
-                        <Check className="h-3 w-3 text-[#25D366]" />
-                      </div>
-                      Extra KM Charges Apply
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground font-medium">
-                      <div className="bg-[#25D366]/20 p-0.5 rounded-full shrink-0">
-                        <Check className="h-3 w-3 text-[#25D366]" />
-                      </div>
-                      Extra Hours / Waiting Time Charges Apply
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 pt-0">
-                  <Button
-                    onClick={() => openBookingFor(type)}
-                    className="w-full py-6 text-base font-bold bg-gradient-to-r from-[#013220] to-[#064e3b] hover:from-[#064e3b] hover:to-[#013220] text-white rounded-xl shadow-md group-hover:shadow-lg transition-all"
-                  >
-                    Book Now
-                  </Button>
-                </div>
-              </motion.div>
-            );
-          })}
+          <div className="flex flex-col gap-4 items-center group">
+            <div className="relative w-full transition-transform duration-300">
+              <img 
+                src={airportCabsImg} 
+                alt="Local Cabs (4hrs & 8hrs)" 
+                className="w-full h-auto rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] group-hover:shadow-[0_8px_30px_rgb(0,0,0,0.16)] transition-shadow object-contain border-[6px] border-white" 
+              />
+            </div>
+            <button
+              onClick={() => openBookingFor("4 Hours Local")}
+              className="relative overflow-hidden w-full px-8 py-3.5 rounded-full font-bold text-white shadow-[0_10px_20px_rgba(1,50,32,0.2)] hover:shadow-[0_15px_30px_rgba(1,50,32,0.3)] transition-all duration-300 hover:-translate-y-1 bg-gradient-to-r from-[#013220] via-[#035939] to-[#013220] bg-[length:200%_auto] hover:bg-right"
+            >
+              <span className="flex items-center justify-center text-base sm:text-lg">
+                Book Local Rental
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Pagination Dots for Mobile */}
@@ -795,9 +793,8 @@ export default function LocalAirportCabsSection() {
           {(Object.keys(PRICING) as BookingType[]).map((_, i) => (
             <div
               key={i}
-              className={`h-2 rounded-full transition-all duration-300 ${
-                activeIndex === i ? "w-6 bg-[#013220]" : "w-2 bg-[#013220]/20"
-              }`}
+              className={`h-2 rounded-full transition-all duration-300 ${activeIndex === i ? "w-6 bg-[#013220]" : "w-2 bg-[#013220]/20"
+                }`}
             />
           ))}
         </div>

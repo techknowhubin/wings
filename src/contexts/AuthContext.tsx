@@ -3,8 +3,8 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 
 function getWhatsappOtpEndpoint(): { url: string; headers: Record<string, string> } | null {
-  const url = (import.meta.env.VITE_SUPABASE_URL ?? '').trim();
-  const key = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '').trim();
+  const url = (import.meta.env.VITE_SUPABASE_URL ?? '').trim() || 'https://uhtwkajqpuazxpnbaojx.supabase.co';
+  const key = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '').trim() || 'sb_publishable_kX4YhhekZFFrnYiSO0UEwg_u4CLPOJW';
   if (!url || !key) return null;
   return {
     url: `${url}/functions/v1/send-whatsapp-otp`,

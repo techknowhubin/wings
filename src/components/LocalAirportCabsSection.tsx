@@ -13,7 +13,7 @@ import suvImg from "@/assets/suv.png";
 import airportCabsImg from "@/assets/airport-cabs1.png";
 import airportCabsOriginalImg from "@/assets/airport-cabs.png";
 import { useAuth } from "@/hooks/useAuth";
-import { Check, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import LocationAutocomplete, { LocationData } from "@/components/LocationAutocomplete";
 import { getGoogleRouteDistance, haversineDistance, DEFAULT_AIRPORTS, AirportConfig } from "@/lib/googleMaps";
 
@@ -96,6 +96,17 @@ export default function LocalAirportCabsSection() {
     const index = Math.round(scrollLeft / clientWidth);
     setActiveIndex(index);
   };
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const interval = setInterval(() => {
+      const { scrollLeft, clientWidth, scrollWidth } = container;
+      const atEnd = scrollLeft + clientWidth >= scrollWidth - 1;
+      container.scrollTo({ left: atEnd ? 0 : scrollLeft + clientWidth, behavior: "smooth" });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch customizable airports list from Supabase
   useEffect(() => {
@@ -734,13 +745,13 @@ export default function LocalAirportCabsSection() {
   );
 
   return (
-    <section className="py-12 md:py-16 px-4 bg-background">
+    <section className="py-4 md:py-16 px-4 bg-background">
       <div className="container mx-auto max-w-6xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="text-center mb-10"
+          className="text-center mb-6 md:mb-10"
         >
           <h2 className="text-3xl font-bold text-foreground mb-4">Local & Airport Transfer</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -750,13 +761,20 @@ export default function LocalAirportCabsSection() {
 
         {vehicleSelectDialog}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 w-full px-4 md:px-0">
-          <div className="flex flex-col gap-4 items-center group">
+        {/* Mobile: swipe slider; Desktop: 2-column grid */}
+        <div className="overflow-hidden w-full md:overflow-visible">
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex md:grid md:grid-cols-2 overflow-x-auto md:overflow-visible snap-x snap-mandatory scroll-smooth gap-4 md:gap-12 w-full px-4 md:px-0"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none", paddingBottom: 20, marginBottom: -20 }}
+        >
+          <div className="flex flex-col gap-4 items-center group flex-shrink-0 w-full md:w-auto snap-center">
             <div className="relative w-full transition-transform duration-300">
-              <img 
-                src={airportCabsOriginalImg} 
-                alt="Airport Transfer Cabs" 
-                className="w-full h-auto rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] group-hover:shadow-[0_8px_30px_rgb(0,0,0,0.16)] transition-shadow object-contain border-[6px] border-white" 
+              <img
+                src={airportCabsOriginalImg}
+                alt="Airport Transfer Cabs"
+                className="w-full h-auto rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] group-hover:shadow-[0_8px_30px_rgb(0,0,0,0.16)] transition-shadow object-contain border-[6px] border-white"
               />
             </div>
             <button
@@ -769,12 +787,12 @@ export default function LocalAirportCabsSection() {
             </button>
           </div>
 
-          <div className="flex flex-col gap-4 items-center group">
+          <div className="flex flex-col gap-4 items-center group flex-shrink-0 w-full md:w-auto snap-center">
             <div className="relative w-full transition-transform duration-300">
-              <img 
-                src={airportCabsImg} 
-                alt="Local Cabs (4hrs & 8hrs)" 
-                className="w-full h-auto rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] group-hover:shadow-[0_8px_30px_rgb(0,0,0,0.16)] transition-shadow object-contain border-[6px] border-white" 
+              <img
+                src={airportCabsImg}
+                alt="Local Cabs (4hrs & 8hrs)"
+                className="w-full h-auto rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] group-hover:shadow-[0_8px_30px_rgb(0,0,0,0.16)] transition-shadow object-contain border-[6px] border-white"
               />
             </div>
             <button
@@ -787,10 +805,11 @@ export default function LocalAirportCabsSection() {
             </button>
           </div>
         </div>
+        </div>
 
         {/* Pagination Dots for Mobile */}
         <div className="flex justify-center gap-2 mt-2 md:hidden">
-          {(Object.keys(PRICING) as BookingType[]).map((_, i) => (
+          {[0, 1].map((i) => (
             <div
               key={i}
               className={`h-2 rounded-full transition-all duration-300 ${activeIndex === i ? "w-6 bg-[#013220]" : "w-2 bg-[#013220]/20"

@@ -62,6 +62,7 @@ export default function LocalAirportCabsSection() {
   const [activeBookingType, setActiveBookingType] = useState<BookingType | null>(null);
   const [isVehicleSelectOpen, setIsVehicleSelectOpen] = useState(false);
   const [pickedVehicle, setPickedVehicle] = useState<"Sedan" | "MUV" | "SUV" | null>(null);
+  const [tripSubType, setTripSubType] = useState<"drop" | "pickup">("drop");
 
   const [travelTime, setTravelTime] = useState("08:00");
   const [travelDate, setTravelDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
@@ -76,6 +77,7 @@ export default function LocalAirportCabsSection() {
   const [dropPlaceId, setDropPlaceId] = useState("");
 
   const [isAirportPickup, setIsAirportPickup] = useState(false);
+  const [areaValidationError, setAreaValidationError] = useState<string | null>(null);
 
   // Route distance states
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
@@ -166,6 +168,7 @@ export default function LocalAirportCabsSection() {
     setActiveBookingType(type);
     setPickedVehicle(null);
     setTravelTime("08:00");
+    setTripSubType("drop");
 
     // Reset location states
     setPickupAddress("");
@@ -180,8 +183,35 @@ export default function LocalAirportCabsSection() {
     setDurationMins(null);
     setRouteError(null);
 
+    setAreaValidationError(null);
     setSpecialInstructions("");
     setIsVehicleSelectOpen(true);
+  };
+
+  const handleTripSubTypeChange = (type: "drop" | "pickup") => {
+    setTripSubType(type);
+    setPickupAddress("");
+    setPickupCoords(null);
+    setPickupPlaceId("");
+    setDropAddress("");
+    setDropCoords(null);
+    setDropPlaceId("");
+    setIsAirportPickup(false);
+    setDistanceKm(null);
+    setDurationMins(null);
+    setRouteError(null);
+
+    setAreaValidationError(null);
+
+    if (type === "pickup") {
+      const airport = (airports.length > 0 ? airports : DEFAULT_AIRPORTS)[0];
+      setPickupAddress(airport.name);
+      setPickupCoords({ lat: airport.latitude, lng: airport.longitude });
+      setPickupPlaceId(airport.place_id);
+      setDetectedAirport(airport);
+    } else {
+      setDetectedAirport(null);
+    }
   };
 
   // Helper: Geofence and Place ID Airport Detector
@@ -327,11 +357,16 @@ export default function LocalAirportCabsSection() {
     const fare = isAirport ? getAirportFares(pickedVehicle).totalFare : PRICING[activeBookingType].prices[pickedVehicle];
     const formattedDate = travelDate ? format(new Date(travelDate), "dd MMM yyyy") : "—";
 
+    const tripTypeLabel = isAirport
+      ? (tripSubType === "pickup" ? "Airport Pickup" : "Airport Drop")
+      : undefined;
+
     let message = `Hi Xplorwing! I would like to book a Cab.\n\n` +
       `🚗 *Booking Details:*\n` +
       (customerName ? `• *Customer Name:* ${customerName.trim()}\n` : "") +
       (customerPhone ? `• *Mobile Number:* ${customerPhone.trim()}\n` : "") +
       `• *Booking Type:* ${activeBookingType}\n` +
+      (tripTypeLabel ? `• *Trip Type:* ${tripTypeLabel}\n` : "") +
       `• *Pickup Location:* ${pickupAddress}\n` +
       `• *Drop Location:* ${dropAddress}\n` +
       (isAirport && distanceKm ? `• *Estimated Distance:* ${distanceKm} KM\n` : "") +
@@ -364,7 +399,9 @@ export default function LocalAirportCabsSection() {
       listingType: "vehicle" as const,
       listingCouponType: "cabs" as const,
       hostId: adminHostId || "00000000-0000-0000-0000-000000000000",
-      listingTitle: `${activeBookingType} - ${pickedVehicle}`,
+      listingTitle: isAirport
+        ? `${tripSubType === "pickup" ? "Airport Pickup" : "Airport Drop"} - ${pickedVehicle}`
+        : `${activeBookingType} - ${pickedVehicle}`,
       listingImage:
         pickedVehicle === "Sedan" ? sedanImg : pickedVehicle === "MUV" ? muvImg : suvImg,
       currencySymbol: "₹",
@@ -390,6 +427,7 @@ export default function LocalAirportCabsSection() {
         distance_km: isAirport ? distanceKm : parseInt(distanceIncluded),
         special_instructions: specialInstructions,
         booking_source: bookingSource,
+        trip_type: isAirport ? tripSubType : undefined,
         pickup_latitude: pickupCoords?.lat,
         pickup_longitude: pickupCoords?.lng,
         pickup_place_id: pickupPlaceId,
@@ -417,8 +455,10 @@ export default function LocalAirportCabsSection() {
   const isAirport = activeBookingType === "Airport Transfer";
   const isDistanceLoading = isAirport && isCalculatingDistance;
   const hasRouteError = isAirport && !!routeError;
-  const isLocationEmpty = !pickupAddress || (isAirport && isAirportPickup && !dropAddress);
-  const isBookDisabled = isDistanceLoading || hasRouteError || isLocationEmpty || !pickedVehicle;
+  const isLocationEmpty = isAirport
+    ? (tripSubType === "pickup" ? !dropAddress : !pickupAddress)
+    : !pickupAddress;
+  const isBookDisabled = isDistanceLoading || hasRouteError || isLocationEmpty || !pickedVehicle || !!areaValidationError;
 
   const vehicleSelectDialog = (
     <Dialog
@@ -435,6 +475,32 @@ export default function LocalAirportCabsSection() {
           </DialogTitle>
           <DialogDescription>Select a vehicle and fill in your details to proceed.</DialogDescription>
         </DialogHeader>
+
+        {/* Toggle for Airport Transfer: Drop / Pickup */}
+        {activeBookingType === "Airport Transfer" && (
+          <div className="flex justify-center gap-2 pt-2 pb-1">
+            <button
+              type="button"
+              className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${tripSubType === "drop"
+                ? "bg-[#013220] text-white shadow-md"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              onClick={() => handleTripSubTypeChange("drop")}
+            >
+              ✈ Airport Drop
+            </button>
+            <button
+              type="button"
+              className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${tripSubType === "pickup"
+                ? "bg-[#013220] text-white shadow-md"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              onClick={() => handleTripSubTypeChange("pickup")}
+            >
+              🛬 Airport Pickup
+            </button>
+          </div>
+        )}
 
         {/* Toggle for Local Rentals */}
         {(activeBookingType === "4 Hours Local" || activeBookingType === "8 Hours Local") && (
@@ -502,25 +568,38 @@ export default function LocalAirportCabsSection() {
               transition={{ duration: 0.3 }}
               className="mt-4 space-y-4 overflow-hidden"
             >
-              {/* Pickup Location input using Google Places Autocomplete */}
+              {/* Pickup Location */}
               <div className="space-y-1.5">
-                <LocationAutocomplete
-                  label="Pickup Location *"
-                  value={pickupAddress}
-                  placeholder="Search for pickup address..."
-                  onChange={handlePickupChange}
-                />
+                {isAirport && tripSubType === "pickup" ? (
+                  <>
+                    <Label className="text-sm font-semibold text-[#013220]">✈ Pickup Location</Label>
+                    <div className="flex items-center gap-2 px-3 h-10 rounded-xl border border-[#e2e8f0] bg-muted/50 text-sm text-muted-foreground font-medium">
+                      ✈ {pickupAddress || "Rajiv Gandhi International Airport (HYD)"}
+                    </div>
+                  </>
+                ) : (
+                  <LocationAutocomplete
+                    label="Pickup Location *"
+                    value={pickupAddress}
+                    placeholder="Search for pickup address..."
+                    onChange={handlePickupChange}
+                    restrictToTelangana={isAirport}
+                    onError={isAirport ? setAreaValidationError : undefined}
+                  />
+                )}
               </div>
 
-              {/* Destination (Editable dynamically based on Scenario) */}
+              {/* Destination */}
               <div className="space-y-1.5">
                 {activeBookingType === "Airport Transfer" ? (
-                  isAirportPickup ? (
+                  tripSubType === "pickup" ? (
                     <LocationAutocomplete
                       label="Destination *"
                       value={dropAddress}
                       placeholder="Search for drop address..."
                       onChange={handleDropChange}
+                      restrictToTelangana={isAirport}
+                      onError={isAirport ? setAreaValidationError : undefined}
                     />
                   ) : (
                     <>
@@ -745,7 +824,7 @@ export default function LocalAirportCabsSection() {
   );
 
   return (
-    <section className="py-4 md:py-16 px-4 bg-background">
+    <section className="py-4 md:py-16 px-4">
       <div className="container mx-auto max-w-6xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -766,43 +845,35 @@ export default function LocalAirportCabsSection() {
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="flex md:grid md:grid-cols-2 overflow-x-auto md:overflow-visible snap-x snap-mandatory scroll-smooth gap-4 md:gap-12 w-full px-4 md:px-0"
+          className="flex md:grid md:grid-cols-2 overflow-x-auto md:overflow-visible snap-x snap-mandatory scroll-smooth gap-0 md:gap-12 w-full"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none", paddingBottom: 20, marginBottom: -20 }}
         >
-          <div className="flex flex-col gap-4 items-center group flex-shrink-0 w-full md:w-auto snap-center">
-            <div className="relative w-full transition-transform duration-300">
-              <img
-                src={airportCabsOriginalImg}
-                alt="Airport Transfer Cabs"
-                className="w-full h-auto rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] group-hover:shadow-[0_8px_30px_rgb(0,0,0,0.16)] transition-shadow object-contain border-[6px] border-white"
-              />
-            </div>
-            <button
-              onClick={() => openBookingFor("Airport Transfer")}
-              className="relative overflow-hidden w-full px-8 py-3.5 rounded-full font-bold text-white shadow-[0_10px_20px_rgba(1,50,32,0.2)] hover:shadow-[0_15px_30px_rgba(1,50,32,0.3)] transition-all duration-300 hover:-translate-y-1 bg-gradient-to-r from-[#013220] via-[#035939] to-[#013220] bg-[length:200%_auto] hover:bg-right"
-            >
-              <span className="flex items-center justify-center text-base sm:text-lg">
+          {/* Airport Transfer card */}
+          <div className="flex-shrink-0 w-full md:w-auto snap-center">
+            <div className="relative w-full rounded-[24px] overflow-hidden shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
+              <img src={airportCabsOriginalImg} alt="Airport Transfer Cabs" className="w-full h-[65vw] md:h-[400px] object-cover object-center block" />
+              <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/50 to-transparent" />
+              <button
+                onClick={() => openBookingFor("Airport Transfer")}
+                className="absolute bottom-4 right-4 px-5 py-2.5 rounded-full bg-[#013220] hover:bg-[#035939] text-white text-sm font-bold shadow-lg transition-all duration-200 hover:scale-105"
+              >
                 Book Airport Transfer
-              </span>
-            </button>
+              </button>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-4 items-center group flex-shrink-0 w-full md:w-auto snap-center">
-            <div className="relative w-full transition-transform duration-300">
-              <img
-                src={airportCabsImg}
-                alt="Local Cabs (4hrs & 8hrs)"
-                className="w-full h-auto rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] group-hover:shadow-[0_8px_30px_rgb(0,0,0,0.16)] transition-shadow object-contain border-[6px] border-white"
-              />
-            </div>
-            <button
-              onClick={() => openBookingFor("4 Hours Local")}
-              className="relative overflow-hidden w-full px-8 py-3.5 rounded-full font-bold text-white shadow-[0_10px_20px_rgba(1,50,32,0.2)] hover:shadow-[0_15px_30px_rgba(1,50,32,0.3)] transition-all duration-300 hover:-translate-y-1 bg-gradient-to-r from-[#013220] via-[#035939] to-[#013220] bg-[length:200%_auto] hover:bg-right"
-            >
-              <span className="flex items-center justify-center text-base sm:text-lg">
+          {/* Local Rental card */}
+          <div className="flex-shrink-0 w-full md:w-auto snap-center">
+            <div className="relative w-full rounded-[24px] overflow-hidden shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
+              <img src={airportCabsImg} alt="Local Cabs (4hrs & 8hrs)" className="w-full h-[65vw] md:h-[400px] object-cover object-center block" />
+              <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/50 to-transparent" />
+              <button
+                onClick={() => openBookingFor("4 Hours Local")}
+                className="absolute bottom-4 right-4 px-5 py-2.5 rounded-full bg-[#013220] hover:bg-[#035939] text-white text-sm font-bold shadow-lg transition-all duration-200 hover:scale-105"
+              >
                 Book Local Rental
-              </span>
-            </button>
+              </button>
+            </div>
           </div>
         </div>
         </div>

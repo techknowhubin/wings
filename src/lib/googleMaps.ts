@@ -69,6 +69,39 @@ export const DEFAULT_AIRPORTS: AirportConfig[] = [
   }
 ];
 
+// Approximate Telangana bounding box (fallback when Geocoder is unavailable)
+const TELANGANA_BBOX = { latMin: 15.80, latMax: 19.93, lngMin: 77.19, lngMax: 81.35 };
+
+function isInTelangana_bbox(lat: number, lng: number): boolean {
+  return (
+    lat >= TELANGANA_BBOX.latMin && lat <= TELANGANA_BBOX.latMax &&
+    lng >= TELANGANA_BBOX.lngMin && lng <= TELANGANA_BBOX.lngMax
+  );
+}
+
+export async function isInTelangana(lat: number, lng: number): Promise<boolean> {
+  const GeocoderClass = typeof window !== "undefined" && (window as any).google?.maps?.Geocoder;
+  if (!GeocoderClass) return isInTelangana_bbox(lat, lng);
+
+  return new Promise((resolve) => {
+    new GeocoderClass().geocode({ location: { lat, lng } }, (results: any, status: any) => {
+      if (status !== "OK" || !results?.length) {
+        resolve(isInTelangana_bbox(lat, lng));
+        return;
+      }
+      for (const result of results) {
+        for (const component of (result.address_components ?? [])) {
+          if (component.types.includes("administrative_area_level_1")) {
+            resolve(component.long_name === "Telangana");
+            return;
+          }
+        }
+      }
+      resolve(isInTelangana_bbox(lat, lng));
+    });
+  });
+}
+
 let loadPromise: Promise<void> | null = null;
 
 /**

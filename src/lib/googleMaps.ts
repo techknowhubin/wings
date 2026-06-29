@@ -69,35 +69,45 @@ export const DEFAULT_AIRPORTS: AirportConfig[] = [
   }
 ];
 
-// Approximate Telangana bounding box (fallback when Geocoder is unavailable)
-const TELANGANA_BBOX = { latMin: 15.80, latMax: 19.93, lngMin: 77.19, lngMax: 81.35 };
+// Approximate Hyderabad bounding box
+export const HYDERABAD_BBOX = { latMin: 17.15, latMax: 17.60, lngMin: 78.20, lngMax: 78.70 };
 
-function isInTelangana_bbox(lat: number, lng: number): boolean {
+function isWithinHyderabad_bbox(lat: number, lng: number): boolean {
   return (
-    lat >= TELANGANA_BBOX.latMin && lat <= TELANGANA_BBOX.latMax &&
-    lng >= TELANGANA_BBOX.lngMin && lng <= TELANGANA_BBOX.lngMax
+    lat >= HYDERABAD_BBOX.latMin && lat <= HYDERABAD_BBOX.latMax &&
+    lng >= HYDERABAD_BBOX.lngMin && lng <= HYDERABAD_BBOX.lngMax
   );
 }
 
-export async function isInTelangana(lat: number, lng: number): Promise<boolean> {
+export async function isWithinHyderabad(lat: number, lng: number): Promise<boolean> {
+  // Strict check against the bounding box first
+  if (!isWithinHyderabad_bbox(lat, lng)) return false;
+
   const GeocoderClass = typeof window !== "undefined" && (window as any).google?.maps?.Geocoder;
-  if (!GeocoderClass) return isInTelangana_bbox(lat, lng);
+  // If Geocoder is not loaded (mock mode), rely purely on the bounding box
+  if (!GeocoderClass) return true;
 
   return new Promise((resolve) => {
     new GeocoderClass().geocode({ location: { lat, lng } }, (results: any, status: any) => {
       if (status !== "OK" || !results?.length) {
-        resolve(isInTelangana_bbox(lat, lng));
+        resolve(true); // Fallback to bounding box success
         return;
       }
       for (const result of results) {
         for (const component of (result.address_components ?? [])) {
-          if (component.types.includes("administrative_area_level_1")) {
-            resolve(component.long_name === "Telangana");
+          const name = component.long_name.toLowerCase();
+          if (
+            name.includes("hyderabad") ||
+            name.includes("rangareddy") ||
+            name.includes("ranga reddy") ||
+            name.includes("medchal")
+          ) {
+            resolve(true);
             return;
           }
         }
       }
-      resolve(isInTelangana_bbox(lat, lng));
+      resolve(false); // Valid address but not in Hyderabad/GHMC region
     });
   });
 }

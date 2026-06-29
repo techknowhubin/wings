@@ -285,10 +285,12 @@ const BikeDetail = () => {
               hostDiscountPercent={discountConfig.hostDiscountPercent}
               availableCoupons={discountConfig.coupons}
               longStayDiscounts={{
-                discount7: bike.long_stay_discount_7 || 0,
-                discount14: bike.long_stay_discount_14 || 0,
-                discount30: bike.long_stay_discount_30 || 0,
+                discount7: Number(bike.long_stay_discount_7) || 0,
+                discount14: Number(bike.long_stay_discount_14) || 0,
+                discount30: Number(bike.long_stay_discount_30) || 0,
               }}
+              weeklyPrice={bike.weekly_price ? Number(bike.weekly_price) : undefined}
+              monthlyPrice={bike.monthly_price ? Number(bike.monthly_price) : undefined}
             />
           </div>
         </div>

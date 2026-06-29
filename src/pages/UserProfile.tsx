@@ -428,6 +428,19 @@ export default function UserProfile() {
     enabled: !!user
   });
 
+  // Fetch Wallet Settings for Referral text
+  const { data: walletSettings } = useQuery({
+    queryKey: ['wallet-settings-global'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('wallet_settings')
+        .select('*')
+        .maybeSingle();
+      if (error && error.code !== 'PGRST116') throw error;
+      return data || { program_enabled: false, referral_bonus: 0 };
+    },
+  });
+
   // My Coupons: fetch coupons from hosts the user has booked with
   const { data: myCoupons = [], isLoading: couponsLoading } = useQuery({
     queryKey: ["my-coupons", user?.id],
@@ -733,23 +746,22 @@ export default function UserProfile() {
                         <Badge variant="outline" className="text-[10px] text-accent border-accent/30">Verified</Badge>
                       </div>
                       <div className="space-y-2">
-                        <Label>Phone</Label>
-                        <div className="relative flex items-center">
-                          {editing && (
-                            <span className="absolute left-3 text-xs font-semibold text-muted-foreground pointer-events-none pr-1.5 border-r border-border z-10">+91</span>
+                        <Label>WhatsApp Number</Label>
+                        <div className="flex gap-2 items-center">
+                          <Input value={user?.phone || form.phone || "Not linked"} disabled className="bg-muted/30 flex-1" />
+                          {user?.phone ? (
+                            <Badge variant="outline" className="text-[10px] text-accent border-accent/30 shrink-0">Verified</Badge>
+                          ) : (
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="shrink-0 bg-[#25D366] text-white hover:bg-[#25D366]/90"
+                              onClick={() => toast({ title: "Link WhatsApp", description: "To link your WhatsApp, please log out and sign in using your WhatsApp number. Your accounts will be securely merged based on your email." })}
+                            >
+                              Link WhatsApp
+                            </Button>
                           )}
-                          <Input
-                            value={form.phone}
-                            onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "").slice(0, 10) })}
-                            disabled={!editing}
-                            maxLength={10}
-                            placeholder="98765 43210"
-                            style={editing ? { paddingLeft: '3.5rem' } : undefined}
-                          />
                         </div>
-                        {editing && form.phone.length > 0 && form.phone.length < 10 && (
-                          <p className="text-[10px] text-amber-600">{10 - form.phone.length} more digits needed</p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>Date of Birth</Label>
@@ -1003,9 +1015,27 @@ export default function UserProfile() {
                               <p className="text-sm font-semibold text-foreground mb-3">Pricing</p>
                               <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Amount Paid (Online)</span>
+                                  <span className="text-muted-foreground">Total Rent</span>
                                   <span className="font-semibold text-foreground">₹{totalAmount.toLocaleString()}</span>
                                 </div>
+                                {selectedBooking.booking_type && selectedBooking.duration_value && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Booking Type & Duration</span>
+                                    <span className="capitalize">{selectedBooking.booking_type} - {selectedBooking.duration_value} {selectedBooking.booking_type === "daily" ? "Days" : selectedBooking.booking_type === "weekly" ? "Weeks" : "Months"}</span>
+                                  </div>
+                                )}
+                                {(selectedBooking.advance_amount || selectedBooking.payment_status === "partial_paid") && (
+                                  <>
+                                    <div className="flex justify-between text-green-600 font-medium">
+                                      <span>Advance Paid (20%)</span>
+                                      <span>₹{(selectedBooking.advance_amount || (totalAmount * 0.2)).toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between text-orange-600 font-medium">
+                                      <span>Balance Due at Pickup</span>
+                                      <span>₹{(selectedBooking.balance_amount || (totalAmount * 0.8)).toLocaleString()}</span>
+                                    </div>
+                                  </>
+                                )}
                                 {selectedBooking.booking_channel && (
                                   <div className="flex justify-between">
                                     <span className="text-muted-foreground">Booking Channel</span>
@@ -1635,55 +1665,65 @@ export default function UserProfile() {
                 <h1 className="text-2xl font-bold text-foreground">Refer &amp; Earn</h1>
 
                 <Card className="overflow-hidden border-primary/20">
-                  <div className="bg-primary/5 p-6 border-b border-primary/10">
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                      <Gift className="h-5 w-5 text-primary" />
-                      Invite Friends &amp; Earn Wing Credits
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Earn ₹500 Wing Credits for every friend who signs up and verifies their account using your referral code!
-                    </p>
-                  </div>
-                  <CardContent className="p-6 space-y-4">
-                    <div>
-                      <Label className="text-sm font-medium mb-2 block">Your Referral Code</Label>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <Input
-                            value={referralCode || 'Loading...'}
-                            readOnly
-                            className="font-mono text-lg bg-muted/50 h-12 pr-12"
-                          />
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="absolute right-1 top-1 h-10 w-10 text-muted-foreground hover:text-foreground"
-                            onClick={handleCopyReferral}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <Button
-                          onClick={handleShareReferralWhatsApp}
-                          className="h-12 px-4 gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white shrink-0"
-                        >
-                          <Share2 className="h-4 w-4" />
-                          <span className="hidden sm:inline">Share on WhatsApp</span>
-                          <span className="sm:hidden">Share</span>
-                        </Button>
+                  {walletSettings && !walletSettings.program_enabled ? (
+                    <CardContent className="p-12 text-center">
+                      <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">Referrals Disabled</h3>
+                      <p className="text-muted-foreground">The referral program is currently disabled.</p>
+                    </CardContent>
+                  ) : (
+                    <>
+                      <div className="bg-primary/5 p-6 border-b border-primary/10">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                          <Gift className="h-5 w-5 text-primary" />
+                          Invite Friends &amp; Earn Wing Credits
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Earn ₹{Number(walletSettings?.referral_bonus || 500).toLocaleString()} Wing Credits for every friend who signs up and verifies their account using your referral code!
+                        </p>
                       </div>
-                    </div>
+                      <CardContent className="p-6 space-y-4">
+                        <div>
+                          <Label className="text-sm font-medium mb-2 block">Your Referral Code</Label>
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <Input
+                                value={referralCode || 'Loading...'}
+                                readOnly
+                                className="font-mono text-lg bg-muted/50 h-12 pr-12"
+                              />
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="absolute right-1 top-1 h-10 w-10 text-muted-foreground hover:text-foreground"
+                                onClick={handleCopyReferral}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <Button
+                              onClick={handleShareReferralWhatsApp}
+                              className="h-12 px-4 gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white shrink-0"
+                            >
+                              <Share2 className="h-4 w-4" />
+                              <span className="hidden sm:inline">Share on WhatsApp</span>
+                              <span className="sm:hidden">Share</span>
+                            </Button>
+                          </div>
+                        </div>
 
-                    <div className="rounded-xl bg-muted/30 p-4 space-y-2">
-                      <p className="text-sm font-semibold text-foreground">How it works</p>
-                      <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                        <li>Share your unique referral code with friends</li>
-                        <li>Friend signs up on Xplorwing using your code</li>
-                        <li>Friend completes their account verification</li>
-                        <li>You earn ₹500 Wing Credits instantly!</li>
-                      </ol>
-                    </div>
-                  </CardContent>
+                        <div className="rounded-xl bg-muted/30 p-4 space-y-2">
+                          <p className="text-sm font-semibold text-foreground">How it works</p>
+                          <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                            <li>Share your unique referral code with friends</li>
+                            <li>Friend signs up on Xplorwing using your code</li>
+                            <li>Friend completes their account verification</li>
+                            <li>You earn ₹{Number(walletSettings?.referral_bonus || 500).toLocaleString()} Wing Credits instantly!</li>
+                          </ol>
+                        </div>
+                      </CardContent>
+                    </>
+                  )}
                 </Card>
               </div>
             </motion.div>

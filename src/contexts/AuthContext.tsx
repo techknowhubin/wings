@@ -45,6 +45,7 @@ interface AuthContextValue {
   verifyOtp: (phone: string, token: string) => Promise<{ data: any; error: any }>;
   resendEmail: (email: string) => Promise<{ error: any }>;
   checkEmailRegistered: (email: string) => Promise<{ exists: boolean; checked: boolean }>;
+  checkPhoneRegistered: (phone: string) => Promise<{ exists: boolean; checked: boolean }>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -358,6 +359,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const checkPhoneRegistered = async (phone: string): Promise<{ exists: boolean; checked: boolean }> => {
+    try {
+      const { data, error } = await supabase.rpc('check_phone_registered' as any, {
+        check_phone: phone.trim(),
+      });
+      if (error) {
+        console.warn('[checkPhoneRegistered] RPC unavailable:', error.message);
+        return { exists: false, checked: false };
+      }
+      return { exists: !!data, checked: true };
+    } catch {
+      return { exists: false, checked: false };
+    }
+  };
+
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
@@ -376,6 +392,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         verifyOtp,
         resendEmail,
         checkEmailRegistered,
+        checkPhoneRegistered,
       }}
     >
       {children}

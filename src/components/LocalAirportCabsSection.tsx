@@ -57,6 +57,7 @@ export default function LocalAirportCabsSection() {
   // Airports configuration
   const [airports, setAirports] = useState<AirportConfig[]>(DEFAULT_AIRPORTS);
   const [detectedAirport, setDetectedAirport] = useState<AirportConfig | null>(null);
+  const [airportParkingCharge, setAirportParkingCharge] = useState<number>(350);
 
   // Booking states
   const [activeBookingType, setActiveBookingType] = useState<BookingType | null>(null);
@@ -134,16 +135,15 @@ export default function LocalAirportCabsSection() {
   }, []);
 
   useEffect(() => {
-    const fetchAdminId = async () => {
-      const { data } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "admin")
-        .limit(1)
-        .maybeSingle();
-      if (data) setAdminHostId(data.user_id);
+    const fetchSettings = async () => {
+      const [adminRes, settingsRes] = await Promise.all([
+        supabase.from("user_roles").select("user_id").eq("role", "admin").limit(1).maybeSingle(),
+        supabase.from("platform_settings").select("airport_parking_charge").limit(1).maybeSingle()
+      ]);
+      if (adminRes.data) setAdminHostId(adminRes.data.user_id);
+      if (settingsRes.data) setAirportParkingCharge(Number(settingsRes.data.airport_parking_charge ?? 350));
     };
-    fetchAdminId();
+    fetchSettings();
   }, []);
 
   useEffect(() => {
@@ -332,7 +332,8 @@ export default function LocalAirportCabsSection() {
       extraCharges = parseFloat((extraDistance * perKmRate).toFixed(2));
     }
 
-    const totalFare = parseFloat((baseFare + extraCharges).toFixed(2));
+    const parkingCharge = tripSubType === "pickup" ? airportParkingCharge : 0;
+    const totalFare = parseFloat((baseFare + extraCharges + parkingCharge).toFixed(2));
 
     return {
       baseFare,
@@ -340,6 +341,7 @@ export default function LocalAirportCabsSection() {
       actualDistance,
       extraDistance,
       extraCharges,
+      parkingCharge,
       totalFare,
     };
   };
@@ -375,6 +377,7 @@ export default function LocalAirportCabsSection() {
       `• *Time:* ${travelTime}\n` +
       `• *Vehicle Type:* ${pickedVehicle}\n` +
       (specialInstructions ? `• *Special Instructions:* ${specialInstructions}\n` : "") +
+      (isAirport && tripSubType === "pickup" ? `• *Parking Charges:* ₹${airportParkingCharge}\n` : "") +
       `• *Total Fare:* ₹${fare.toLocaleString()}*\n\n` +
       `Please confirm availability. Thank you!`;
 
@@ -434,6 +437,7 @@ export default function LocalAirportCabsSection() {
         drop_latitude: dropCoords?.lat,
         drop_longitude: dropCoords?.lng,
         drop_place_id: dropPlaceId,
+        parking_charge: isAirport && tripSubType === "pickup" ? getAirportFares(pickedVehicle).parkingCharge : 0,
       },
     };
 
@@ -468,7 +472,7 @@ export default function LocalAirportCabsSection() {
         if (!open) setPickedVehicle(null);
       }}
     >
-      <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-xl max-h-[95vh] overflow-y-auto p-4 md:p-6 gap-3 md:gap-4">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">
             {activeBookingType === "Airport Transfer" ? "Airport Transfer Booking" : "Local Rental Booking"}
@@ -538,7 +542,7 @@ export default function LocalAirportCabsSection() {
                 <button
                   key={type}
                   onClick={() => setPickedVehicle(type)}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border-2 transition-all text-center ${isSelected
+                  className={`flex flex-col items-center gap-1 p-2 md:p-3 rounded-xl md:rounded-2xl border-2 transition-all text-center ${isSelected
                     ? "border-[#064e3b] bg-[#f0fdf4] shadow-md"
                     : "border-border hover:border-[#064e3b]/40 hover:bg-muted/40"
                     }`}
@@ -546,10 +550,10 @@ export default function LocalAirportCabsSection() {
                   <img
                     src={img}
                     alt={type}
-                    className={`h-14 md:h-20 w-full object-contain mix-blend-multiply dark:mix-blend-normal transition-transform ${type === 'MUV' || type === 'SUV' ? 'scale-[1.3] md:scale-[1.4] mt-1' : ''}`}
+                    className={`h-11 md:h-14 w-full object-contain mix-blend-multiply dark:mix-blend-normal transition-transform ${type === 'MUV' || type === 'SUV' ? 'scale-[1.3] md:scale-[1.4] mt-0.5 md:mt-1' : ''}`}
                   />
-                  <p className={`font-bold text-sm ${isSelected ? "text-[#064e3b]" : "text-foreground"}`}>{type}</p>
-                  <p className="font-bold text-[#064e3b]">₹{fare}</p>
+                  <p className={`font-bold text-xs md:text-sm ${isSelected ? "text-[#064e3b]" : "text-foreground"}`}>{type}</p>
+                  <p className="font-bold text-[#064e3b] text-xs md:text-sm">₹{fare}</p>
                   <p className="text-[10px] text-muted-foreground hidden md:block">{desc}</p>
                   {isSelected && <span className="text-[9px] font-bold text-[#064e3b] mt-1">✓ Selected</span>}
                 </button>
@@ -566,7 +570,7 @@ export default function LocalAirportCabsSection() {
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.3 }}
-              className="mt-4 space-y-4 overflow-hidden"
+              className="mt-2 md:mt-4 space-y-3 md:space-y-4 overflow-hidden"
             >
               {/* Pickup Location */}
               <div className="space-y-1.5">
@@ -583,8 +587,8 @@ export default function LocalAirportCabsSection() {
                     value={pickupAddress}
                     placeholder="Search for pickup address..."
                     onChange={handlePickupChange}
-                    restrictToTelangana={isAirport}
-                    onError={isAirport ? setAreaValidationError : undefined}
+                    restrictToHyderabad={true}
+                    onError={setAreaValidationError}
                   />
                 )}
               </div>
@@ -598,8 +602,8 @@ export default function LocalAirportCabsSection() {
                       value={dropAddress}
                       placeholder="Search for drop address..."
                       onChange={handleDropChange}
-                      restrictToTelangana={isAirport}
-                      onError={isAirport ? setAreaValidationError : undefined}
+                      restrictToHyderabad={true}
+                      onError={setAreaValidationError}
                     />
                   ) : (
                     <>
@@ -622,8 +626,8 @@ export default function LocalAirportCabsSection() {
               </div>
 
               {/* Date & Time */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+              <div className="grid grid-cols-2 gap-2 md:gap-4">
+                <div className="space-y-1 md:space-y-1.5">
                   <Label className="text-sm font-semibold text-[#013220]">
                     {activeBookingType === "Airport Transfer" ? "Pickup Date *" : "Date *"}
                   </Label>
@@ -635,7 +639,7 @@ export default function LocalAirportCabsSection() {
                     className="h-10 text-sm rounded-xl border-[#e2e8f0] bg-white text-foreground"
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1 md:space-y-1.5">
                   <Label className="text-sm font-semibold text-[#013220]">
                     {activeBookingType === "Airport Transfer" ? "Pickup Time *" : "Start Time *"}
                   </Label>
@@ -654,8 +658,8 @@ export default function LocalAirportCabsSection() {
               </div>
 
               {/* Traveller Details */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4">
+                <div className="space-y-1 md:space-y-1.5">
                   <Label className="text-sm font-semibold text-[#013220]">Traveller Name</Label>
                   <Input
                     value={customerName}
@@ -664,7 +668,7 @@ export default function LocalAirportCabsSection() {
                     className="h-10 text-sm rounded-xl border-[#e2e8f0]"
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1 md:space-y-1.5">
                   <Label className="text-sm font-semibold text-[#013220]">Mobile Number</Label>
                   <Input
                     value={customerPhone}
@@ -675,7 +679,7 @@ export default function LocalAirportCabsSection() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1 md:space-y-1.5">
                 <Label className="text-sm font-semibold text-[#013220]">Special Instructions (Optional)</Label>
                 <Input
                   value={specialInstructions}
@@ -687,7 +691,7 @@ export default function LocalAirportCabsSection() {
 
               {/* Price & Fare Summary UI */}
               {activeBookingType === "Airport Transfer" ? (
-                <div className="rounded-2xl border border-[#e2e8f0] p-4 bg-muted/20 space-y-2 text-sm shadow-sm">
+                <div className="rounded-xl md:rounded-2xl border border-[#e2e8f0] p-3 md:p-4 bg-muted/20 space-y-1.5 md:space-y-2 text-xs md:text-sm shadow-sm">
                   <p className="font-bold text-[#013220] mb-1">Fare Breakdown</p>
 
                   {isCalculatingDistance ? (
@@ -731,6 +735,14 @@ export default function LocalAirportCabsSection() {
                         <span>Extra Charges</span>
                         <span>₹{getAirportFares(pickedVehicle).extraCharges}</span>
                       </div>
+                      {getAirportFares(pickedVehicle).parkingCharge > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Parking Charges</span>
+                          <span className="font-semibold text-[#013220]">
+                            ₹{getAirportFares(pickedVehicle).parkingCharge}
+                          </span>
+                        </div>
+                      )}
                       {durationMins && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Estimated Duration</span>
@@ -738,9 +750,9 @@ export default function LocalAirportCabsSection() {
                         </div>
                       )}
 
-                      <div className="flex justify-between border-t border-[#e2e8f0] pt-2.5 mt-1 bg-gradient-to-r from-emerald-50/50 to-teal-50/50 px-2 py-1 rounded">
-                        <span className="font-bold text-base text-[#013220]">Total Payable</span>
-                        <span className="font-bold text-xl text-[#013220]">
+                      <div className="flex justify-between border-t border-[#e2e8f0] pt-2 mt-1 bg-gradient-to-r from-emerald-50/50 to-teal-50/50 px-2 py-1 rounded">
+                        <span className="font-bold text-sm md:text-base text-[#013220]">Total Payable</span>
+                        <span className="font-bold text-lg md:text-xl text-[#013220]">
                           ₹{getAirportFares(pickedVehicle).totalFare}
                         </span>
                       </div>
@@ -748,7 +760,7 @@ export default function LocalAirportCabsSection() {
                   )}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-[#e2e8f0] p-4 bg-muted/20 space-y-2.5 text-sm shadow-sm">
+                <div className="rounded-xl md:rounded-2xl border border-[#e2e8f0] p-3 md:p-4 bg-muted/20 space-y-2 md:space-y-2.5 text-xs md:text-sm shadow-sm">
                   <p className="font-bold text-[#013220] mb-1">Price Summary</p>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Booking Type</span>
@@ -774,9 +786,9 @@ export default function LocalAirportCabsSection() {
                     <span className="text-muted-foreground">Extra Waiting</span>
                     <span className="text-xs text-amber-600 font-semibold">Additional charges apply Rs. 100/Hour</span>
                   </div>
-                  <div className="flex justify-between border-t border-[#e2e8f0] pt-2.5 mt-1">
-                    <span className="font-bold text-base text-[#013220]">Estimated Total</span>
-                    <span className="font-bold text-xl text-[#013220]">
+                  <div className="flex justify-between border-t border-[#e2e8f0] pt-2 mt-1">
+                    <span className="font-bold text-sm md:text-base text-[#013220]">Estimated Total</span>
+                    <span className="font-bold text-lg md:text-xl text-[#013220]">
                       ₹{PRICING[activeBookingType].prices[pickedVehicle]}
                     </span>
                   </div>
@@ -796,18 +808,19 @@ export default function LocalAirportCabsSection() {
                   type="button"
                   variant="outline"
                   disabled={isBookDisabled}
-                  className="flex-1 h-12 text-sm font-bold border-[#25D366] text-[#25D366] rounded-xl hover:bg-[#25D366]/10 hover:text-[#25D366] disabled:opacity-50 disabled:pointer-events-none"
+                  className="flex-1 h-10 md:h-12 text-xs md:text-sm font-bold border-[#25D366] text-[#25D366] rounded-xl hover:bg-[#25D366]/10 hover:text-[#25D366] disabled:opacity-50 disabled:pointer-events-none"
                   onClick={() => {
                     window.open(buildWhatsAppUrl(), "_blank");
                     setIsVehicleSelectOpen(false);
                   }}
                 >
-                  Book via WhatsApp
+                  <span className="hidden md:inline">Book via WhatsApp</span>
+                  <span className="md:hidden">WhatsApp</span>
                 </Button>
                 <Button
                   type="button"
                   disabled={isBookDisabled}
-                  className="flex-1 h-12 text-sm font-bold bg-[#013220] text-white rounded-xl hover:bg-[#013220]/90 shadow-md disabled:opacity-50 disabled:pointer-events-none"
+                  className="flex-1 h-10 md:h-12 text-xs md:text-sm font-bold bg-[#013220] text-white rounded-xl hover:bg-[#013220]/90 shadow-md disabled:opacity-50 disabled:pointer-events-none"
                   onClick={() => {
                     setIsVehicleSelectOpen(false);
                     handleOnlinePayment();

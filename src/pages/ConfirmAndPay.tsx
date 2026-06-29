@@ -136,6 +136,7 @@ const ConfirmAndPay = () => {
   // Wing Credits
   const [walletBalance, setWalletBalance] = useState(0);
   const [maxRedemptionPercentage, setMaxRedemptionPercentage] = useState(10);
+  const [programEnabled, setProgramEnabled] = useState(true);
   const [useWingCredits, setUseWingCredits] = useState(false);
 
   // GST Settings
@@ -157,10 +158,13 @@ const ConfirmAndPay = () => {
       if (user) {
         const [walletRes, settingsRes] = await Promise.all([
           supabase.from('wallets').select('balance').eq('user_id', user.id).maybeSingle(),
-          supabase.from('wallet_settings').select('max_redemption_percentage').maybeSingle()
+          supabase.from('wallet_settings').select('max_redemption_percentage, program_enabled').maybeSingle()
         ]);
         if (walletRes.data) setWalletBalance(Number(walletRes.data.balance || 0));
-        if (settingsRes.data) setMaxRedemptionPercentage(Number(settingsRes.data.max_redemption_percentage || 10));
+        if (settingsRes.data) {
+          setMaxRedemptionPercentage(Number(settingsRes.data.max_redemption_percentage || 10));
+          setProgramEnabled(Boolean(settingsRes.data.program_enabled ?? true));
+        }
       }
 
       // Fetch GST Settings
@@ -669,6 +673,7 @@ const ConfirmAndPay = () => {
             return_date: booking.cabDetails.return_date ? new Date(booking.cabDetails.return_date).toISOString() : null,
             cab_type: booking.cabDetails.cab_type,
             fare_amount: booking.cabDetails.fare_amount,
+            airport_parking_charge: booking.cabDetails.parking_charge || 0,
             base_amount: Number(fullBaseAmount.toFixed(2)),
             base_fare: Number(fullBaseAmount.toFixed(2)),
             gst_percentage: Number(gstPercentage.toFixed(2)),
@@ -1111,7 +1116,7 @@ const ConfirmAndPay = () => {
             <h2 className="text-xl font-semibold text-foreground mb-4">Checkout Summary</h2>
 
             {/* Wing Credits */}
-            {walletBalance > 0 && (
+            {programEnabled && walletBalance > 0 && (
               <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -1210,6 +1215,13 @@ const ConfirmAndPay = () => {
                 <span className="text-muted-foreground">Subtotal</span>
                 <span className="font-medium text-foreground">{booking.currencySymbol}{formatAmount(fullBaseAmount)}</span>
               </div>
+
+              {booking.cabDetails && booking.cabDetails.parking_charge > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Parking Charges</span>
+                  <span className="font-medium text-foreground">{booking.currencySymbol}{formatAmount(booking.cabDetails.parking_charge)}</span>
+                </div>
+              )}
 
               {gstEnabled && gstPercentage > 0 && (
                 <div className="flex items-center justify-between">

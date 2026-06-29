@@ -93,6 +93,7 @@ import AdminSecurityDashboard from "./pages/Admin/AdminSecurityDashboard";
 import SEODashboard from "./pages/Admin/SEODashboard";
 import AdminGSTSettings from "./pages/Admin/AdminGSTSettings";
 import AdminCoupons from "./pages/Admin/AdminCoupons";
+import AdminFeatureRequests from "./pages/Admin/FeatureRequests";
 import CreatePackage from "./pages/Admin/Packages/CreatePackage";
 import EditPackage from "./pages/Admin/Packages/EditPackage";
 import PackageList from "./pages/Admin/Packages/PackageList";
@@ -302,6 +303,7 @@ const App = () =>
               <Route path="gst" element={<AdminGSTSettings />} />
               <Route path="coupons" element={<AdminCoupons />} />
               <Route path="settings" element={<AdminSettings />} />
+              <Route path="feature-requests" element={<AdminFeatureRequests />} />
               
               <Route path="experiences" element={<PackageList />} />
               <Route path="experiences/create" element={<CreatePackage />} />

@@ -102,47 +102,7 @@ function useHostApprovedTypes(userId?: string) {
   });
 }
 
-function useMyListingTypeRequests(userId?: string) {
-  return useQuery({
-    queryKey: ['host', 'listing-requests', userId],
-    queryFn: async () => {
-      if (!userId) return [];
-      const { data } = await (supabase as any)
-        .from('listing_type_requests')
-        .select('requested_type, status')
-        .eq('host_id', userId);
-      return (data ?? []) as Array<{ requested_type: string; status: string }>;
-    },
-    enabled: !!userId,
-    staleTime: 30_000,
-  });
-}
 
-function useRequestListingType() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ hostId, type, note }: { hostId: string; type: string; note: string }) => {
-      const { error } = await (supabase as any).from('listing_type_requests').insert({
-        host_id: hostId,
-        requested_type: type,
-        host_note: note || null,
-        status: 'pending',
-      });
-      if (error) throw error;
-    },
-    onSuccess: (_data, variables) => {
-      qc.invalidateQueries({ queryKey: ['host', 'listing-requests', variables.hostId] });
-      toast.success('Request submitted! Admin will review it shortly.');
-    },
-    onError: (err: any) => {
-      if (err?.code === '23505') {
-        toast.info('You already have a pending request for this listing type.');
-      } else {
-        toast.error(err?.message || 'Failed to submit request');
-      }
-    },
-  });
-}
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -155,11 +115,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { data: profile } = useProfile(user?.id);
   const { data: unreadCount } = useUnreadNotificationCount(user?.id);
   const { data: hostData } = useHostApprovedTypes(user?.id);
-  const { data: typeRequests = [] } = useMyListingTypeRequests(user?.id);
-  const requestMut = useRequestListingType();
-
-  const [requestDialog, setRequestDialog] = useState<{ open: boolean; type: ListingTypeKey | null }>({ open: false, type: null });
-  const [requestNote, setRequestNote] = useState('');
 
   // If approved_listing_types is empty/null → show all (legacy hosts)
   const approvedTypes: string[] = hostData?.approved_listing_types?.length
@@ -171,12 +126,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     ? ALL_LISTING_TYPES.filter(t => approvedTypes.includes(t.key))
     : ALL_LISTING_TYPES;
 
-  const lockedItems = hasRestriction
-    ? ALL_LISTING_TYPES.filter(t => !approvedTypes.includes(t.key))
-    : [];
-
-  const getRequestStatus = (key: string) =>
-    typeRequests.find(r => r.requested_type === key)?.status ?? null;
 
   const handleSignOut = async () => {
     await signOut();
@@ -284,55 +233,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   );
                 })}
 
-                {/* Locked listing types with request option */}
-                {lockedItems.map((item) => {
-                  const reqStatus = getRequestStatus(item.key);
-                  return (
-                    <li key={item.key}>
-                      <div className="flex items-center gap-2 px-4 py-2 mx-2 rounded-xl text-sm text-muted-foreground/50">
-                        <item.icon className="h-[16px] w-[16px] shrink-0" />
-                        <span className="flex-1 line-through">{item.label}</span>
-                        {reqStatus === 'pending' && (
-                          <span title="Request pending review">
-                            <Clock className="h-3.5 w-3.5 text-amber-500" />
-                          </span>
-                        )}
-                        {reqStatus === 'approved' && (
-                          <span title="Approved">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                          </span>
-                        )}
-                        {!reqStatus && (
-                          <button
-                            title="Request access"
-                            onClick={() => { setRequestDialog({ open: true, type: item.key as ListingTypeKey }); setRequestNote(''); }}
-                            className="p-0.5 rounded-md hover:bg-primary/10 hover:text-primary transition-colors"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                        {reqStatus === 'rejected' && (
-                          <button
-                            title="Re-request access"
-                            onClick={() => { setRequestDialog({ open: true, type: item.key as ListingTypeKey }); setRequestNote(''); }}
-                            className="p-0.5 rounded-md hover:bg-primary/10 hover:text-primary transition-colors"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-
-                {/* Request new type button (only when restrictions are active) */}
-                {hasRestriction && lockedItems.length > 0 && (
-                  <li>
-                    <p className="px-6 py-1.5 text-[10px] text-muted-foreground/50 italic flex items-center gap-1">
-                      <Lock className="h-3 w-3" /> Click + to request access
-                    </p>
-                  </li>
-                )}
               </ul>
             </CollapsibleContent>
           </Collapsible>
@@ -354,10 +254,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       </div>
     </div>
   );
-
-  const requestedTypeLabel = requestDialog.type
-    ? ALL_LISTING_TYPES.find(t => t.key === requestDialog.type)?.label ?? ''
-    : '';
 
   return (
     <>
@@ -466,51 +362,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </main>
       </div>
-
-      {/* Request Listing Type Dialog */}
-      <Dialog open={requestDialog.open} onOpenChange={(open) => setRequestDialog({ open, type: open ? requestDialog.type : null })}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Send className="h-5 w-5 text-primary" />
-              Request Access — {requestedTypeLabel}
-            </DialogTitle>
-            <DialogDescription>
-              Your request will be reviewed by the admin. Once approved, <strong>{requestedTypeLabel}</strong> will appear in your dashboard.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Why do you want to add this listing type? <span className="text-muted-foreground font-normal">(optional)</span></label>
-              <Textarea
-                placeholder="e.g. I have a fleet of cars I'd like to list alongside my homestay..."
-                value={requestNote}
-                onChange={(e) => setRequestNote(e.target.value)}
-                className="resize-none"
-                rows={3}
-              />
-            </div>
-            <div className="flex gap-3 pt-1">
-              <Button variant="outline" className="flex-1" onClick={() => setRequestDialog({ open: false, type: null })}>
-                Cancel
-              </Button>
-              <Button
-                className="flex-1"
-                disabled={requestMut.isPending}
-                onClick={() => {
-                  if (!user || !requestDialog.type) return;
-                  requestMut.mutate(
-                    { hostId: user.id, type: requestDialog.type, note: requestNote },
-                    { onSuccess: () => setRequestDialog({ open: false, type: null }) }
-                  );
-                }}
-              >
-                {requestMut.isPending ? 'Sending…' : 'Submit Request'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

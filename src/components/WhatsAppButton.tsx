@@ -17,7 +17,7 @@ const WhatsAppButton = () => {
 
   return (
     <a
-      href="https://wa.me/916362986420?text=Hi%2C%20I%20have%20a%20question%20about%20Xplorwing"
+      href="https://wa.me/919492986413?text=Hi%2C%20I%20have%20a%20question%20about%20Xplorwing"
       className={`wa${!hasResponded ? " wa--shifted" : ""}`}
       target="_blank"
       rel="noreferrer"

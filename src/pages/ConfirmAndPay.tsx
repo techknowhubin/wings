@@ -417,13 +417,20 @@ const ConfirmAndPay = () => {
     return Math.max(booking.subtotal - hostDiscountAmount + booking.serviceFee, 0);
   }, [booking, hostDiscountAmount]);
 
+  const isLocalOrAirport = useMemo(() => {
+    const src = booking?.bookingSource ?? booking?.cabDetails?.booking_source;
+    return src === 'airport_transfer' || src === 'local_4hrs' || src === 'local_8hrs';
+  }, [booking]);
+
   const normalBookingFee = useMemo(() => baseTotal * (bookingFeeRate / 100), [baseTotal, bookingFeeRate]);
 
   const couponDiscountAmount = useMemo(() => {
     if (!booking || !appliedCoupon) return 0;
-    if (appliedCoupon.type === "flat") return Math.min(appliedCoupon.value, normalBookingFee);
-    return (normalBookingFee * appliedCoupon.value) / 100;
-  }, [appliedCoupon, booking, normalBookingFee]);
+    // For airport/local transfers: apply coupon to the full fare, not just the booking-fee slice
+    const couponBase = isLocalOrAirport ? baseTotal : normalBookingFee;
+    if (appliedCoupon.type === "flat") return Math.min(appliedCoupon.value, couponBase);
+    return (couponBase * appliedCoupon.value) / 100;
+  }, [appliedCoupon, booking, normalBookingFee, isLocalOrAirport, baseTotal]);
 
   const maxRedeemableCredits = useMemo(() => {
     if (!booking) return 0;
@@ -433,18 +440,23 @@ const ConfirmAndPay = () => {
 
   const wingCreditsDiscountAmount = useWingCredits ? maxRedeemableCredits : 0;
 
-  // Xplorwing now acts as merchant of record, collecting full amount
-  // Calculate full final amount
-  const fullBaseAmount = baseTotal; // Subtotal - host discount + service fee
+  const fullBaseAmount = baseTotal;
   const gstAmount = gstEnabled ? (fullBaseAmount * gstPercentage) / 100 : 0;
   const fullTotalWithTax = fullBaseAmount + gstAmount;
 
   const totalPayable = useMemo(() => {
-    // If the requirement is to charge the full amount + GST:
-    const raw = fullTotalWithTax - couponDiscountAmount - wingCreditsDiscountAmount;
+    let raw: number;
+    if (isLocalOrAirport) {
+      // Airport/Local transfers: customer pays the full fare upfront
+      raw = fullTotalWithTax - couponDiscountAmount - wingCreditsDiscountAmount;
+    } else {
+      // All other bookings: customer pays only the booking-fee % now (rest at time of service)
+      const bookingFeeAmount = (fullTotalWithTax * bookingFeeRate) / 100;
+      raw = bookingFeeAmount - couponDiscountAmount - wingCreditsDiscountAmount;
+    }
     if (raw <= 0) return 0;
     return Math.max(raw, 1.00);
-  }, [fullTotalWithTax, couponDiscountAmount, wingCreditsDiscountAmount]);
+  }, [fullTotalWithTax, couponDiscountAmount, wingCreditsDiscountAmount, isLocalOrAirport, bookingFeeRate]);
 
   const formatAmount = (val: number) => val.toFixed(2);
 
@@ -1255,7 +1267,7 @@ const ConfirmAndPay = () => {
               <div className="flex items-center justify-between pt-3 mt-2 border-t border-border">
                 <span className="font-semibold text-foreground flex items-center gap-1.5">
                   <Receipt className="h-4 w-4 text-accent" />
-                  Total payable ({bookingFeeRate}% Booking Fee)
+                  {isLocalOrAirport ? "Total Fare" : `Total payable (${bookingFeeRate}% Booking Fee)`}
                 </span>
                 <span className="font-bold text-xl text-accent">{booking.currencySymbol}{formatAmount(totalPayable)}</span>
               </div>
@@ -1277,7 +1289,7 @@ const ConfirmAndPay = () => {
                 className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
               />
               <span>
-                By clicking Pay {bookingFeeRate}% and confirm booking, I confirm I have read and accepted Xplorwing's Privacy Policy,
+                By clicking {isLocalOrAirport ? "Pay and confirm booking" : `Pay ${bookingFeeRate}% and confirm booking`}, I confirm I have read and accepted Xplorwing's Privacy Policy,
                 Terms of Use, and Cancellation Policy for this booking.
               </span>
             </label>
@@ -1290,7 +1302,7 @@ const ConfirmAndPay = () => {
               className="w-full mt-5 h-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               <CreditCard className="h-4 w-4 mr-1" />
-              {isProcessing ? "Processing..." : `Pay ${bookingFeeRate}% and confirm booking`}
+              {isProcessing ? "Processing..." : isLocalOrAirport ? "Pay and confirm booking" : `Pay ${bookingFeeRate}% and confirm booking`}
             </Button>
           </Card>
         </div>

@@ -51,9 +51,16 @@ const VehicleBookingPanel = ({
   const [bookingType, setBookingType] = useState<"daily" | "weekly" | "monthly">("daily");
   const [durationValue, setDurationValue] = useState<number>(1);
 
+  // Discounted unit prices: 10% off for weekly, 20% off for monthly (vs daily rate)
+  const weeklyOriginalUnit = pricePerDay * 7;
+  const weeklyDiscountedUnit = weeklyPrice || Math.round(weeklyOriginalUnit * 0.90);
+  const monthlyOriginalUnit = pricePerDay * 30;
+  const monthlyDiscountedUnit = monthlyPrice || Math.round(monthlyOriginalUnit * 0.80);
+
   // The duration logic
   let days = Math.max(differenceInDays(dropoffDate, pickupDate), 1);
   let subtotal = 0;
+  let originalSubtotal = 0;
   let unitLabel = "day";
   let unitPrice = pricePerDay;
   let finalDuration = durationValue;
@@ -62,24 +69,28 @@ const VehicleBookingPanel = ({
     days = Math.max(differenceInDays(dropoffDate, pickupDate), 1);
     const pricing = calculateLongStayPricing(pricePerDay, days, longStayDiscounts);
     subtotal = pricing.finalTotal;
+    originalSubtotal = subtotal;
     unitLabel = days === 1 ? "day" : "days";
     unitPrice = pricePerDay;
     finalDuration = days;
   } else if (bookingType === "weekly") {
     unitLabel = durationValue === 1 ? "week" : "weeks";
-    unitPrice = weeklyPrice || (pricePerDay * 7);
-    subtotal = unitPrice * durationValue;
+    unitPrice = weeklyDiscountedUnit;
+    originalSubtotal = weeklyOriginalUnit * durationValue;
+    subtotal = weeklyDiscountedUnit * durationValue;
     finalDuration = durationValue;
-    // Auto sync dropoff date for display purposes
     days = durationValue * 7;
   } else if (bookingType === "monthly") {
     unitLabel = durationValue === 1 ? "month" : "months";
-    unitPrice = monthlyPrice || (pricePerDay * 30);
-    subtotal = unitPrice * durationValue;
+    unitPrice = monthlyDiscountedUnit;
+    originalSubtotal = monthlyOriginalUnit * durationValue;
+    subtotal = monthlyDiscountedUnit * durationValue;
     finalDuration = durationValue;
-    // Auto sync dropoff date for display purposes
     days = durationValue * 30;
   }
+
+  const rentalDiscountPct = bookingType === "weekly" ? 10 : bookingType === "monthly" ? 20 : 0;
+  const rentalDiscountSaving = originalSubtotal - subtotal;
 
   // Calculate dates for weekly/monthly
   const actualDropoffDate = bookingType === "daily" ? dropoffDate : addDays(pickupDate, days);
@@ -115,6 +126,18 @@ const VehicleBookingPanel = ({
       </div>
 
       <div className="mb-2">
+        {bookingType === "weekly" && (
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-sm text-muted-foreground line-through">{currencySymbol}{weeklyOriginalUnit.toLocaleString()}</span>
+            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">10% OFF</span>
+          </div>
+        )}
+        {bookingType === "monthly" && (
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-sm text-muted-foreground line-through">{currencySymbol}{monthlyOriginalUnit.toLocaleString()}</span>
+            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">20% OFF</span>
+          </div>
+        )}
         <span className="text-2xl font-bold text-foreground">{currencySymbol}{unitPrice.toLocaleString()}</span>
         <span className="text-sm text-muted-foreground font-medium">/{unitLabel.replace(/s$/, '')}</span>
       </div>
@@ -255,8 +278,14 @@ const VehicleBookingPanel = ({
       <div className="space-y-1.5 pt-3 border-t border-border">
         <div className="flex justify-between text-xs">
           <span className="text-muted-foreground">Rental Price ({finalDuration} {unitLabel})</span>
-          <span className="text-foreground font-medium">{currencySymbol}{subtotal.toLocaleString()}</span>
+          <span className="text-foreground font-medium">{currencySymbol}{originalSubtotal.toLocaleString()}</span>
         </div>
+        {rentalDiscountSaving > 0 && (
+          <div className="flex justify-between text-xs">
+            <span className="text-green-600 font-medium">{rentalDiscountPct}% rental discount</span>
+            <span className="text-green-600 font-medium">-{currencySymbol}{rentalDiscountSaving.toLocaleString()}</span>
+          </div>
+        )}
         {hostDiscountPercent > 0 ? (
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Host discount ({hostDiscountPercent}%)</span>
@@ -267,7 +296,7 @@ const VehicleBookingPanel = ({
           <span className="text-foreground">Total Amount</span>
           <span className="text-foreground">{currencySymbol}{total.toLocaleString()}</span>
         </div>
-        <div className="flex justify-between text-sm font-bold text-primary pt-2">
+        <div className="flex justify-between text-sm font-bold text-foreground pt-2">
           <span>Pay Now (20%)</span>
           <span>{currencySymbol}{advanceAmount.toLocaleString()}</span>
         </div>

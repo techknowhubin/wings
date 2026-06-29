@@ -35,6 +35,19 @@ export function WalletSection() {
     enabled: !!user,
   });
 
+  // Fetch Wallet Settings
+  const { data: walletSettings, isLoading: settingsLoading } = useQuery({
+    queryKey: ['wallet-settings-global'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('wallet_settings')
+        .select('*')
+        .maybeSingle();
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    },
+  });
+
   // Fetch Transactions
   const { data: transactions = [], isLoading: txLoading } = useQuery({
     queryKey: ['wallet-transactions', wallet?.id],
@@ -69,11 +82,23 @@ export function WalletSection() {
     }
   };
 
-  if (walletLoading) {
+  if (walletLoading || settingsLoading) {
     return (
       <div className="flex items-center justify-center p-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
+    );
+  }
+
+  if (walletSettings && !walletSettings.program_enabled) {
+    return (
+      <Card>
+        <CardContent className="p-12 text-center">
+          <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Wing Credits Disabled</h3>
+          <p className="text-muted-foreground">Wing Credits program is currently disabled.</p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -109,10 +134,18 @@ export function WalletSection() {
           How Wing Credits Work
         </p>
         <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
-          <li>New sign-ups receive <strong className="text-foreground">₹1000</strong> Wing Credits.</li>
-          <li>Earn <strong className="text-foreground">₹500</strong> for every successful referral.</li>
-          <li>You can use up to <strong className="text-foreground">10%</strong> of your booking value in credits per booking.</li>
-          <li>Credits automatically expire after <strong className="text-foreground">3 months</strong>.</li>
+          {walletSettings?.signup_bonus > 0 && (
+            <li>New sign-ups receive <strong className="text-foreground">₹{Number(walletSettings.signup_bonus).toLocaleString()}</strong> Wing Credits.</li>
+          )}
+          {walletSettings?.referral_bonus > 0 && (
+            <li>Earn <strong className="text-foreground">₹{Number(walletSettings.referral_bonus).toLocaleString()}</strong> for every successful referral.</li>
+          )}
+          {walletSettings?.max_redemption_percentage > 0 && (
+            <li>You can use up to <strong className="text-foreground">{walletSettings.max_redemption_percentage}%</strong> of your booking value in credits per booking.</li>
+          )}
+          {walletSettings?.expiry_days > 0 && (
+            <li>Credits automatically expire after <strong className="text-foreground">{walletSettings.expiry_days} days</strong>.</li>
+          )}
         </ul>
       </div>
 

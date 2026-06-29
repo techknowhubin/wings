@@ -80,6 +80,18 @@ export default function HostSection() {
     }
   }
 
+  // Feature access restriction check
+  if (!isLoading && profile) {
+    const ALL_LISTING_TYPES = ["stays", "hotels", "resorts", "cars", "bikes", "experiences"];
+    if (ALL_LISTING_TYPES.includes(resolvedSection)) {
+      const approvedTypes = profile.approved_listing_types || [];
+      const hasRestriction = approvedTypes.length > 0;
+      if (hasRestriction && !approvedTypes.includes(resolvedSection)) {
+        return <Navigate to="/host/dashboard" replace />;
+      }
+    }
+  }
+
   switch (resolvedSection) {
     case "dashboard":
       return <HostDashboard />;

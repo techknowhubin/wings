@@ -196,7 +196,7 @@ const Auth = () => {
   const isHostSigninPath = location.pathname === "/host/signin";
 
   // View state
-  const [authMethod, setAuthMethod] = useState<"whatsapp" | "email">("email");
+  const [authMethod, setAuthMethod] = useState<"whatsapp" | "email">("whatsapp");
 
   // WhatsApp state
   const [waNumber, setWaNumber] = useState("");
@@ -455,7 +455,7 @@ const Auth = () => {
     }
     setLoading(true);
 
-    // Check if this phone number is registered before sending OTP
+    // Check if this phone number is registered (just for UI state, don't block)
     const formattedPhone = `+91${waNumber}`;
     const { data: phoneCheck } = await supabase
       .from('profiles')
@@ -463,25 +463,15 @@ const Auth = () => {
       .or(`phone.eq.${formattedPhone},phone.eq.${waNumber}`)
       .maybeSingle();
 
-    if (!phoneCheck) {
-      setLoading(false);
-      setWaAccountExists(false);
-      toast({
-        variant: "destructive",
-        title: "Account not found",
-        description: "No account found for this number. Please create an account with your email first.",
-      });
-      return;
-    }
-
-    setWaAccountExists(true);
+    setWaAccountExists(!!phoneCheck);
+    
     const { error } = await signInWithOtp(formattedPhone);
     setLoading(false);
     if (error) {
       toast({ variant: "destructive", title: "Failed to send OTP", description: error.message });
     } else {
       setIsOtpSent(true);
-      setCountdown(60);
+      setCountdown(30);
       setOtpValue("");
       toast({ title: "OTP Sent", description: "Check your WhatsApp for the verification code." });
     }
@@ -872,21 +862,14 @@ const Auth = () => {
               type="tel"
               value={waNumber}
               onChange={(e) => setWaNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
-              placeholder="98765 43210"
+              placeholder="WhatsApp Number"
               className="auth-input wa-input"
               autoFocus={autoFocusInput}
             />
           </div>
           {waAccountExists === false && (
-            <p className="text-[11px] text-red-400 text-center">
-              No account with this number.{' '}
-              <button
-                type="button"
-                onClick={() => { setAuthMethod('email'); setEmailPhase('signup'); setWaAccountExists(null); }}
-                className="underline font-bold hover:opacity-80"
-              >
-                Create account with email
-              </button>
+            <p className="text-[11px] text-green-700 text-center bg-green-50 p-2 rounded-md">
+              New number! You'll be asked to set up your profile next.
             </p>
           )}
           <button
@@ -930,7 +913,7 @@ const Auth = () => {
                     cx="22" cy="22" r="18"
                     stroke="#111"
                     strokeDasharray={circumference}
-                    strokeDashoffset={circumference * (1 - countdownPercent)}
+                    strokeDashoffset={circumference * (1 - countdown / 30)}
                     style={{ transition: "stroke-dashoffset 1s linear" }}
                   />
                 </svg>
@@ -1008,7 +991,7 @@ const Auth = () => {
                 : authMethod === "whatsapp"
                 ? (isOtpSent
                   ? "A 6-digit code was sent to your WhatsApp."
-                  : "Enter your mobile number to get a secure verification code.")
+                  : "Enter your WhatsApp number to continue.")
                 : emailPhase === 'enter' || emailPhase === 'checking'
                   ? "Enter your email address to get started."
                   : emailPhase === 'login'

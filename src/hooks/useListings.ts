@@ -663,3 +663,49 @@ export function useListingTitles(items: Array<{ listing_id: string; listing_type
     staleTime: 5 * 60 * 1000,
   });
 }
+
+// ============ Feature Access Hooks ============
+
+export function useMyListingTypeRequests(userId?: string) {
+  return useQuery({
+    queryKey: ['host', 'listing-requests', userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data } = await (supabase as any)
+        .from('feature_access_requests')
+        .select('feature_name, status')
+        .eq('host_id', userId);
+      return (data ?? []) as Array<{ feature_name: string; status: string }>;
+    },
+    enabled: !!userId,
+    staleTime: 30_000,
+  });
+}
+
+export function useRequestListingType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ hostId, type, note }: { hostId: string; type: string; note: string }) => {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { error } = await (supabase as any).from('feature_access_requests').insert({
+        host_id: hostId,
+        feature_name: type,
+        host_note: note || null,
+        status: 'pending',
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ['host', 'listing-requests', variables.hostId] });
+      // Note: toaster is typically called in the component
+    },
+    onError: (err: any) => {
+      if (err?.code === '23505') {
+        import('sonner').then(module => module.toast.info('You already have a pending request.'));
+      } else {
+        import('sonner').then(module => module.toast.error(err?.message || 'Failed to submit request. Did you run the database migration?'));
+      }
+    }
+  });
+}

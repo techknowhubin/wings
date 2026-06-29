@@ -8,9 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { format, addDays } from "date-fns";
 import carIcon from "@/assets/car-icon-5436.png";
-import sedanImg from "@/assets/sedan-dzire.jpeg";
-import muvImg from "@/assets/MUV-Ertiga.jpeg";
-import suvImg from "@/assets/SUV-Innova.jpeg";
+import sedanImg from "@/assets/sedan.png";
+import muvImg from "@/assets/muv.png";
+import suvImg from "@/assets/suv.png";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import "./CabFareCard.css";
@@ -470,7 +470,7 @@ const CabFareCard = ({
                 <img
                   src={img}
                   alt={type}
-                  className="h-16 w-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                  className={`h-16 w-full object-contain mix-blend-multiply dark:mix-blend-normal transition-transform ${type === 'MUV' || type === 'SUV' ? 'scale-[1.4] mt-1' : ''}`}
                 />
                 <p className={`font-bold text-sm ${isSelected ? "text-[#064e3b]" : "text-foreground"}`}>{type}</p>
                 <p className="text-[10px] text-muted-foreground mb-1">{desc}</p>

@@ -42,15 +42,17 @@ export default function PackageBookingFlow() {
   const [confirmedBookingRef, setConfirmedBookingRef] = useState('');
 
   const [walletBalance, setWalletBalance] = useState(0);
+  const [maxRedemptionPercentage, setMaxRedemptionPercentage] = useState(10);
+  const [programEnabled, setProgramEnabled] = useState(true);
   const [useWingCredits, setUseWingCredits] = useState(false);
 
   const selectedPackages = effectiveState?.selectedPackages || [];
   const totalTravellers  = effectiveState?.totalTravellers || 1;
   const grandTotal       = effectiveState?.grandTotal || 0;
 
-  // Credits: max 10% of available credit balance per booking
-  const allowedCredits          = Math.round(walletBalance * 0.10 * 100) / 100;
-  const wingCreditsDiscountAmount = useWingCredits ? Math.min(walletBalance, allowedCredits) : 0;
+  // Credits: max based on admin config per booking
+  const allowedCredits          = Math.round((effectiveState?.grandTotal || 0) * (maxRedemptionPercentage / 100) * 100) / 100;
+  const wingCreditsDiscountAmount = useWingCredits && programEnabled ? Math.min(walletBalance, allowedCredits) : 0;
   const finalPayable            = Math.max(grandTotal - wingCreditsDiscountAmount, 0);
 
   useEffect(() => {
@@ -105,8 +107,15 @@ export default function PackageBookingFlow() {
   }, [id]);
 
   const fetchWallet = async (userId: string) => {
-    const { data } = await supabase.from("wallets").select("balance").eq("user_id", userId).maybeSingle();
-    if (data) setWalletBalance(Number(data.balance || 0));
+    const [walletRes, settingsRes] = await Promise.all([
+      supabase.from("wallets").select("balance").eq("user_id", userId).maybeSingle(),
+      supabase.from("wallet_settings").select("max_redemption_percentage, program_enabled").maybeSingle()
+    ]);
+    if (walletRes.data) setWalletBalance(Number(walletRes.data.balance || 0));
+    if (settingsRes.data) {
+      setMaxRedemptionPercentage(Number(settingsRes.data.max_redemption_percentage || 10));
+      setProgramEnabled(Boolean(settingsRes.data.program_enabled ?? true));
+    }
   };
 
   const fetchPackage = async () => {
@@ -363,25 +372,24 @@ export default function PackageBookingFlow() {
               <h2 className="text-2xl font-bold text-foreground">Checkout Summary</h2>
 
               {/* Wing Credits */}
-              {walletBalance > 0 && (
-                <div className="bg-[#fcfdf7] border border-[#e8eed2] rounded-xl p-4 flex items-start justify-between">
-                  <div className="flex items-start gap-3">
-                    <Wallet className="h-5 w-5 text-[#c1d06e] mt-0.5" />
-                    <div>
-                      <p className="font-bold text-[#0c3b2e] text-lg mb-1">Wing Credits</p>
-                      <p className="text-sm text-[#4a6b5d] mb-0.5">Available: ₹{walletBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
-                      <p className="text-sm text-[#4a6b5d]">You can apply up to 10% of your credits — ₹{allowedCredits.toLocaleString("en-IN", { minimumFractionDigits: 2 })} on this booking.</p>
-                    </div>
+              {programEnabled && walletBalance > 0 && (
+                <div className="border border-primary/20 bg-primary/5 rounded-xl p-4 flex items-center justify-between mt-4">
+                  <div>
+                    <p className="font-bold text-[#0c3b2e] text-lg mb-1">Wing Credits</p>
+                    <p className="text-sm text-muted-foreground">Available: ₹{walletBalance.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">You can use up to ₹{allowedCredits.toLocaleString()} (Max {maxRedemptionPercentage}% of total).</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="use-wing-credits"
+                    <input 
+                      type="checkbox" 
+                      id="useCredits"
                       checked={useWingCredits}
                       onChange={(e) => setUseWingCredits(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-[#0c3b2e] focus:ring-[#0c3b2e]"
+                      className="w-5 h-5 rounded border-gray-300 text-[#0c3b2e] focus:ring-[#0c3b2e]"
                     />
-                    <Label htmlFor="use-wing-credits" className="text-sm font-bold text-[#0c3b2e] cursor-pointer">Apply</Label>
+                    <label htmlFor="useCredits" className="font-medium text-sm text-gray-700 cursor-pointer">
+                      Apply
+                    </label>
                   </div>
                 </div>
               )}

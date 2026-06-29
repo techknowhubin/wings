@@ -26,6 +26,7 @@ export function AddCarForm() {
 
   const [form, setForm] = useState({
     title: '', description: '', location: '', price_per_day: '',
+    weekly_price: '', monthly_price: '',
     brand: '', model: '', year: '', fuel_type: '', transmission: '',
     vehicle_type: '', seating_capacity: '', mileage_limit: '',
     availability_status: true, images: [] as string[],
@@ -44,6 +45,8 @@ export function AddCarForm() {
       await createCar.mutateAsync({
         host_id: user.id, title: form.title, description: form.description || null,
         location: form.location, price_per_day: Number(form.price_per_day),
+        weekly_price: form.weekly_price ? Number(form.weekly_price) : null,
+        monthly_price: form.monthly_price ? Number(form.monthly_price) : null,
         brand: form.brand || null, model: form.model || null,
         year: form.year ? Number(form.year) : null,
         fuel_type: form.fuel_type || null, transmission: form.transmission || null,
@@ -86,10 +89,12 @@ export function AddCarForm() {
             <CardHeader><CardTitle>Basic Information</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div><Label>Title *</Label><Input value={form.title} onChange={e => set('title', e.target.value)} placeholder="e.g. Honda City 2023 - Self Drive" /></div>
+              <div><Label>Location *</Label><Input value={form.location} onChange={e => set('location', e.target.value)} placeholder="e.g. Mumbai, Maharashtra" /></div>
               <div><Label>Description</Label><Textarea value={form.description} onChange={e => set('description', e.target.value)} placeholder="Describe the car..." rows={4} /></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><Label>Location *</Label><Input value={form.location} onChange={e => set('location', e.target.value)} placeholder="e.g. Mumbai, Maharashtra" /></div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div><Label>Price/Day (₹) *</Label><Input type="number" value={form.price_per_day} onChange={e => set('price_per_day', e.target.value)} placeholder="1500" /></div>
+                <div><Label>Weekly Price (₹)</Label><Input type="number" value={form.weekly_price} onChange={e => set('weekly_price', e.target.value)} placeholder="9000" /></div>
+                <div><Label>Monthly Price (₹)</Label><Input type="number" value={form.monthly_price} onChange={e => set('monthly_price', e.target.value)} placeholder="30000" /></div>
               </div>
             </CardContent>
           </Card>

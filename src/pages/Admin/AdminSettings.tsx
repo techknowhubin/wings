@@ -45,6 +45,7 @@ const DEFAULTS = {
   min_advance_hours: 4,
   districts: [] as string[],
   force_2fa_roles: [] as string[],
+  airport_parking_charge: 350,
 };
 
 type Settings = typeof DEFAULTS;
@@ -157,6 +158,7 @@ export default function AdminSettings() {
         min_advance_hours:             Number(data.min_advance_hours            ?? DEFAULTS.min_advance_hours),
         districts:                     Array.isArray(data.districts) ? data.districts : DEFAULTS.districts,
         force_2fa_roles:               Array.isArray(data.force_2fa_roles) ? data.force_2fa_roles : DEFAULTS.force_2fa_roles,
+        airport_parking_charge:        Number(data.airport_parking_charge       ?? DEFAULTS.airport_parking_charge),
       });
     }
     // data is null → table exists but no row yet; defaults are fine
@@ -366,6 +368,9 @@ ON CONFLICT (id) DO NOTHING;`}
           <Field label="Support WhatsApp">
             <Input value={settings.support_whatsapp} onChange={(e) => set('support_whatsapp', e.target.value)} placeholder="+91 9000000000" />
           </Field>
+          <Field label="Airport Parking Charge (₹)">
+            <Input type="number" min={0} value={settings.airport_parking_charge} onChange={(e) => set('airport_parking_charge', Number(e.target.value))} />
+          </Field>
         </div>
         <Button disabled={saving.platform} className="bg-[#013220] text-white hover:bg-[#013220]/90"
           onClick={() => save('platform', {
@@ -373,6 +378,7 @@ ON CONFLICT (id) DO NOTHING;`}
             support_email: settings.support_email,
             support_phone: settings.support_phone,
             support_whatsapp: settings.support_whatsapp,
+            airport_parking_charge: settings.airport_parking_charge,
           }, 'Platform configuration saved')}>
           {saving.platform ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
           Save Platform Config

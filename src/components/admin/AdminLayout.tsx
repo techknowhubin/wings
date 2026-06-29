@@ -51,6 +51,7 @@ export default function AdminLayout() {
       items: [
         { label: 'KYC Review', to: '/admin/kyc', icon: ShieldCheck, badge: metrics?.pendingKyc },
         { label: 'Listing Approvals', to: '/admin/listings', icon: CheckSquare, badge: metrics?.pendingListings },
+        { label: 'Feature Requests', to: '/admin/feature-requests', icon: ShieldCheck },
       ],
     },
     {

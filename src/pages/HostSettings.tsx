@@ -21,6 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { calculateHostBookingAmounts, formatPrice } from '@/lib/supabase-helpers';
 import { safeDecrypt } from '@/lib/crypto';
 import { SecurityCard } from '@/components/SecurityCard';
+import { FeatureAccessSettings } from '@/components/dashboard/FeatureAccessSettings';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -477,11 +478,12 @@ export default function HostSettings() {
       </div>
 
       <Tabs defaultValue="profile">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="billing">Billing</TabsTrigger>
+          <TabsTrigger value="features">Feature Access</TabsTrigger>
         </TabsList>
 
         {/* ── Profile Tab ── */}
@@ -568,13 +570,27 @@ export default function HostSettings() {
                 </div>
               </div>
               <div>
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+91 9876543210"
-                />
+                <Label htmlFor="phone">WhatsApp Number</Label>
+                <div className="flex gap-2 items-center mt-1">
+                  <Input
+                    id="phone"
+                    value={user?.phone || formData.phone || "Not linked"}
+                    disabled
+                    className="bg-secondary flex-1"
+                  />
+                  {user?.phone ? (
+                    <Badge variant="outline" className="text-[10px] text-accent border-accent/30 shrink-0">Verified</Badge>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="shrink-0 bg-[#25D366] text-white hover:bg-[#25D366]/90"
+                      onClick={() => toast.info("To link your WhatsApp, please log out and sign in using your WhatsApp number. Your accounts will be securely merged based on your email.")}
+                    >
+                      Link WhatsApp
+                    </Button>
+                  )}
+                </div>
               </div>
               <div>
                 <Label htmlFor="bio">Bio</Label>
@@ -986,6 +1002,11 @@ export default function HostSettings() {
               </p>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── Feature Access Tab ── */}
+        <TabsContent value="features" className="mt-6">
+          <FeatureAccessSettings />
         </TabsContent>
       </Tabs>
     </motion.div>

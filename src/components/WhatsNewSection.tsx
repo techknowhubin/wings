@@ -36,7 +36,7 @@ const newFeatures: FeatureItem[] = [
     id: 4,
     title: "Link-in-Bio storefronts",
     subtitle: "One link for stays, cabs & tours. Share anywhere.",
-    details: "For creators and local service providers: build your custom storefront on Xplorwing. Aggregate your listings, accept direct bookings, and share your personal Wing Link across social media platforms like Instagram or WhatsApp.",
+    details: "For creators and local service providers: build your custom storefront on Xplorwing. Aggregate your listings, accept direct bookings, and share your personal Link-in-Bio across social media platforms like Instagram or WhatsApp.",
     iconName: "link"
   },
   {

@@ -14,7 +14,7 @@ const benefits = [
   { icon: Shield, title: "Secure Payments", desc: "Verified payouts directly to your bank — no chasing guests." },
   { icon: BarChart3, title: "Smart Dashboard", desc: "Manage bookings, earnings, coupons, and reviews from one place." },
   { icon: Users, title: "Community Support", desc: "Join 500+ hosts with 24/7 support and local hub partners." },
-  { icon: Star, title: "Wing Link Page", desc: "Get a personal landing page to share your listings across social media." },
+  { icon: Star, title: "Link-in-Bio Page", desc: "Get a personal landing page to share your listings across social media." },
 ];
 
 const steps = [

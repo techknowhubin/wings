@@ -43,7 +43,7 @@ const transportLinks = [
 const hostLinks = [
   { label: "Become a Host", to: "/become-host" },
   { label: "Host Dashboard", to: "/host" },
-  { label: "Wing Link", to: "/link-in-bio" },
+  { label: "Link-in-Bio", to: "/link-in-bio" },
 ];
 
 function Footerdemo() {

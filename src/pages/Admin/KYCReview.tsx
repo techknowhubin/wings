@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { ShieldCheck, AlertTriangle, Clock, ZoomIn, CheckCircle2, XCircle, RefreshCw, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { presignGet } from '@/lib/r2';
 
 type KycSubmission = any;
 
@@ -57,10 +58,10 @@ function getSlaClass(submittedAt: string, status: string) {
 
 async function getSignedUrl(path: string) {
   if (!path) return null;
-  // If already a full URL, return as-is (external URLs)
+  // Legacy Supabase URLs or any absolute URL — return as-is
   if (path.startsWith('http')) return path;
-  const { data } = await supabase.storage.from('user-documents').createSignedUrl(path, 900);
-  return data?.signedUrl ?? null;
+  // R2 object key — generate a 15-minute presigned GET URL
+  return presignGet(path, 900).catch(() => null);
 }
 
 export default function KYCReview() {

@@ -11,6 +11,11 @@ import {
   errorResponse,
   ForbiddenError,
 } from "../_shared/jwt-middleware.ts";
+import {
+  S3Client,
+  ListObjectsV2Command,
+  DeleteObjectsCommand,
+} from "npm:@aws-sdk/client-s3";
 
 const ENC_PREFIX = 'gcm_';
 const IV_LENGTH = 12;
@@ -580,25 +585,53 @@ Deno.serve(async (req) => {
         if (!ctx.isAdmin) {
           throw new ForbiddenError("Unauthorized: admin only");
         }
-        // First delete from storage
-        const buckets = ['user-documents', 'listing-images', 'profiles'];
-        for (const bucket of buckets) {
-          try {
-            const { data: files, error: listError } = await admin.storage.from(bucket).list(userId);
-            if (listError) {
-              console.error(`Error listing files in bucket ${bucket}:`, listError);
-              continue;
+
+        // Delete all user-owned R2 objects by prefix
+        const r2Endpoint   = Deno.env.get("R2_ENDPOINT");
+        const r2AccessKey  = Deno.env.get("R2_ACCESS_KEY_ID");
+        const r2SecretKey  = Deno.env.get("R2_SECRET_ACCESS_KEY");
+        const r2Bucket     = Deno.env.get("R2_BUCKET");
+
+        if (r2Endpoint && r2AccessKey && r2SecretKey && r2Bucket) {
+          const s3 = new S3Client({
+            region: "auto",
+            endpoint: r2Endpoint,
+            credentials: { accessKeyId: r2AccessKey, secretAccessKey: r2SecretKey },
+          });
+
+          // All user-scoped prefixes in R2
+          const prefixes = [
+            `kyc/${userId}/`,
+            `profiles/${userId}/`,
+            `listings/${userId}/`,
+          ];
+
+          for (const prefix of prefixes) {
+            try {
+              let continuationToken: string | undefined;
+              do {
+                const list = await s3.send(new ListObjectsV2Command({
+                  Bucket: r2Bucket,
+                  Prefix: prefix,
+                  MaxKeys: 1000,
+                  ContinuationToken: continuationToken,
+                }));
+                const objects = list.Contents ?? [];
+                if (objects.length > 0) {
+                  await s3.send(new DeleteObjectsCommand({
+                    Bucket: r2Bucket,
+                    Delete: { Objects: objects.map(({ Key }) => ({ Key: Key! })), Quiet: true },
+                  }));
+                  console.log(`[admin-actions] delete_user R2 cleanup: ${prefix} (${objects.length} objects)`);
+                }
+                continuationToken = list.IsTruncated ? list.NextContinuationToken : undefined;
+              } while (continuationToken);
+            } catch (err) {
+              console.error(`[admin-actions] R2 cleanup failed for prefix ${prefix}:`, err);
             }
-            if (files && files.length > 0) {
-              const pathsToDelete = files.map(file => `${userId}/${file.name}`);
-              const { error: deleteError } = await admin.storage.from(bucket).remove(pathsToDelete);
-              if (deleteError) {
-                console.error(`Error deleting files in bucket ${bucket}:`, deleteError);
-              }
-            }
-          } catch (err) {
-            console.error(`Failed to cleanup bucket ${bucket}:`, err);
           }
+        } else {
+          console.warn("[admin-actions] R2 credentials not set — skipping R2 file cleanup for delete_user.");
         }
 
         // Call the cascade delete RPC to clean public tables, log security event, and soft-delete bookings

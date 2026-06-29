@@ -18,6 +18,7 @@ import { useProfile, useUpdateProfile, useHostProfile, useHostBookings } from '@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { uploadImage } from '@/lib/r2-upload';
 import { calculateHostBookingAmounts, formatPrice } from '@/lib/supabase-helpers';
 import { safeDecrypt } from '@/lib/crypto';
 import { SecurityCard } from '@/components/SecurityCard';
@@ -170,30 +171,9 @@ export default function HostSettings() {
 
     setIsUploadingAvatar(true);
     try {
-      const ext = file.name.split('.').pop() ?? 'jpg';
-      const filePath = `${user.id}/avatar.${ext}`;
-      const BUCKET = 'avatars';
-
-      const { error: uploadError } = await supabase.storage
-        .from(BUCKET)
-        .upload(filePath, file, { upsert: true, contentType: file.type });
-
-      if (uploadError) {
-        if (
-          uploadError.message.toLowerCase().includes('bucket not found') ||
-          uploadError.message.toLowerCase().includes('not found')
-        ) {
-          toast.error(
-            'Storage bucket "avatars" not found. Please create it in Supabase Dashboard → Storage → New Bucket (name: avatars, Public: ON).'
-          );
-          return;
-        }
-        throw uploadError;
-      }
-
-      const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
+      const { publicUrl: imageUrl } = await uploadImage(file, `profiles/${user.id}`);
       // Append timestamp to bust CDN cache after re-upload
-      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+      const publicUrl = `${imageUrl}?t=${Date.now()}`;
 
       await updateProfile.mutateAsync({ userId: user.id, updates: { profile_image: publicUrl } });
       setAvatarPreview(publicUrl);

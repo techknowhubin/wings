@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { uploadDocument } from '@/lib/r2-upload';
 import { Loader2, Upload, File as FileIcon, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -41,18 +42,7 @@ export default function DocumentManagement() {
 
     setUploading(`${travellerId}-${docType}`);
     try {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${bookingId}/${travellerId}/${docType}-${Math.random()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('package-documents')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('package-documents')
-        .getPublicUrl(filePath);
+      const { publicUrl } = await uploadDocument(file, `documents/${bookingId}/${travellerId}`);
 
       const { error: dbError } = await supabase
         .from('package_documents')

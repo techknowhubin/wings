@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { uploadImage } from '@/lib/r2-upload';
 import { toast } from 'sonner';
 import { ImageIcon, Upload, X, Loader2, Link as LinkIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -21,11 +21,7 @@ export default function FeaturedImageUpload({ value, onChange }: FeaturedImageUp
     if (file.size > 10 * 1024 * 1024) { toast.error('Image must be under 10MB.'); return; }
     setUploading(true);
     try {
-      const ext = file.name.split('.').pop() ?? 'jpg';
-      const path = `blog/featured/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error } = await supabase.storage.from('blog-images').upload(path, file);
-      if (error) throw error;
-      const { data: { publicUrl } } = supabase.storage.from('blog-images').getPublicUrl(path);
+      const { publicUrl } = await uploadImage(file, 'blog');
       onChange(publicUrl);
       toast.success('Featured image uploaded!');
     } catch (e: any) {

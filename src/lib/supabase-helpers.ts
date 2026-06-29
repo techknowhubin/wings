@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
-import { encryptField, hashPhone, hashEmail } from '@/lib/crypto';
-import type { 
+import { hashPhone, hashEmail } from '@/lib/crypto';
+import type {
   Bike, Car, Stay, Experience, Booking, Review, Profile, LinkInBioPage,
   ListingType, AppRole, BookingStatus
 } from '@/types/database';
@@ -33,52 +33,23 @@ export async function getHostProfile(userId: string) {
 }
 
 export async function updateProfile(userId: string, updates: Partial<any>) {
-  // Prepare encryption for sensitive fields
-  const encryptedUpdates: any = { ...updates };
+  const payload: any = { ...updates };
 
-  // Full Name
-  if (updates.full_name) {
-    encryptedUpdates.full_name_encrypted = await encryptField(updates.full_name);
-    delete encryptedUpdates.full_name;
-  }
-
-  // Phone
+  // Keep phone_hash in sync so WhatsApp login lookups still work
   if (updates.phone) {
-    encryptedUpdates.phone_encrypted = await encryptField(updates.phone);
-    encryptedUpdates.phone_hash = await hashPhone(updates.phone);
-    delete encryptedUpdates.phone;
+    payload.phone_hash = await hashPhone(updates.phone);
   }
 
-  // Email
+  // Keep email_hash in sync for lookup queries
   if (updates.email) {
-    encryptedUpdates.email_encrypted = await encryptField(updates.email);
-    encryptedUpdates.email_hash = await hashEmail(updates.email);
-    delete encryptedUpdates.email;
-  }
-
-  // Address
-  if (updates.address) {
-    encryptedUpdates.address_encrypted = await encryptField(updates.address);
-    delete encryptedUpdates.address;
-  }
-
-  // Emergency Contact (assuming fields emergency_contact_name and emergency_contact_phone)
-  if (updates.emergency_contact_name) {
-    encryptedUpdates.emergency_contact_name_encrypted = await encryptField(updates.emergency_contact_name);
-    delete encryptedUpdates.emergency_contact_name;
-  }
-  if (updates.emergency_contact_phone) {
-    encryptedUpdates.emergency_contact_phone_encrypted = await encryptField(updates.emergency_contact_phone);
-    encryptedUpdates.emergency_contact_phone_hash = await hashPhone(updates.emergency_contact_phone);
-    delete encryptedUpdates.emergency_contact_phone;
+    payload.email_hash = await hashEmail(updates.email);
   }
 
   const { error } = await supabase
     .from('profiles')
-    .update(encryptedUpdates)
+    .update(payload)
     .eq('id', userId);
   if (error) throw error;
-  // Invalidate cache if needed – handled by react-query in hooks.
   return true;
 }
 

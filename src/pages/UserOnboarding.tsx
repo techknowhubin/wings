@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadDocument } from "@/lib/r2-upload";
 import { toast } from "sonner";
 import { DynamicLogo } from "@/components/DynamicLogo";
 import { useQueryClient } from "@tanstack/react-query";
@@ -251,12 +252,8 @@ function DocUploadStep({
   const queryClient = useQueryClient();
 
   const uploadFile = async (file: File, side: "front" | "back"): Promise<string> => {
-    const ext = file.name.split(".").pop();
-    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const filePath = `${userId}/${docType}/${side}/${fileName}`;
-    const { error } = await supabase.storage.from("user-documents").upload(filePath, file);
-    if (error) throw error;
-    return filePath; // store path, not public URL (private bucket)
+    const { key } = await uploadDocument(file, `kyc/${userId}/${docType}/${side}`);
+    return key; // store object key (not URL) — private KYC document
   };
 
   const handleUploadAndSave = async () => {

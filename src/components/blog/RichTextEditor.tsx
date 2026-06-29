@@ -16,7 +16,7 @@ import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
 import CharacterCount from '@tiptap/extension-character-count';
 import { useCallback, useRef, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { uploadImage } from '@/lib/r2-upload';
 import { toast } from 'sonner';
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough, Code,
@@ -119,11 +119,7 @@ export default function RichTextEditor({ content, onChange, placeholder, minHeig
     if (file.size > 10 * 1024 * 1024) { toast.error('Image must be under 10MB.'); return; }
     setUploadingImage(true);
     try {
-      const ext = file.name.split('.').pop() ?? 'jpg';
-      const path = `blog/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('blog-images').upload(path, file, { upsert: false });
-      if (upErr) throw upErr;
-      const { data: { publicUrl } } = supabase.storage.from('blog-images').getPublicUrl(path);
+      const { publicUrl } = await uploadImage(file, 'blog');
       editor?.chain().focus().setImage({ src: publicUrl, alt: file.name.replace(/\.[^.]+$/, '') }).run();
       toast.success('Image uploaded!');
     } catch (e: any) {

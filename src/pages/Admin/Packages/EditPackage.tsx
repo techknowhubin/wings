@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { uploadImage, uploadDocument } from '@/lib/r2-upload';
 import { Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { MediaUploads, PackageMedia } from './components/MediaUploads';
@@ -148,13 +149,7 @@ export default function EditPackage() {
       // 1. Upload Cover Image
       let coverImageUrl = null;
       if (media.coverImage && typeof media.coverImage !== 'string') {
-        const fileExt = media.coverImage.name.split('.').pop();
-        const filePath = `covers/${Date.now()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage
-          .from('package-gallery')
-          .upload(filePath, media.coverImage);
-        if (uploadError) throw uploadError;
-        const { data: { publicUrl } } = supabase.storage.from('package-gallery').getPublicUrl(filePath);
+        const { publicUrl } = await uploadImage(media.coverImage, 'listing-gallery/covers');
         coverImageUrl = publicUrl;
       } else if (typeof media.coverImage === 'string') {
         coverImageUrl = media.coverImage;
@@ -195,44 +190,46 @@ export default function EditPackage() {
 
       // 3. Upload Gallery Images
       for (const img of media.galleryImages) {
-        let imageUrl = img;
+        let imageUrl: string | null = null;
         if (typeof img !== 'string') {
-          const fileExt = img.name.split('.').pop();
-          const filePath = `gallery/${packageId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-          const { error: uploadError } = await supabase.storage.from('package-gallery').upload(filePath, img);
-          if (!uploadError) {
-            const { data: { publicUrl } } = supabase.storage.from('package-gallery').getPublicUrl(filePath);
+          try {
+            const { publicUrl } = await uploadImage(img, `listing-gallery/gallery/${packageId}`);
             imageUrl = publicUrl;
+          } catch (e: any) {
+            console.error('[EditPackage] gallery upload error:', e.message);
           }
+        } else {
+          imageUrl = img;
         }
-        if (typeof imageUrl === 'string') {
+        if (imageUrl) {
           await supabase.from('package_gallery').insert({
             package_id: packageId,
             image_url: imageUrl,
-            is_cover: false
+            is_cover: false,
           });
         }
       }
 
       // 4. Upload Documents
       for (const doc of documents) {
-        let fileUrl = doc.file;
+        let fileUrl: string | null = null;
         if (typeof doc.file !== 'string') {
-          const fileExt = doc.file.name.split('.').pop();
-          const filePath = `${packageId}/${Date.now()}_${doc.file.name}`;
-          const { error: uploadError } = await supabase.storage.from('package-itineraries').upload(filePath, doc.file);
-          if (!uploadError) {
-            const { data: { publicUrl } } = supabase.storage.from('package-itineraries').getPublicUrl(filePath);
+          try {
+            const { publicUrl } = await uploadDocument(doc.file, `documents/${packageId}`);
             fileUrl = publicUrl;
+          } catch (e: any) {
+            console.error('[EditPackage] document upload error:', e.message);
           }
+        } else {
+          fileUrl = doc.file;
         }
-        if (typeof fileUrl === 'string') {
+        if (fileUrl) {
           await supabase.from('package_itineraries').insert({
             package_id: packageId,
             file_url: fileUrl,
             file_type: doc.type,
             uploaded_by: userData.user.id,
-            version: 1
+            version: 1,
           });
         }
       }

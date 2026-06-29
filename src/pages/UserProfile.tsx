@@ -21,8 +21,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile, useUpdateProfile } from "@/hooks/useListings";
+import { uploadImage } from "@/lib/r2-upload";
 import { useTheme } from "@/components/ThemeProvider";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -194,6 +196,8 @@ export default function UserProfile() {
   const location = useLocation();
   const { data: profile, isLoading: profileLoading } = useProfile(user?.id);
   const updateProfile = useUpdateProfile();
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   useEffect(() => {
     if (profile?.role === 'hub_partner' && user?.id) {
@@ -459,29 +463,55 @@ export default function UserProfile() {
     enabled: !!user,
   });
 
-  const handleSaveProfile = async () => {
-    if (!user) return;
-    setEditing(false); // close form immediately for instant feedback
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setAvatarUploading(true);
     try {
+      const { publicUrl } = await uploadImage(file, `profiles/${user.id}`);
       await updateProfile.mutateAsync({
         userId: user.id,
-        updates: {
-          full_name: form.full_name,
-          display_name: form.display_name,
-          phone: form.phone
-            ? (form.phone.startsWith('+') ? form.phone : `+91${form.phone}`)
-            : null,
-          date_of_birth: form.dob || null,
-          gender: form.gender,
-          city: form.city,
-          state: form.state
-        } as any
+        updates: { profile_image: publicUrl } as any,
       });
+      // Immediately patch the cache so Avatar re-renders without waiting for refetch
+      queryClient.setQueryData(['profile', user.id], (old: any) =>
+        old ? { ...old, profile_image: publicUrl } : old
+      );
+      toast.success("Profile photo updated!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to upload photo");
+    } finally {
+      setAvatarUploading(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    setEditing(false);
+    const phone = form.phone
+      ? (form.phone.startsWith('+') ? form.phone : `+91${form.phone}`)
+      : null;
+    const updates = {
+      full_name: form.full_name,
+      display_name: form.display_name,
+      phone,
+      date_of_birth: form.dob || null,
+      gender: form.gender,
+      city: form.city,
+      state: form.state,
+    };
+    try {
+      await updateProfile.mutateAsync({ userId: user.id, updates: updates as any });
+      // Immediately patch the cache so the name/phone updates without waiting for refetch
+      queryClient.setQueryData(['profile', user.id], (old: any) =>
+        old ? { ...old, ...updates } : old
+      );
       toast.success("Profile updated successfully!");
     } catch (err: any) {
       console.error("Profile Update Error:", err);
       toast.error(err.message || "Failed to update profile");
-      setEditing(true); // reopen form on error so user can retry
+      setEditing(true);
     }
   };
 
@@ -664,11 +694,21 @@ export default function UserProfile() {
                             {(form.display_name || form.full_name)?.charAt(0) || "U"}
                           </AvatarFallback>
                         </Avatar>
-                        {editing && (
-                          <button className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                            <Camera className="h-3.5 w-3.5" />
-                          </button>
-                        )}
+                        <input
+                          ref={avatarInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleAvatarChange}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => avatarInputRef.current?.click()}
+                          disabled={avatarUploading}
+                          className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-60"
+                        >
+                          {avatarUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+                        </button>
                       </div>
                       <div>
                         <h2 className="text-lg font-semibold text-foreground">

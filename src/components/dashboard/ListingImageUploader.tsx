@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { uploadImage } from "@/lib/r2-upload";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, ImagePlus, Star, X } from "lucide-react";
 import { toast } from "sonner";
@@ -13,8 +13,6 @@ interface ListingImageUploaderProps {
   label?: string;
   maxFiles?: number;
 }
-
-const BUCKET = "listings";
 
 export function ListingImageUploader({
   images,
@@ -53,36 +51,13 @@ export function ListingImageUploader({
           continue;
         }
 
-        const ext = file.name.split(".").pop() ?? "jpg";
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
-        const filePath = `${user.id}/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from(BUCKET)
-          .upload(filePath, file, { contentType: file.type });
-
-        if (uploadError) {
-          const msg = uploadError.message.toLowerCase();
-          if (msg.includes("bucket not found") || msg.includes("not found")) {
-            toast.error(
-              'Storage bucket "listings" not found. Go to Supabase Dashboard → Storage → New Bucket → name: listings → Public: ON.',
-              { duration: 8000 }
-            );
-            break;
-          }
-          if (msg.includes("row-level security") || msg.includes("violates") || msg.includes("security policy")) {
-            toast.error(
-              'Upload blocked by storage permissions. In Supabase Dashboard → SQL Editor, run:\n\nCREATE POLICY "listings_insert" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = \'listings\');\nCREATE POLICY "listings_select" ON storage.objects FOR SELECT TO public USING (bucket_id = \'listings\');',
-              { duration: 12000 }
-            );
-            break;
-          }
+        try {
+          const { publicUrl } = await uploadImage(file, `listings/${user.id}`);
+          newImages.push(publicUrl);
+        } catch (uploadError: any) {
           toast.error(`Upload failed for ${file.name}: ${uploadError.message}`);
           continue;
         }
-
-        const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-        newImages.push(data.publicUrl);
       }
 
       if (newImages.length > images.length) {

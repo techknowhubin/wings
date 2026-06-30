@@ -268,8 +268,8 @@ export default function UserProfile() {
 
   const buildReferralMessage = () => {
     const link = `${window.location.origin}/signup?ref=${referralCode}`;
-    const welcomeBonus = Number(walletSettings?.signup_bonus ?? 300);
-    return `Sign up for Xplorwing using my referral code ${referralCode} and get Rs. ${welcomeBonus} Wing Credits! \n${link}`;
+    const referralBonus = Number(walletSettings?.referral_bonus ?? 200);
+    return `Sign up for Xplorwing using my referral code ${referralCode} and get Rs. ${referralBonus} Wing Credits! \n${link}`;
   };
 
   const handleCopyReferral = () => {

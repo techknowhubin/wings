@@ -266,18 +266,21 @@ export default function UserProfile() {
       .then(({ data }) => { if (data?.referral_code) setReferralCode(data.referral_code); });
   }, [user?.id]);
 
+  const buildReferralMessage = () => {
+    const link = `${window.location.origin}/signup?ref=${referralCode}`;
+    const welcomeBonus = Number(walletSettings?.signup_bonus ?? 300);
+    return `Sign up for Xplorwing using my referral code ${referralCode} and get Rs. ${welcomeBonus} Wing Credits! \n${link}`;
+  };
+
   const handleCopyReferral = () => {
     if (!referralCode) return;
-    const link = `${window.location.origin}/signup?ref=${referralCode}`;
-    navigator.clipboard.writeText(link);
+    navigator.clipboard.writeText(buildReferralMessage());
     toast.success('Referral link copied!');
   };
 
   const handleShareReferralWhatsApp = () => {
     if (!referralCode) return;
-    const link = `${window.location.origin}/signup?ref=${referralCode}`;
-    const text = encodeURIComponent(`Sign up for Xplorwing using my referral code ${referralCode} and get Wing Credits! ${link}`);
-    window.open(`https://wa.me/?text=${text}`, '_blank', 'noreferrer');
+    window.open(`https://wa.me/?text=${encodeURIComponent(buildReferralMessage())}`, '_blank', 'noreferrer');
   };
   const [isModifyingDates, setIsModifyingDates] = useState(false);
   const [newStartDate, setNewStartDate] = useState<Date | undefined>(undefined);

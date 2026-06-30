@@ -18,7 +18,15 @@ const STATUS_COLORS: Record<string, string> = {
   confirmed: 'bg-blue-100 text-blue-700',
   completed: 'bg-green-100 text-green-700',
   cancelled: 'bg-red-100 text-red-700',
+  failed: 'bg-red-100 text-red-700',
 };
+
+function getTripType(b: any): string {
+  if (b.trip_type) return b.trip_type;
+  if (b.return_date) return 'Round Trip';
+  if (b.booking_type?.toLowerCase().includes('round')) return 'Round Trip';
+  return 'One Way';
+}
 
 export default function AdminOutstationCabs() {
   const [statusFilter, setStatusFilter] = useState('');
@@ -199,7 +207,7 @@ export default function AdminOutstationCabs() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
-                        <Badge variant="outline" className="w-max text-[10px]">{b.trip_type || 'One Way'}</Badge>
+                        <Badge variant="outline" className="w-max text-[10px]">{getTripType(b)}</Badge>
                         <span className="text-xs font-medium">{b.travel_date ? format(new Date(b.travel_date), 'dd MMM yyyy') : '—'}</span>
                       </div>
                     </TableCell>
@@ -265,7 +273,7 @@ export default function AdminOutstationCabs() {
                     <Car className="h-4 w-4 text-muted-foreground" /> Trip Information
                   </h4>
                   <div className="text-sm space-y-1">
-                    <p><span className="text-muted-foreground">Trip Type:</span> {selectedBooking.trip_type || 'One Way'}</p>
+                    <p><span className="text-muted-foreground">Trip Type:</span> {getTripType(selectedBooking)}</p>
                     <p><span className="text-muted-foreground">Vehicle:</span> {selectedBooking.cab_type || '—'}</p>
                     <p><span className="text-muted-foreground">Travel Date:</span> {selectedBooking.travel_date ? format(new Date(selectedBooking.travel_date), 'dd MMM yyyy, hh:mm a') : '—'}</p>
                     {selectedBooking.return_date && (
@@ -294,7 +302,7 @@ export default function AdminOutstationCabs() {
                   </div>
                   <div className="flex gap-2">
                     <span className="text-muted-foreground">Buffer Included:</span>
-                    <span className="font-medium">+{selectedBooking.trip_type === 'Round Trip' ? 50 : 25} km</span>
+                    <span className="font-medium">+{getTripType(selectedBooking) === 'Round Trip' ? 50 : 25} km</span>
                   </div>
                 </div>
                 {selectedBooking.pickup_latitude && selectedBooking.pickup_longitude && (

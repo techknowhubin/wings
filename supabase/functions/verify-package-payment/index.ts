@@ -84,9 +84,37 @@ Deno.serve(async (req) => {
 
       const expected = await hmacSha256(secret, `${razorpay_order_id}|${razorpay_payment_id}`);
       if (expected !== razorpay_signature) {
-        await admin.from("package_bookings")
-          .update({ payment_status: "failed", booking_status: "cancelled" })
-          .eq("id", booking_id);
+        const failureReason = "Payment verification failed: invalid signature";
+        const now = new Date().toISOString();
+
+        await admin.from("package_bookings").update({
+          payment_status:        "failed",
+          booking_status:        "failed",
+          failure_reason:        failureReason,
+          payment_attempted_at:  now,
+          payment_failure_count: ((booking as any).payment_failure_count ?? 0) + 1,
+        }).eq("id", booking_id);
+
+        await admin.from("payment_attempts").insert({
+          booking_id,
+          booking_table:      "package_bookings",
+          payment_gateway:    "razorpay",
+          gateway_order_id:   razorpay_order_id,
+          gateway_payment_id: razorpay_payment_id,
+          amount:             booking.total_amount,
+          status:             "failed",
+          failure_reason:     failureReason,
+          attempted_by:       booking.user_id,
+        }).select().maybeSingle();
+
+        await admin.from("notifications").insert({
+          user_id: booking.user_id,
+          type:    "payment",
+          title:   "Payment Verification Failed",
+          message: "Your package payment could not be verified. Please try again or contact support.",
+          link:    "/profile/bookings",
+        });
+
         return json({ error: "Invalid payment signature" }, 400);
       }
     }
@@ -106,6 +134,27 @@ Deno.serve(async (req) => {
       .single();
 
     if (updateErr) throw updateErr;
+
+    // Record successful payment attempt
+    await admin.from("payment_attempts").insert({
+      booking_id,
+      booking_table:      "package_bookings",
+      payment_gateway:    "razorpay",
+      gateway_order_id:   razorpay_order_id,
+      gateway_payment_id: razorpay_payment_id,
+      amount:             booking.total_amount,
+      status:             "success",
+      attempted_by:       booking.user_id,
+    }).select().maybeSingle();
+
+    // Notify traveller of confirmed package booking
+    await admin.from("notifications").insert({
+      user_id: booking.user_id,
+      type:    "booking",
+      title:   "Package Booking Confirmed!",
+      message: `Your package booking is confirmed and payment received. Booking ID: ${booking_id.slice(0, 8).toUpperCase()}`,
+      link:    "/profile/bookings",
+    });
 
     // Record payment in package_payments
     await admin.from("package_payments").insert({

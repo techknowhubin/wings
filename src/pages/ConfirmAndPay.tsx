@@ -22,6 +22,7 @@ import LocationAutocomplete, { LocationData } from "@/components/LocationAutocom
 
 type ConfirmAndPayState = {
   booking?: BookingDetails;
+  existingFailedBookingId?: string;
 };
 
 interface HostedCoupon extends CouponOffer {
@@ -579,161 +580,195 @@ const ConfirmAndPay = () => {
       additionalGuests: allGuests,
     };
 
+    const existingFailedBookingId = (state as ConfirmAndPayState | null)?.existingFailedBookingId;
+
     let pendingBookingId = "";
     try {
-      const bookingData: any = {
-        user_id: user.id,
-        listing_type: dbListingType,
-        start_date: new Date(booking.startDate).toISOString(),
-        end_date: new Date(booking.endDate).toISOString(),
-        total_price: Number(totalPayable.toFixed(2)),
-        base_amount: Number(fullBaseAmount.toFixed(2)),
-        gst_percentage: Number(gstPercentage.toFixed(2)),
-        gst_amount: Number(gstAmount.toFixed(2)),
-        currency: booking.currencySymbol === "₹" ? "INR" : "USD",
-        payment_status: "pending",
-        booking_status: "pending",
-        guests_count: (booking.quantity || 1) + allGuests.length,
-        booking_channel: booking.bookingChannel || "marketplace",
-        commission_amount: Number(normalBookingFee.toFixed(2)),
-        notes: JSON.stringify(notesPayload),
-      };
-
-      const finalListingId = booking.listingId || "00000000-0000-0000-0000-000000000001";
-      bookingData.listing_id = finalListingId;
-
       const finalHostId = (booking.hostId && booking.hostId !== "00000000-0000-0000-0000-000000000000") ? booking.hostId : user.id;
-      bookingData.host_id = finalHostId;
 
-      const { data: newBooking, error: bookingError } = await supabase
-        .from("bookings")
-        .insert(bookingData)
-        .select()
-        .single();
+      if (existingFailedBookingId) {
+        // Retry path: reuse the existing failed booking record (no duplicate INSERT)
+        const { error: resetErr } = await supabase.from("bookings").update({
+          payment_status:       "pending",
+          booking_status:       "pending",
+          failure_reason:       null,
+          payment_attempted_at: null,
+          total_price:          Number(totalPayable.toFixed(2)),
+        }).eq("id", existingFailedBookingId);
 
-      if (bookingError || !newBooking) {
-        const errMsg = bookingError?.message ?? "Unknown error";
-        console.error("Booking insert error:", bookingError);
+        if (resetErr) {
+          toast.error(`Retry error: ${resetErr.message}`);
+          setIsProcessing(false);
+          return;
+        }
 
-        // Show exact error message for debugging
-        toast.error(`Booking DB Error: ${errMsg}`, { duration: 10000 });
-        setIsProcessing(false);
-        return;
-      }
-      pendingBookingId = newBooking.id;
-
-      if (booking.cabDetails) {
-        try {
-          let finalTravelDate = new Date(booking.cabDetails.travel_date);
-          if (booking.cabDetails.pickup_time) {
-            const timeMatch = booking.cabDetails.pickup_time.match(/(\d+):(\d+)\s*(AM|PM)/i);
-            if (timeMatch) {
-              let hours = parseInt(timeMatch[1], 10);
-              const mins = parseInt(timeMatch[2], 10);
-              const ampm = timeMatch[3].toUpperCase();
-              if (ampm === "PM" && hours < 12) hours += 12;
-              if (ampm === "AM" && hours === 12) hours = 0;
-              finalTravelDate.setHours(hours, mins, 0, 0);
-            }
-          }
-
-          // Auto-routing logic for Hub Partner
-          let matchedHubPartnerId: string | null = null;
-          let assignmentStatus = "Awaiting Hub Partner Assignment";
-
-          try {
-            const { data: partners } = await supabase
-              .from("profiles")
-              .select("id, assigned_district, assigned_area, assigned_state")
-              .eq("role", "hub_partner");
-
-            if (partners && partners.length > 0) {
-              const pickupLower = booking.cabDetails.pickup_location.toLowerCase();
-              const matched = partners.find((p: any) =>
-                (p.assigned_district && pickupLower.includes(p.assigned_district.toLowerCase())) ||
-                (p.assigned_area && pickupLower.includes(p.assigned_area.toLowerCase())) ||
-                (p.assigned_state && pickupLower.includes(p.assigned_state.toLowerCase()))
-              );
-              if (matched) {
-                matchedHubPartnerId = matched.id;
-                assignmentStatus = "Assigned";
-              }
-            }
-          } catch (e) {
-            console.error("Failed to route to hub partner:", e);
-          }
-
-          // Derive booking_source from the booking details
-          const bookingSource = booking.bookingSource
-            || booking.cabDetails.booking_source
-            || (booking.listingTitle?.toLowerCase().includes('airport') ? 'airport_transfer'
-              : booking.listingTitle?.toLowerCase().includes('4 hour') || booking.listingTitle?.toLowerCase().includes('4hrs') ? 'local_4hrs'
-                : booking.listingTitle?.toLowerCase().includes('8 hour') || booking.listingTitle?.toLowerCase().includes('8hrs') ? 'local_8hrs'
-                  : 'outstation_cab');
-
-          const { error: cabError } = await supabase.from('cab_bookings').insert({
-            booking_id: newBooking.id,
-            traveller_id: user.id,
-            host_id: finalHostId,
-            hub_partner_id: matchedHubPartnerId,
-            assignment_status: assignmentStatus,
-            distance_km: booking.cabDetails.distance_km,
-            state: booking.cabDetails.state,
-            pickup_location: pickupAddress,
-            drop_location: booking.cabDetails.drop_location,
-            travel_date: finalTravelDate.toISOString(),
-            return_date: booking.cabDetails.return_date ? new Date(booking.cabDetails.return_date).toISOString() : null,
-            cab_type: booking.cabDetails.cab_type,
-            fare_amount: booking.cabDetails.fare_amount,
-            airport_parking_charge: booking.cabDetails.parking_charge || 0,
-            base_amount: Number(fullBaseAmount.toFixed(2)),
-            base_fare: Number(fullBaseAmount.toFixed(2)),
-            gst_percentage: Number(gstPercentage.toFixed(2)),
-            gst_amount: Number(gstAmount.toFixed(2)),
-            payment_status: 'pending',
-            booking_status: 'pending',
-            booking_type: booking.listingTitle,
-            booking_source: bookingSource,
-            booking_category: 'cab',
-            customer_name: name,
+        // Reset cab_bookings if it's a cab booking
+        if (booking.cabDetails) {
+          await supabase.from("cab_bookings").update({
+            payment_status: "pending",
+            booking_status: "pending",
+            failure_reason: null,
+            customer_name:  name,
             customer_phone: phone,
+            pickup_location: pickupAddress,
             pickup_latitude: pickupCoords?.lat,
             pickup_longitude: pickupCoords?.lng,
-            pickup_place_id: pickupPlaceId || booking.cabDetails.pickup_place_id,
-            drop_latitude: booking.cabDetails.drop_latitude,
-            drop_longitude: booking.cabDetails.drop_longitude,
-            drop_place_id: booking.cabDetails.drop_place_id
-          });
-          if (cabError) console.error("Cab booking insert error:", cabError);
-
-          // Notify the matched Hub Partner
-          if (matchedHubPartnerId) {
-            await createNotification({
-              user_id: matchedHubPartnerId,
-              title: "New Assigned Cab Booking!",
-              message: `${name} has booked a cab from ${booking.cabDetails.pickup_location} to ${booking.cabDetails.drop_location}. Distance: ${booking.cabDetails.distance_km || "Unknown"} KM.`,
-              type: "bookings",
-              link: "/hub/bookings",
-              reference_id: newBooking.id,
-              reference_type: "booking",
-            });
-          }
-        } catch (err) {
-          console.error("Cab booking insert exception:", err);
+          }).eq("booking_id", existingFailedBookingId);
         }
-      }
 
-      // Notify the host about the new booking request
-      if (booking.hostId && booking.hostId !== "00000000-0000-0000-0000-000000000000") {
-        await createNotification({
-          user_id: booking.hostId,
-          title: "New Booking Request!",
-          message: `${name} has booked "${booking.listingTitle}". Check-in: ${format(new Date(booking.startDate), "MMM d, yyyy")} — Check-out: ${format(new Date(booking.endDate), "MMM d, yyyy")}.`,
-          type: "bookings",
-          link: "/host/bookings",
-          reference_id: newBooking.id,
-          reference_type: "booking",
-        });
+        pendingBookingId = existingFailedBookingId;
+      } else {
+        // Fresh booking path: INSERT a new booking record
+        const bookingData: any = {
+          user_id: user.id,
+          listing_type: dbListingType,
+          start_date: new Date(booking.startDate).toISOString(),
+          end_date: new Date(booking.endDate).toISOString(),
+          total_price: Number(totalPayable.toFixed(2)),
+          base_amount: Number(fullBaseAmount.toFixed(2)),
+          gst_percentage: Number(gstPercentage.toFixed(2)),
+          gst_amount: Number(gstAmount.toFixed(2)),
+          currency: booking.currencySymbol === "₹" ? "INR" : "USD",
+          payment_status: "pending",
+          booking_status: "pending",
+          guests_count: (booking.quantity || 1) + allGuests.length,
+          booking_channel: booking.bookingChannel || "marketplace",
+          commission_amount: Number(normalBookingFee.toFixed(2)),
+          notes: JSON.stringify(notesPayload),
+        };
+
+        const finalListingId = booking.listingId || "00000000-0000-0000-0000-000000000001";
+        bookingData.listing_id = finalListingId;
+        bookingData.host_id = finalHostId;
+
+        const { data: newBooking, error: bookingError } = await supabase
+          .from("bookings")
+          .insert(bookingData)
+          .select()
+          .single();
+
+        if (bookingError || !newBooking) {
+          const errMsg = bookingError?.message ?? "Unknown error";
+          console.error("Booking insert error:", bookingError);
+          toast.error(`Booking DB Error: ${errMsg}`, { duration: 10000 });
+          setIsProcessing(false);
+          return;
+        }
+        pendingBookingId = newBooking.id;
+
+        if (booking.cabDetails) {
+          try {
+            let finalTravelDate = new Date(booking.cabDetails.travel_date);
+            if (booking.cabDetails.pickup_time) {
+              const timeMatch = booking.cabDetails.pickup_time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+              if (timeMatch) {
+                let hours = parseInt(timeMatch[1], 10);
+                const mins = parseInt(timeMatch[2], 10);
+                const ampm = timeMatch[3].toUpperCase();
+                if (ampm === "PM" && hours < 12) hours += 12;
+                if (ampm === "AM" && hours === 12) hours = 0;
+                finalTravelDate.setHours(hours, mins, 0, 0);
+              }
+            }
+
+            // Auto-routing logic for Hub Partner
+            let matchedHubPartnerId: string | null = null;
+            let assignmentStatus = "Awaiting Hub Partner Assignment";
+
+            try {
+              const { data: partners } = await supabase
+                .from("profiles")
+                .select("id, assigned_district, assigned_area, assigned_state")
+                .eq("role", "hub_partner");
+
+              if (partners && partners.length > 0) {
+                const pickupLower = booking.cabDetails.pickup_location.toLowerCase();
+                const matched = partners.find((p: any) =>
+                  (p.assigned_district && pickupLower.includes(p.assigned_district.toLowerCase())) ||
+                  (p.assigned_area && pickupLower.includes(p.assigned_area.toLowerCase())) ||
+                  (p.assigned_state && pickupLower.includes(p.assigned_state.toLowerCase()))
+                );
+                if (matched) {
+                  matchedHubPartnerId = matched.id;
+                  assignmentStatus = "Assigned";
+                }
+              }
+            } catch (e) {
+              console.error("Failed to route to hub partner:", e);
+            }
+
+            // Derive booking_source from the booking details
+            const bookingSource = booking.bookingSource
+              || booking.cabDetails.booking_source
+              || (booking.listingTitle?.toLowerCase().includes('airport') ? 'airport_transfer'
+                : booking.listingTitle?.toLowerCase().includes('4 hour') || booking.listingTitle?.toLowerCase().includes('4hrs') ? 'local_4hrs'
+                  : booking.listingTitle?.toLowerCase().includes('8 hour') || booking.listingTitle?.toLowerCase().includes('8hrs') ? 'local_8hrs'
+                    : 'outstation_cab');
+
+            const { error: cabError } = await supabase.from('cab_bookings').insert({
+              booking_id: newBooking.id,
+              traveller_id: user.id,
+              host_id: finalHostId,
+              hub_partner_id: matchedHubPartnerId,
+              assignment_status: assignmentStatus,
+              distance_km: booking.cabDetails.distance_km,
+              state: booking.cabDetails.state,
+              pickup_location: pickupAddress,
+              drop_location: booking.cabDetails.drop_location,
+              travel_date: finalTravelDate.toISOString(),
+              return_date: booking.cabDetails.return_date ? new Date(booking.cabDetails.return_date).toISOString() : null,
+              cab_type: booking.cabDetails.cab_type,
+              fare_amount: booking.cabDetails.fare_amount,
+              airport_parking_charge: booking.cabDetails.parking_charge || 0,
+              base_amount: Number(fullBaseAmount.toFixed(2)),
+              base_fare: Number(fullBaseAmount.toFixed(2)),
+              gst_percentage: Number(gstPercentage.toFixed(2)),
+              gst_amount: Number(gstAmount.toFixed(2)),
+              payment_status: 'pending',
+              booking_status: 'pending',
+              booking_type: booking.listingTitle,
+              booking_source: bookingSource,
+              booking_category: 'cab',
+              customer_name: name,
+              customer_phone: phone,
+              pickup_latitude: pickupCoords?.lat,
+              pickup_longitude: pickupCoords?.lng,
+              pickup_place_id: pickupPlaceId || booking.cabDetails.pickup_place_id,
+              drop_latitude: booking.cabDetails.drop_latitude,
+              drop_longitude: booking.cabDetails.drop_longitude,
+              drop_place_id: booking.cabDetails.drop_place_id
+            });
+            if (cabError) console.error("Cab booking insert error:", cabError);
+
+            // Notify the matched Hub Partner
+            if (matchedHubPartnerId) {
+              await createNotification({
+                user_id: matchedHubPartnerId,
+                title: "New Assigned Cab Booking!",
+                message: `${name} has booked a cab from ${booking.cabDetails.pickup_location} to ${booking.cabDetails.drop_location}. Distance: ${booking.cabDetails.distance_km || "Unknown"} KM.`,
+                type: "bookings",
+                link: "/hub/bookings",
+                reference_id: newBooking.id,
+                reference_type: "booking",
+              });
+            }
+          } catch (err) {
+            console.error("Cab booking insert exception:", err);
+          }
+        }
+
+        // Notify the host about the new booking request
+        if (booking.hostId && booking.hostId !== "00000000-0000-0000-0000-000000000000") {
+          await createNotification({
+            user_id: booking.hostId,
+            title: "New Booking Request!",
+            message: `${name} has booked "${booking.listingTitle}". Check-in: ${format(new Date(booking.startDate), "MMM d, yyyy")} — Check-out: ${format(new Date(booking.endDate), "MMM d, yyyy")}.`,
+            type: "bookings",
+            link: "/host/bookings",
+            reference_id: newBooking.id,
+            reference_type: "booking",
+          });
+        }
       }
     } catch (err: any) {
       console.error("Booking init exception:", err);
@@ -741,6 +776,68 @@ const ConfirmAndPay = () => {
       setIsProcessing(false);
       return;
     }
+
+    const failureState = {
+      booking: { ...booking, discount: hostDiscountAmount + couponDiscountAmount, total: totalPayable },
+      failedBookingId: pendingBookingId,
+    };
+
+    const recordFrontendFailure = async (failureReason: string) => {
+      if (!pendingBookingId) return;
+      const now = new Date().toISOString();
+
+      await supabase.from('bookings').update({
+        payment_status:       'failed',
+        booking_status:       'failed',
+        failure_reason:       failureReason,
+        payment_attempted_at: now,
+      }).eq('id', pendingBookingId);
+
+      // cab_bookings is TEXT type so 'failed' works directly (sync trigger doesn't cover cab type)
+      if (booking.cabDetails) {
+        await supabase.from('cab_bookings').update({
+          payment_status:       'failed',
+          booking_status:       'failed',
+          failure_reason:       failureReason,
+          payment_attempted_at: now,
+        }).eq('booking_id', pendingBookingId);
+      }
+
+      // Record in payment_attempts history
+      await supabase.from('payment_attempts' as any).insert({
+        booking_id:      pendingBookingId,
+        booking_table:   'bookings',
+        payment_gateway: 'razorpay',
+        amount:          totalPayable,
+        status:          failureReason.includes('cancelled') ? 'cancelled' : 'failed',
+        failure_reason:  failureReason,
+        attempted_by:    user!.id,
+      });
+
+      // Notify traveller
+      await createNotification({
+        user_id:        user!.id,
+        title:          "Payment Failed",
+        message:        `Your payment for "${booking.listingTitle}" could not be completed. ${failureReason}.`,
+        type:           "payment",
+        link:           "/confirm-and-pay",
+        reference_id:   pendingBookingId,
+        reference_type: "booking",
+      });
+
+      // Notify host (non-blocking)
+      if (booking.hostId && booking.hostId !== "00000000-0000-0000-0000-000000000000") {
+        createNotification({
+          user_id:        booking.hostId,
+          title:          "Booking Payment Failed",
+          message:        `A payment for "${booking.listingTitle}" failed. The traveller may retry.`,
+          type:           "payment",
+          link:           "/host/bookings",
+          reference_id:   pendingBookingId,
+          reference_type: "booking",
+        }).catch(console.error);
+      }
+    };
 
     await initiateRazorpayPayment({
       amount: totalPayable,
@@ -762,11 +859,13 @@ const ConfirmAndPay = () => {
           });
 
           if (error || !data?.success) {
+            const reason = "Payment verification failed — please contact support if amount was deducted";
             console.error("Payment verification failed:", error);
-            toast.error("Payment verification failed. Invalid signature.");
+            toast.error("Payment verification failed. Please contact support.");
+            await recordFrontendFailure(reason);
             setIsProcessing(false);
             navigate("/transaction-failed", {
-              state: { booking: { ...booking, discount: hostDiscountAmount + couponDiscountAmount, total: totalPayable } },
+              state: { ...failureState, failureReason: reason },
             });
             return;
           }
@@ -783,30 +882,33 @@ const ConfirmAndPay = () => {
           });
         } catch (err) {
           console.error("Edge function error:", err);
+          const reason = "Payment gateway error — please contact support";
+          await recordFrontendFailure(reason);
           setIsProcessing(false);
           navigate("/transaction-failed", {
-            state: { booking: { ...booking, discount: hostDiscountAmount + couponDiscountAmount, total: totalPayable } },
+            state: { ...failureState, failureReason: reason },
           });
         }
       },
-      onFailure: async () => {
-        // Mark the booking as payment_failed so it doesn't sit as 'pending' forever
-        if (pendingBookingId) {
-          // bookings table only supports 'cancelled', not 'failed' for booking_status
-          await supabase.from('bookings').update({
-            payment_status: 'failed',
-            booking_status: 'cancelled',
-          }).eq('id', pendingBookingId);
-
-          // cab_bookings supports 'failed' for booking_status
-          await supabase.from('cab_bookings').update({
-            payment_status: 'failed',
-            booking_status: 'failed',
-          }).eq('booking_id', pendingBookingId);
+      onFailure: async (error) => {
+        const raw = error as any;
+        let reason: string;
+        if (raw instanceof Error && raw.message.includes("cancelled")) {
+          reason = "Payment cancelled by user";
+        } else if (raw?.description) {
+          reason = raw.description;
+        } else if (raw?.reason) {
+          reason = raw.reason;
+        } else if (raw instanceof Error) {
+          reason = raw.message;
+        } else {
+          reason = "Payment failed";
         }
+
+        await recordFrontendFailure(reason);
         setIsProcessing(false);
         navigate("/transaction-failed", {
-          state: { booking: { ...booking, discount: hostDiscountAmount + couponDiscountAmount, total: totalPayable } },
+          state: { ...failureState, failureReason: reason },
         });
       },
     });

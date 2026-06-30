@@ -92,6 +92,10 @@ export async function initiateRazorpayPayment({
       return;
     }
 
+    // Track whether onFailure has already been called by payment.failed event
+    // to avoid double-calling when the modal is also dismissed after a failure
+    let failureCalled = false;
+
     const options = {
       key: RAZORPAY_KEY_ID,
       amount: data.amount,
@@ -107,13 +111,18 @@ export async function initiateRazorpayPayment({
       theme: { color: "#013220" },
       modal: {
         ondismiss: () => {
-          toast.info("Payment cancelled");
+          if (!failureCalled) {
+            failureCalled = true;
+            toast.info("Payment cancelled");
+            onFailure?.(new Error("Payment cancelled by user"));
+          }
         },
       },
     };
 
     const rzp = new (window as any).Razorpay(options);
     rzp.on("payment.failed", (resp: any) => {
+      failureCalled = true;
       toast.error("Payment failed. Please try again.");
       onFailure?.(resp.error);
     });

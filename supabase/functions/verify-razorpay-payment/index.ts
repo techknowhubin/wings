@@ -129,16 +129,43 @@ Deno.serve(async (req) => {
       if (expected !== razorpay_signature) {
         console.error(`[Security] Forged signature for booking ${booking_id} from IP ${clientIp}`);
 
+        const failureReason = "Payment verification failed: invalid signature";
+        const now = new Date().toISOString();
+
         await admin.from("bookings").update({
-          payment_status: "failed",
-          booking_status: "cancelled",
+          payment_status:          "failed",
+          booking_status:          "failed",
+          failure_reason:          failureReason,
+          payment_attempted_at:    now,
+          payment_failure_count:   (booking as any).payment_failure_count ? (booking as any).payment_failure_count + 1 : 1,
         }).eq("id", booking_id);
+
+        await admin.from("payment_attempts").insert({
+          booking_id,
+          booking_table:     "bookings",
+          payment_gateway:   "razorpay",
+          gateway_order_id:  razorpay_order_id,
+          gateway_payment_id: razorpay_payment_id,
+          amount:            booking.total_price,
+          status:            "failed",
+          failure_reason:    failureReason,
+          attempted_by:      booking.user_id,
+        }).select().maybeSingle();
 
         await admin.from("audit_logs").insert({
           actor_id:   booking.user_id,
           action:     "payment_signature_invalid",
           ip_address: clientIp,
           metadata:   { booking_id, razorpay_order_id },
+        });
+
+        // Notify traveller
+        await admin.from("notifications").insert({
+          user_id: booking.user_id,
+          type:    "payment",
+          title:   "Payment Verification Failed",
+          message: `Your payment for booking could not be verified. Please try again or contact support.`,
+          link:    "/profile/bookings",
         });
 
         return json({ error: "Invalid payment signature" }, 400);
@@ -158,6 +185,38 @@ Deno.serve(async (req) => {
       .single();
 
     if (updateError) throw updateError;
+
+    // ── Record successful payment attempt ─────────────────────
+    await admin.from("payment_attempts").insert({
+      booking_id,
+      booking_table:      "bookings",
+      payment_gateway:    "razorpay",
+      gateway_order_id:   razorpay_order_id,
+      gateway_payment_id: razorpay_payment_id,
+      amount:             booking.total_price,
+      status:             "success",
+      attempted_by:       booking.user_id,
+    }).select().maybeSingle();
+
+    // ── Notify traveller of confirmed booking ─────────────────
+    await admin.from("notifications").insert({
+      user_id: booking.user_id,
+      type:    "booking",
+      title:   "Booking Confirmed!",
+      message: `Your payment was successful and your booking is confirmed. Booking ID: ${booking_id.slice(0, 8).toUpperCase()}`,
+      link:    "/profile/bookings",
+    });
+
+    // ── Notify host of confirmed booking ─────────────────────
+    if (booking.host_id && booking.host_id !== booking.user_id) {
+      await admin.from("notifications").insert({
+        user_id: booking.host_id,
+        type:    "booking",
+        title:   "New Confirmed Booking!",
+        message: `A booking has been confirmed and payment received. Booking ID: ${booking_id.slice(0, 8).toUpperCase()}`,
+        link:    "/host/bookings",
+      });
+    }
 
     // ── Audit log ─────────────────────────────────────────────
     await admin.from("audit_logs").insert({

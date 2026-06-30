@@ -87,6 +87,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         }
 
+        // Apply any pending WING referral code now that we have a logged-in user.
+        // This is the provider-agnostic capture point: WhatsApp/email signups already
+        // pass referred_by through signUp() and get it applied server-side by the
+        // on-confirm trigger, but Google (and any other OAuth provider) has no metadata
+        // channel for app-supplied data — apply_pending_referral is idempotent (it's a
+        // no-op if a referral row already exists for this user), so calling it here on
+        // every sign-in for every provider is safe and requires no provider branching.
+        if (event === 'SIGNED_IN' && newSession?.user) {
+          (async () => {
+            try {
+              const { getUserReferralCode, clearUserReferral } = await import('@/lib/referral');
+              const code = getUserReferralCode();
+              if (!code) return;
+              const { error: refErr } = await supabase.rpc('apply_pending_referral', {
+                p_user_id: newSession.user.id,
+                p_referral_code: code,
+              });
+              if (!refErr) clearUserReferral();
+            } catch (err) {
+              console.error('[AuthContext] Failed to apply pending referral:', err);
+            }
+          })();
+        }
+
         // Close the popup window automatically after a successful login, but ONLY if we are on the /auth route
         if (
           newSession &&

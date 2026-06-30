@@ -1679,7 +1679,7 @@ export default function UserProfile() {
                           Invite Friends &amp; Earn Wing Credits
                         </h3>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Earn ₹{Number(walletSettings?.referral_bonus || 500).toLocaleString()} Wing Credits for every friend who signs up and verifies their account using your referral code!
+                          Earn ₹{Number(walletSettings?.referral_bonus || 200).toLocaleString()} Wing Credits when a friend signs up with your code, plus another ₹{Number(walletSettings?.referral_local_bonus || 300).toLocaleString()}–₹{Number(walletSettings?.referral_outstation_bonus || 500).toLocaleString()} when they complete their first paid booking!
                         </p>
                       </div>
                       <CardContent className="p-6 space-y-4">
@@ -1717,8 +1717,8 @@ export default function UserProfile() {
                           <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
                             <li>Share your unique referral code with friends</li>
                             <li>Friend signs up on Xplorwing using your code</li>
-                            <li>Friend completes their account verification</li>
-                            <li>You earn ₹{Number(walletSettings?.referral_bonus || 500).toLocaleString()} Wing Credits instantly!</li>
+                            <li>You earn ₹{Number(walletSettings?.referral_bonus || 200).toLocaleString()} Wing Credits as soon as they verify their account</li>
+                            <li>When they complete their first paid booking, you earn another ₹{Number(walletSettings?.referral_local_bonus || 300).toLocaleString()} (local/airport) or ₹{Number(walletSettings?.referral_outstation_bonus || 500).toLocaleString()} (outstation)!</li>
                           </ol>
                         </div>
                       </CardContent>

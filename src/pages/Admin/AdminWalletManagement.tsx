@@ -17,8 +17,12 @@ export default function AdminWalletManagement() {
 
   // Wallet Settings Form State
   const [settings, setSettings] = useState({
-    signup_bonus: 1000,
-    referral_bonus: 500,
+    signup_bonus: 300,
+    referral_bonus: 200,
+    welcome_local_bonus: 200,
+    welcome_outstation_bonus: 500,
+    referral_local_bonus: 300,
+    referral_outstation_bonus: 500,
     expiry_days: 90,
     max_redemption_percentage: 10,
     program_enabled: true,
@@ -47,6 +51,10 @@ export default function AdminWalletManagement() {
       setSettings({
         signup_bonus: Number(serverSettings.signup_bonus),
         referral_bonus: Number(serverSettings.referral_bonus),
+        welcome_local_bonus: Number(serverSettings.welcome_local_bonus ?? 200),
+        welcome_outstation_bonus: Number(serverSettings.welcome_outstation_bonus ?? 500),
+        referral_local_bonus: Number(serverSettings.referral_local_bonus ?? 300),
+        referral_outstation_bonus: Number(serverSettings.referral_outstation_bonus ?? 500),
         expiry_days: Number(serverSettings.expiry_days),
         max_redemption_percentage: Number(serverSettings.max_redemption_percentage),
         program_enabled: Boolean(serverSettings.program_enabled),
@@ -128,7 +136,7 @@ export default function AdminWalletManagement() {
     setAdjusting(true);
     try {
       const finalAmount = adjustType === "admin_credit" ? amount : -amount;
-      const { error } = await supabase.rpc("process_wallet_transaction", {
+      const { error } = await supabase.rpc("admin_adjust_wallet", {
         p_user_id: selectedUser.id,
         p_type: adjustType,
         p_amount: finalAmount,
@@ -183,20 +191,56 @@ export default function AdminWalletManagement() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Sign-Up Bonus (₹)</Label>
-                    <Input 
-                      type="number" 
-                      value={settings.signup_bonus} 
-                      onChange={(e) => setSettings({ ...settings, signup_bonus: Number(e.target.value) })} 
+                    <Label>Welcome Signup Bonus (₹)</Label>
+                    <Input
+                      type="number"
+                      value={settings.signup_bonus}
+                      onChange={(e) => setSettings({ ...settings, signup_bonus: Number(e.target.value) })}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Referral Bonus (₹)</Label>
-                    <Input 
-                      type="number" 
-                      value={settings.referral_bonus} 
-                      onChange={(e) => setSettings({ ...settings, referral_bonus: Number(e.target.value) })} 
+                    <Label>Referral Signup Bonus (₹)</Label>
+                    <Input
+                      type="number"
+                      value={settings.referral_bonus}
+                      onChange={(e) => setSettings({ ...settings, referral_bonus: Number(e.target.value) })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Welcome: First Local/Airport Booking (₹)</Label>
+                    <Input
+                      type="number"
+                      value={settings.welcome_local_bonus}
+                      onChange={(e) => setSettings({ ...settings, welcome_local_bonus: Number(e.target.value) })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Welcome: First Outstation Booking (₹)</Label>
+                    <Input
+                      type="number"
+                      value={settings.welcome_outstation_bonus}
+                      onChange={(e) => setSettings({ ...settings, welcome_outstation_bonus: Number(e.target.value) })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Referral: Friend's First Local/Airport Booking (₹)</Label>
+                    <Input
+                      type="number"
+                      value={settings.referral_local_bonus}
+                      onChange={(e) => setSettings({ ...settings, referral_local_bonus: Number(e.target.value) })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Referral: Friend's First Outstation Booking (₹)</Label>
+                    <Input
+                      type="number"
+                      value={settings.referral_outstation_bonus}
+                      onChange={(e) => setSettings({ ...settings, referral_outstation_bonus: Number(e.target.value) })}
                     />
                   </div>
 

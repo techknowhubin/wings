@@ -168,13 +168,12 @@ Deno.serve(async (req) => {
     // Deduct Wing Credits atomically (non-fatal)
     if (used_wing_credits && used_wing_credits > 0) {
       try {
-        await admin.rpc("process_wallet_transaction", {
-          p_user_id:     booking.user_id,
-          p_type:        "booking_redemption",
-          p_amount:      -Math.abs(used_wing_credits),
-          p_source:      "booking_checkout",
-          p_reference_id: booking_id,
+        const { error: credErr } = await admin.rpc("redeem_wing_credits_for_package_booking", {
+          p_user_id:    booking.user_id,
+          p_booking_id: booking_id,
+          p_amount:     Math.abs(used_wing_credits),
         });
+        if (credErr) throw credErr;
       } catch (credErr) {
         console.error("[verify-package-payment] Wing credits deduction failed (non-fatal):", credErr);
       }

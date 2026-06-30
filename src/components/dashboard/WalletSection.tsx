@@ -74,6 +74,10 @@ export function WalletSection() {
     switch(type) {
       case 'signup_bonus': return 'Sign-Up Bonus';
       case 'referral_reward': return 'Referral Reward';
+      case 'welcome_local_booking': return 'First Local/Airport Booking Bonus';
+      case 'welcome_outstation_booking': return 'First Outstation Booking Bonus';
+      case 'referral_local_booking': return "Referral: Friend's Local Booking";
+      case 'referral_outstation_booking': return "Referral: Friend's Outstation Booking";
       case 'booking_redemption': return 'Booking Deduction';
       case 'expired_credits': return 'Expired Credits';
       case 'admin_credit': return 'Promotional Credit';

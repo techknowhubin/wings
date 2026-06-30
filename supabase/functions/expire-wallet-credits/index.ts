@@ -16,76 +16,57 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // 1. Find all completed earning transactions that have expired, 
-    //    and haven't already been expired.
-    // We check this by seeing if there is an 'expired_credits' transaction with reference_id = this transaction.id.
-    const { data: expiredEarns, error: fetchErr } = await supabase
-      .from("wallet_transactions")
-      .select("id, wallet_id, amount, wallets(user_id, balance)")
-      .in("type", ["signup_bonus", "referral_reward", "promotional_credits", "admin_credit"])
-      .eq("status", "completed")
+    // 1. Find expired earning lots via wallet_lot_remaining, which accounts for
+    //    how much of each lot has already been spent via FIFO consumption —
+    //    unlike a raw wallet_transactions scan, this never over- or under-expires
+    //    a lot that's been partially redeemed.
+    const { data: expiredLots, error: fetchErr } = await supabase
+      .from("wallet_lot_remaining")
+      .select("lot_transaction_id, user_id, remaining, expiry_date")
       .lt("expiry_date", new Date().toISOString())
-      // Ideally we would do a complex join, but for simplicity we fetch and then filter or use a view.
-      // Since this is a simple job, let's just fetch them and check.
+      .gt("remaining", 0)
       .limit(100);
 
     if (fetchErr) throw fetchErr;
 
     const processedIds = [];
 
-    for (const tx of (expiredEarns || [])) {
-      // Check if already expired
+    for (const lot of (expiredLots || [])) {
+      // Check if already expired (idempotency_key is the primary guard; this is a fallback)
       const { data: alreadyExpired } = await supabase
         .from("wallet_transactions")
         .select("id")
         .eq("type", "expired_credits")
-        .eq("reference_id", tx.id)
+        .eq("reference_id", lot.lot_transaction_id)
         .maybeSingle();
 
       if (alreadyExpired) continue;
 
-      const userId = tx.wallets?.user_id;
-      const currentBalance = Number(tx.wallets?.balance || 0);
+      const amountToExpire = Number(lot.remaining);
 
-      // How much to expire? At most the transaction amount, but no more than the current wallet balance.
-      const amountToExpire = Math.min(Number(tx.amount), currentBalance);
+      const { error: deductErr } = await supabase.rpc("process_wallet_transaction", {
+        p_user_id: lot.user_id,
+        p_type: "expired_credits",
+        p_amount: -amountToExpire,
+        p_source: "system_cron",
+        p_reference_id: lot.lot_transaction_id,
+        p_idempotency_key: `expire:${lot.lot_transaction_id}`,
+      });
 
-      if (amountToExpire > 0) {
-        // Deduct from wallet
-        const { error: deductErr } = await supabase.rpc("process_wallet_transaction", {
-          p_user_id: userId,
-          p_type: "expired_credits",
-          p_amount: -amountToExpire,
-          p_source: "system_cron",
-          p_reference_id: tx.id,
-        });
-
-        if (deductErr) {
-          console.error(`Failed to expire credits for tx ${tx.id}:`, deductErr);
-          continue;
-        }
-
-        // Add a notification
-        await supabase.rpc('create_notification', {
-          p_user_id: userId,
-          p_type: 'wallet_expired',
-          p_title: 'Wing Credits Expired',
-          p_message: `Your ${amountToExpire} Wing Credits have expired.`,
-          p_action_link: '/profile/wing-credits'
-        });
-      } else {
-        // If balance is 0, just create a 0 amount transaction to mark it processed
-        await supabase.from("wallet_transactions").insert({
-          wallet_id: tx.wallet_id,
-          type: "expired_credits",
-          amount: 0,
-          status: "completed",
-          source: "system_cron",
-          reference_id: tx.id
-        });
+      if (deductErr) {
+        console.error(`Failed to expire credits for lot ${lot.lot_transaction_id}:`, deductErr);
+        continue;
       }
 
-      processedIds.push(tx.id);
+      await supabase.rpc('create_notification', {
+        p_user_id: lot.user_id,
+        p_type: 'wallet_expired',
+        p_title: 'Wing Credits Expired',
+        p_message: `Your ${amountToExpire} Wing Credits have expired.`,
+        p_action_link: '/profile/wing-credits'
+      });
+
+      processedIds.push(lot.lot_transaction_id);
     }
 
     return new Response(

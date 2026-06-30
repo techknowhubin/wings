@@ -186,6 +186,16 @@ Deno.serve(async (req) => {
 
     if (updateError) throw updateError;
 
+    // ── Wing Credits milestone rewards (non-fatal) ─────────────
+    try {
+      const { error: milestoneErr } = await admin.rpc("award_booking_milestone_credits", {
+        p_booking_id: booking_id,
+      });
+      if (milestoneErr) throw milestoneErr;
+    } catch (err) {
+      console.error("[Wing Credits] Failed to award milestone credits:", err);
+    }
+
     // ── Record successful payment attempt ─────────────────────
     await admin.from("payment_attempts").insert({
       booking_id,
@@ -304,12 +314,10 @@ Deno.serve(async (req) => {
     // ── Wing Credits Deduction (non-fatal) ────────────────────
     if (used_wing_credits && used_wing_credits > 0 && updatedBooking) {
       try {
-        const { error: creditErr } = await admin.rpc("process_wallet_transaction", {
+        const { error: creditErr } = await admin.rpc("redeem_wing_credits_for_booking", {
           p_user_id: updatedBooking.user_id,
-          p_type: "booking_redemption",
-          p_amount: -Math.abs(used_wing_credits),
-          p_source: "booking_checkout",
-          p_reference_id: booking_id,
+          p_booking_id: booking_id,
+          p_amount: Math.abs(used_wing_credits),
         });
         if (creditErr) throw creditErr;
       } catch (err) {

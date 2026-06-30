@@ -766,6 +766,21 @@ export function useAdminUsers(kycFilter?: string, search?: string) {
         const s = search.toLowerCase();
         users = users.filter((u: any) => u.full_name?.toLowerCase().includes(s) || u.phone?.includes(s));
       }
+
+      // 4. Fetch wing credits (wallet balances) for these travellers
+      if (users.length > 0) {
+        const userIds = users.map((u: any) => u.id);
+        const { data: wallets } = await supabase
+          .from('wallets')
+          .select('user_id, balance, lifetime_earned')
+          .in('user_id', userIds);
+        const walletMap = new Map((wallets ?? []).map((w: any) => [w.user_id, w]));
+        users = users.map((u: any) => {
+          const w = walletMap.get(u.id);
+          return { ...u, wing_credits: w?.balance ?? 0, wing_credits_earned: w?.lifetime_earned ?? 0 };
+        });
+      }
+
       return users;
     },
   });

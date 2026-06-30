@@ -30,7 +30,7 @@ export default function AdminOutstationCabs() {
       let query = supabase
         .from('cab_bookings')
         .select('*, bookings(notes)')
-        .ilike('booking_type', '%Outstation%')
+        .eq('booking_source', 'outstation_cab')
         .order('created_at', { ascending: false });
 
       if (statusFilter && statusFilter !== 'all') {

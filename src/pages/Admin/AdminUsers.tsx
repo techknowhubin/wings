@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAdminUsers } from '@/hooks/useAdmin';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Award } from 'lucide-react';
+import { Search, Coins } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 const KYC_BADGE: Record<string, { label: string; className: string }> = {
@@ -19,10 +19,40 @@ const KYC_BADGE: Record<string, { label: string; className: string }> = {
   re_upload_requested: { label: 'Re-upload', className: 'bg-orange-100 text-orange-700' },
 };
 
+interface LiveWallet { balance: number; lifetime_earned: number; }
+
 export default function AdminUsers() {
   const [search, setSearch] = useState('');
   const [kycFilter, setKycFilter] = useState('all');
   const { data: users, isLoading } = useAdminUsers(kycFilter, search);
+
+  // Live wallet updates via Supabase Realtime
+  const [liveWallets, setLiveWallets] = useState<Map<string, LiveWallet>>(new Map());
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-wallet-live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'wallets' },
+        (payload: any) => {
+          const row = payload.new ?? payload.old;
+          if (row?.user_id) {
+            setLiveWallets(prev => {
+              const next = new Map(prev);
+              next.set(row.user_id, {
+                balance: payload.new?.balance ?? 0,
+                lifetime_earned: payload.new?.lifetime_earned ?? 0,
+              });
+              return next;
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -63,14 +93,18 @@ export default function AdminUsers() {
                       <TableHead>Contact</TableHead>
                       <TableHead>Joined</TableHead>
                       <TableHead>KYC Status</TableHead>
+                      <TableHead>Wing Credits</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {(users ?? []).length === 0 && (
-                      <TableRow><TableCell colSpan={4} className="text-center py-10 text-muted-foreground">No travelers found.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No travelers found.</TableCell></TableRow>
                     )}
                     {(users ?? []).map((u: any) => {
                       const badgeInfo = KYC_BADGE[u.kyc_status] ?? KYC_BADGE.not_started;
+                      const live = liveWallets.get(u.id);
+                      const balance = live?.balance ?? u.wing_credits ?? 0;
+                      const earned = live?.lifetime_earned ?? u.wing_credits_earned ?? 0;
                       return (
                         <TableRow key={u.id}>
                           <TableCell>
@@ -89,6 +123,21 @@ export default function AdminUsers() {
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className={`text-[10px] ${badgeInfo.className}`}>{badgeInfo.label}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              <Coins className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                              <div>
+                                <p className="text-sm font-semibold text-amber-600">
+                                  ₹{Number(balance).toLocaleString('en-IN')}
+                                </p>
+                                {earned > 0 && (
+                                  <p className="text-[10px] text-muted-foreground leading-none">
+                                    ₹{Number(earned).toLocaleString('en-IN')} earned
+                                  </p>
+                                )}
+                              </div>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );

@@ -575,10 +575,46 @@ const ConfirmAndPay = () => {
 
     // Store additional guests in notes as JSON
     const allGuests = extraGuests.filter(g => g.name.trim());
-    const notesPayload = {
+    const notesPayload: Record<string, unknown> = {
       primaryGuest: { name, email, phone },
       additionalGuests: allGuests,
+      pricing: {
+        baseAmount:           Number(fullBaseAmount.toFixed(2)),
+        gstAmount:            Number(gstAmount.toFixed(2)),
+        totalBeforeDiscounts: Number(fullTotalWithTax.toFixed(2)),
+        hostDiscount:         Number(hostDiscountAmount.toFixed(2)),
+        couponCode:           appliedCoupon?.code || null,
+        couponDiscount:       Number(couponDiscountAmount.toFixed(2)),
+        wingCreditsUsed:      Number(wingCreditsDiscountAmount.toFixed(2)),
+        amountPaid:           Number(totalPayable.toFixed(2)),
+        paymentType:          isLocalOrAirport ? 'full' : 'booking_fee',
+        bookingFeePercent:    isLocalOrAirport ? 100 : bookingFeeRate,
+      },
     };
+    if (booking.cabDetails) {
+      notesPayload.cabDetails = {
+        pickup_location:       booking.cabDetails.pickup_location,
+        drop_location:         booking.cabDetails.drop_location,
+        cab_type:              booking.cabDetails.cab_type,
+        distance_km:           booking.cabDetails.distance_km,
+        travel_date:           booking.cabDetails.travel_date,
+        return_date:           booking.cabDetails.return_date || null,
+        fare_amount:           booking.cabDetails.fare_amount,
+        base_amount:           Number(fullBaseAmount.toFixed(2)),
+        base_fare:             Number(fullBaseAmount.toFixed(2)),
+        gst_percentage:        Number(gstPercentage.toFixed(2)),
+        gst_amount:            Number(gstAmount.toFixed(2)),
+        airport_parking_charge: booking.cabDetails.parking_charge || 0,
+        booking_type:          booking.listingTitle,
+        customer_name:         name,
+        customer_phone:        phone,
+        state:                 booking.cabDetails.state,
+        pickup_latitude:       booking.cabDetails.pickup_latitude,
+        pickup_longitude:      booking.cabDetails.pickup_longitude,
+        drop_latitude:         booking.cabDetails.drop_latitude,
+        drop_longitude:        booking.cabDetails.drop_longitude,
+      };
+    }
 
     const existingFailedBookingId = (state as ConfirmAndPayState | null)?.existingFailedBookingId;
 
@@ -676,17 +712,17 @@ const ConfirmAndPay = () => {
             let assignmentStatus = "Awaiting Hub Partner Assignment";
 
             try {
-              const { data: partners } = await supabase
-                .from("profiles")
-                .select("id, assigned_district, assigned_area, assigned_state")
-                .eq("role", "hub_partner");
+              // Match from hubs table so hub_partner_id FK (→ hubs.id) is always valid
+              const { data: hubs } = await supabase
+                .from("hubs")
+                .select("id, district, area")
+                .eq("status", "active");
 
-              if (partners && partners.length > 0) {
+              if (hubs && hubs.length > 0) {
                 const pickupLower = booking.cabDetails.pickup_location.toLowerCase();
-                const matched = partners.find((p: any) =>
-                  (p.assigned_district && pickupLower.includes(p.assigned_district.toLowerCase())) ||
-                  (p.assigned_area && pickupLower.includes(p.assigned_area.toLowerCase())) ||
-                  (p.assigned_state && pickupLower.includes(p.assigned_state.toLowerCase()))
+                const matched = hubs.find((h: any) =>
+                  (h.district && pickupLower.includes(h.district.toLowerCase())) ||
+                  (h.area && pickupLower.includes(h.area.toLowerCase()))
                 );
                 if (matched) {
                   matchedHubPartnerId = matched.id;
@@ -738,7 +774,10 @@ const ConfirmAndPay = () => {
               drop_longitude: booking.cabDetails.drop_longitude,
               drop_place_id: booking.cabDetails.drop_place_id
             });
-            if (cabError) console.error("Cab booking insert error:", cabError);
+            if (cabError) {
+              console.error("Cab booking insert error:", cabError);
+              toast.error(`Cab details not saved: ${cabError.message}`, { duration: 8000 });
+            }
 
             // Notify the matched Hub Partner
             if (matchedHubPartnerId) {

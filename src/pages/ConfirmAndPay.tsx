@@ -630,6 +630,7 @@ const ConfirmAndPay = () => {
           failure_reason:       null,
           payment_attempted_at: null,
           total_price:          Number(totalPayable.toFixed(2)),
+          notes:                JSON.stringify(notesPayload),
         }).eq("id", existingFailedBookingId);
 
         if (resetErr) {

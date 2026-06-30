@@ -37,37 +37,38 @@ export default function AdminBookings() {
   useEffect(() => {
     if (!selected) { setSelectedPaymentMeta(null); return; }
 
-    // Skip fetch if notes already has pricing data
+    // Parse notes for fallback values (used when DB records don't exist yet, e.g. pending/failed bookings)
     let parsedNotes: any = null;
     try { if (selected.notes) parsedNotes = typeof selected.notes === 'string' ? JSON.parse(selected.notes) : selected.notes; } catch {}
-    if (parsedNotes?.pricing) { setSelectedPaymentMeta(null); return; }
+    const pricingFallback = parsedNotes?.pricing ?? null;
 
     (async () => {
-      // Wing credits: wallet_transactions where reference_id = booking id and type = booking_redemption
+      // Wing credits from DB (only exist after successful payment)
       const { data: wtData } = await supabase
         .from('wallet_transactions' as any)
         .select('amount')
         .eq('reference_id', selected.id)
         .eq('type', 'booking_redemption');
-      const wingCredits = wtData && wtData.length > 0
+      const dbWingCredits = wtData && wtData.length > 0
         ? Math.abs(wtData.reduce((s: number, r: any) => s + Number(r.amount), 0))
-        : 0;
+        : null;
 
-      // Coupon: host_coupon_redemptions matched by transaction_id (paymentId in booking_context)
-      let couponCode: string | null = null;
-      let couponDiscount = 0;
+      // Coupon from DB via paymentId in booking_context (only exists after successful payment)
+      let dbCouponCode: string | null = null;
       if (selected.transaction_id) {
         const { data: crData } = await supabase
           .from('host_coupon_redemptions' as any)
-          .select('coupon_id, coupon:host_coupons(code, discount_type, discount_value, discount_percent)')
+          .select('coupon_id, coupon:host_coupons(code)')
           .eq('user_id', selected.user_id)
           .filter('booking_context->>paymentId', 'eq', selected.transaction_id)
           .maybeSingle();
-        if (crData) {
-          couponCode = (crData as any).coupon?.code ?? null;
-          // Discount amount can't be recovered precisely for old bookings without pricing block
-        }
+        if (crData) dbCouponCode = (crData as any).coupon?.code ?? null;
       }
+
+      // DB values take priority (confirmed payments); fall back to notes.pricing (pending/failed)
+      const wingCredits = dbWingCredits  ?? pricingFallback?.wingCreditsUsed ?? 0;
+      const couponCode  = dbCouponCode   ?? pricingFallback?.couponCode       ?? null;
+      const couponDiscount = pricingFallback?.couponDiscount ?? 0;
 
       setSelectedPaymentMeta({ wingCredits, couponCode, couponDiscount });
     })();
@@ -479,9 +480,10 @@ export default function AdminBookings() {
                       {/* Coupon & Wing Credits labels */}
                       {(() => {
                         const meta = selectedPaymentMeta;
-                        const displayCoupon = p?.couponCode ?? meta?.couponCode;
-                        const displayCouponDiscount = p ? couponDiscount : (meta?.couponDiscount ?? 0);
-                        const displayWingCredits = p ? wingCredits : (meta?.wingCredits ?? 0);
+                        // DB records take priority (meta always fetched now); notes.pricing as fallback
+                        const displayCoupon = meta?.couponCode ?? p?.couponCode ?? null;
+                        const displayCouponDiscount = meta?.couponDiscount || couponDiscount;
+                        const displayWingCredits = meta?.wingCredits ?? wingCredits;
 
                         return (
                           <>

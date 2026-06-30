@@ -268,8 +268,9 @@ export default function UserProfile() {
 
   const handleCopyReferral = () => {
     if (!referralCode) return;
-    navigator.clipboard.writeText(referralCode);
-    toast.success('Referral code copied!');
+    const link = `${window.location.origin}/signup?ref=${referralCode}`;
+    navigator.clipboard.writeText(link);
+    toast.success('Referral link copied!');
   };
 
   const handleShareReferralWhatsApp = () => {

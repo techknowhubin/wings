@@ -43,7 +43,7 @@ const transportLinks = [
 const hostLinks = [
   { label: "Become a Host", to: "/become-host" },
   { label: "Host Dashboard", to: "/host" },
-  { label: "Link-in-Bio", to: "/link-in-bio" },
+  { label: "Wing-bio", to: "/link-in-bio" },
 ];
 
 function Footerdemo() {
@@ -223,7 +223,7 @@ function Footerdemo() {
             <div className="mt-6 pt-4 border-t border-border/50">
               <h4 className="text-sm font-bold text-foreground/70 mb-2">Contact</h4>
               <address className="space-y-2 text-sm not-italic text-muted-foreground">
-                <p>📞 +91 6362986420</p>
+                <p>📞 +91 9422799420</p>
                 <p>✉️ hello@xplorwing.com</p>
               </address>
             </div>

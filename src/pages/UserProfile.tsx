@@ -7,7 +7,7 @@ import {
   User, Calendar, ShieldCheck, Lock, Bell, HelpCircle, LogOut,
   Camera, Edit2, Save, Check, Clock, Upload, X, Eye, EyeOff,
   FileText, ChevronRight, ExternalLink, MessageSquare, Loader2, Ticket, Wallet, FileBadge,
-  Gift, Copy, Share2
+  Gift, Copy, Share2, Link
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -273,6 +273,14 @@ export default function UserProfile() {
   };
 
   const handleCopyReferral = () => {
+    if (!referralCode) return;
+    navigator.clipboard.writeText(referralCode);
+    toast.success('Referral code copied!');
+  };
+
+  const getReferralLink = () => `${window.location.origin}/signup?ref=${referralCode}`;
+
+  const handleCopyReferralLink = () => {
     if (!referralCode) return;
     navigator.clipboard.writeText(buildReferralMessage());
     toast.success('Referral link copied!');
@@ -1705,6 +1713,14 @@ export default function UserProfile() {
                                 <Copy className="h-4 w-4" />
                               </Button>
                             </div>
+                            <Button
+                              variant="outline"
+                              onClick={handleCopyReferralLink}
+                              className="h-12 px-4 gap-2 shrink-0"
+                            >
+                              <Link className="h-4 w-4" />
+                              <span className="hidden sm:inline">Copy Link</span>
+                            </Button>
                             <Button
                               onClick={handleShareReferralWhatsApp}
                               className="h-12 px-4 gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white shrink-0"

@@ -1691,7 +1691,7 @@ export default function UserProfile() {
                           Invite Friends &amp; Earn Wing Credits
                         </h3>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Earn ₹{Number(walletSettings?.referral_bonus || 200).toLocaleString()} Wing Credits when a friend signs up with your code, plus another ₹{Number(walletSettings?.referral_local_bonus || 300).toLocaleString()}–₹{Number(walletSettings?.referral_outstation_bonus || 500).toLocaleString()} when they complete their first paid booking!
+                          Earn up to ₹{(Number(walletSettings?.referral_bonus || 200) + Number(walletSettings?.referral_local_bonus || 300) + Number(walletSettings?.referral_outstation_bonus || 500)).toLocaleString()} Wing Credits per referral! Get ₹{Number(walletSettings?.referral_bonus || 200).toLocaleString()} when a friend signs up, plus ₹{Number(walletSettings?.referral_local_bonus || 300).toLocaleString()} (local/airport) or ₹{Number(walletSettings?.referral_outstation_bonus || 500).toLocaleString()} (outstation) when they complete their first paid booking!
                         </p>
                       </div>
                       <CardContent className="p-6 space-y-4">

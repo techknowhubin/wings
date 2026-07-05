@@ -270,6 +270,7 @@ const Auth = () => {
   const [manualRefError, setManualRefError] = useState("");
   const [applyingRef, setApplyingRef] = useState(false);
   const [pendingNavigatePath, setPendingNavigatePath] = useState("");
+  const [refCountdown, setRefCountdown] = useState(5);
 
   useEffect(() => {
     setSelectedRole(targetRole === 'host' ? 'host' : 'user');
@@ -637,22 +638,52 @@ const Auth = () => {
     if (pendingNavigatePath) navigate(pendingNavigatePath);
   };
 
+  // Auto-advance referral popup after 5 seconds
+  useEffect(() => {
+    if (!showReferralPopup) { setRefCountdown(5); return; }
+    setRefCountdown(5);
+    const id = setInterval(() => {
+      setRefCountdown(prev => {
+        if (prev <= 1) { clearInterval(id); handleReferralPopupDone(); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showReferralPopup]);
+
   const handleApplyManualRef = async () => {
     const code = manualRefCode.trim().toUpperCase();
-    if (!/^WING[A-Z0-9]{6,}$/.test(code)) {
-      setManualRefError('Invalid referral code format');
-      return;
-    }
+    if (!code) return;
     setApplyingRef(true);
     setManualRefError('');
     try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      // Validate: check if the referral code exists
+      const { data: referrerData } = await supabase
+        .from('profiles')
+        .select('id, full_name, display_name')
+        .eq('referral_code', code)
+        .maybeSingle();
+
+      if (!referrerData) {
+        setManualRefError('Referral code not found. Please check and try again.');
+        setApplyingRef(false);
+        return;
+      }
+
+      // Apply the referral bonus
+      const currentUser = user ?? (await supabase.auth.getUser()).data.user;
       if (currentUser) {
         await supabase.rpc('apply_pending_referral', { p_user_id: currentUser.id, p_referral_code: code });
       }
-    } catch { /* ignore */ }
+
+      // Switch to success view ("Referred by [Name]")
+      setReferrerName(referrerData.display_name || referrerData.full_name || 'a friend');
+      setReferralPopupType('referred');
+    } catch {
+      setManualRefError('Something went wrong. Please try again.');
+    }
     setApplyingRef(false);
-    handleReferralPopupDone();
   };
 
   /* ─── WhatsApp post-OTP submit ─── */
@@ -663,19 +694,23 @@ const Auth = () => {
     if (!waPostOtpEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(waPostOtpEmail.trim())) errors.email = 'Valid email address is required';
     if (Object.keys(errors).length) { setWaPostOtpErrors(errors); return; }
     setWaPostOtpLoading(true);
-    try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (currentUser) {
-        await updateProfile(currentUser.id, {
-          full_name: waPostOtpName.trim(),
-          email: waPostOtpEmail.trim(),
-        });
+    const currentUser = user ?? (await supabase.auth.getUser()).data.user;
+    if (currentUser) {
+      try {
+        await updateProfile(currentUser.id, { full_name: waPostOtpName.trim() });
+      } catch (err) {
+        console.error('[WA post-OTP] name save failed:', err);
+      }
+      try {
+        await updateProfile(currentUser.id, { email: waPostOtpEmail.trim() });
+      } catch (err) {
+        console.error('[WA post-OTP] email save failed:', err);
+      }
+      try {
         await supabase.auth.updateUser({
           data: { full_name: waPostOtpName.trim(), email: waPostOtpEmail.trim() },
         });
-      }
-    } catch (err) {
-      console.error('[WA post-OTP] profile update failed:', err);
+      } catch { /* best-effort metadata update */ }
     }
     setWaPostOtpLoading(false);
     setShowWaPostOtp(false);
@@ -1754,7 +1789,7 @@ const Auth = () => {
                 </DialogDescription>
               </DialogHeader>
               <button onClick={handleReferralPopupDone} className="auth-btn auth-btn-primary mt-6">
-                Get Started
+                Get Started ({refCountdown}s)
               </button>
             </>
           ) : (
@@ -1772,7 +1807,7 @@ const Auth = () => {
                 <input
                   type="text"
                   value={manualRefCode}
-                  onChange={e => { setManualRefCode(e.target.value.toUpperCase()); setManualRefError(''); }}
+                  onChange={e => { setManualRefCode(e.target.value.toUpperCase()); setManualRefError(''); setRefCountdown(5); }}
                   placeholder="Enter referral code (e.g. WING123456)"
                   className="auth-input"
                 />
@@ -1781,7 +1816,7 @@ const Auth = () => {
                   {applyingRef ? "Applying…" : "Apply Referral Code"}
                 </button>
                 <button onClick={handleReferralPopupDone} className="w-full text-sm text-gray-400 hover:text-gray-600 font-medium py-2 transition-colors">
-                  Skip
+                  Skip ({refCountdown}s)
                 </button>
               </div>
             </>

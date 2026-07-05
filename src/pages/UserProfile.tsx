@@ -633,7 +633,7 @@ export default function UserProfile() {
                   <p className="font-semibold text-foreground text-sm truncate">
                     {profile?.display_name || profile?.full_name || "Guest User"}
                   </p>
-                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                  <p className="text-xs text-muted-foreground truncate">{(profile as any)?.email || user?.email}</p>
                 </div>
               </div>
 
@@ -737,7 +737,7 @@ export default function UserProfile() {
                         <h2 className="text-lg font-semibold text-foreground">
                           {profile?.display_name || profile?.full_name || "Guest User"}
                         </h2>
-                        <p className="text-sm text-muted-foreground">{user?.email}</p>
+                        <p className="text-sm text-muted-foreground">{(profile as any)?.email || user?.email}</p>
                       </div>
                     </div>
 
@@ -752,7 +752,7 @@ export default function UserProfile() {
                       </div>
                       <div className="space-y-2">
                         <Label>Email</Label>
-                        <Input value={user?.email || ""} disabled className="bg-muted/30" />
+                        <Input value={(profile as any)?.email || user?.email || ""} disabled className="bg-muted/30" />
                         <Badge variant="outline" className="text-[10px] text-accent border-accent/30">Verified</Badge>
                       </div>
                       <div className="space-y-2">

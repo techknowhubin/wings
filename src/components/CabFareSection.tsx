@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import CabFareCard from "./CabFareCard";
 import CabFareKPIs from "./CabFareKPIs";
+import { useCity } from "@/contexts/CityContext";
 
 type State = "telangana" | "andhra" | "karnataka";
 
@@ -526,9 +527,15 @@ interface CabFareSectionProps {
 }
 
 const CabFareSection = ({ variant = "previous", withContainer = false }: CabFareSectionProps) => {
-  const [selectedState, setSelectedState] = useState<State>("telangana");
+  const { selectedCity } = useCity();
+  const defaultState: State = selectedCity === 'bangalore' ? 'karnataka' : 'telangana';
+  const [selectedState, setSelectedState] = useState<State>(defaultState);
   const [cabFares, setCabFares] = useState<Record<State, FareData[]>>(emptyFares);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setSelectedState(selectedCity === 'bangalore' ? 'karnataka' : 'telangana');
+  }, [selectedCity]);
 
   useEffect(() => {
     const loadSheetFares = async () => {

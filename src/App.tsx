@@ -64,6 +64,8 @@ import SEOLandingPage from "./pages/SEOLandingPage";
 
 import { ProtectedTravelerRoute } from "./components/ProtectedTravelerRoute";
 import { RoleGuard } from "./components/RoleGuard";
+import { CityProvider } from "./contexts/CityContext";
+import { CitySelectionModal } from "./components/CitySelectionModal";
 
 // Host Dashboard
 import HostLayout from "./pages/HostLayout";
@@ -163,6 +165,7 @@ const App = () =>
     <HelmetProvider>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <CityProvider>
         <CookieConsentProvider>
         <ThemeProvider defaultTheme="light">
       <TooltipProvider>
@@ -172,6 +175,7 @@ const App = () =>
           <ScrollToTop />
           <ReferralCapture />
           <AuthRedirectHandler />
+          <CitySelectionModal />
           <SEOSchema />
           <Routes>
             <Route path="/" element={<RoleGuard><OutstationCabs /></RoleGuard>} />
@@ -373,6 +377,7 @@ const App = () =>
       </TooltipProvider>
         </ThemeProvider>
         </CookieConsentProvider>
+        </CityProvider>
       </AuthProvider>
     </QueryClientProvider>
     </HelmetProvider>

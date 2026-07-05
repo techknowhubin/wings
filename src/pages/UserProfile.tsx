@@ -6,7 +6,7 @@ import {
   User, Calendar, ShieldCheck, Lock, Bell, HelpCircle, LogOut,
   Camera, Edit2, Save, Check, Clock, Upload, X, Eye, EyeOff,
   FileText, ChevronRight, ExternalLink, MessageSquare, Loader2, Ticket, Wallet,
-  Gift, Copy, Share2, Link
+  Gift, Copy, Share2, Link, MapPin
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -36,6 +36,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
 import { PasswordStrengthMeter } from "@/components/PasswordStrengthMeter";
+import { useCity } from "@/contexts/CityContext";
+import { useRole, isNonTravelerRole } from "@/hooks/useRole";
 
 // ======================== Types ========================
 
@@ -190,6 +192,8 @@ export default function UserProfile() {
   const { user, loading: authLoading, signOut } = useAuth();
   const queryClient = useQueryClient();
   const { theme } = useTheme();
+  const { role } = useRole();
+  const { selectedCity, setCity, setShowCityPicker } = useCity();
   const navigate = useNavigate();
   const location = useLocation();
   const { data: profile, isLoading: profileLoading } = useProfile(user?.id);
@@ -808,6 +812,33 @@ export default function UserProfile() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* City preference — travellers only */}
+                {!isNonTravelerRole(role) && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        Selected City
+                      </CardTitle>
+                      <CardDescription>Your cab services and routes are tailored to this city.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex items-center gap-4">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-foreground capitalize">
+                          {selectedCity ?? <span className="text-muted-foreground italic">Not set</span>}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowCityPicker(true)}
+                      >
+                        Change City
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             )}
 

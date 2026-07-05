@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
 import LocationAutocomplete, { LocationData } from "@/components/LocationAutocomplete";
 import { getGoogleRouteDistance, haversineDistance, DEFAULT_AIRPORTS, AirportConfig } from "@/lib/googleMaps";
+import { useCity } from "@/contexts/CityContext";
 
 
 type BookingType = "Airport Transfer" | "4 Hours Local" | "8 Hours Local";
@@ -53,11 +54,20 @@ const VEHICLES = [
 export default function LocalAirportCabsSection() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { selectedCity } = useCity();
 
   // Airports configuration
   const [airports, setAirports] = useState<AirportConfig[]>(DEFAULT_AIRPORTS);
   const [detectedAirport, setDetectedAirport] = useState<AirportConfig | null>(null);
   const [airportParkingCharge, setAirportParkingCharge] = useState<number>(350);
+
+  // Returns the airport that matches the traveller's selected city.
+  // Falls back to HYD for Hyderabad or when no city is set.
+  const getCityAirport = (): AirportConfig => {
+    const list = airports.length > 0 ? airports : DEFAULT_AIRPORTS;
+    const targetCode = selectedCity === 'bangalore' ? 'BLR' : 'HYD';
+    return list.find((a) => a.code === targetCode) ?? list[0];
+  };
 
   // Booking states
   const [activeBookingType, setActiveBookingType] = useState<BookingType | null>(null);
@@ -204,7 +214,7 @@ export default function LocalAirportCabsSection() {
     setAreaValidationError(null);
 
     if (type === "pickup") {
-      const airport = (airports.length > 0 ? airports : DEFAULT_AIRPORTS)[0];
+      const airport = getCityAirport();
       setPickupAddress(airport.name);
       setPickupCoords({ lat: airport.latitude, lng: airport.longitude });
       setPickupPlaceId(airport.place_id);
@@ -578,7 +588,7 @@ export default function LocalAirportCabsSection() {
                   <>
                     <Label className="text-sm font-semibold text-[#013220]">✈ Pickup Location</Label>
                     <div className="flex items-center gap-2 px-3 h-10 rounded-xl border border-[#e2e8f0] bg-muted/50 text-sm text-muted-foreground font-medium">
-                      ✈ {pickupAddress || "Rajiv Gandhi International Airport (HYD)"}
+                      ✈ {pickupAddress || getCityAirport().name}
                     </div>
                   </>
                 ) : (
@@ -587,7 +597,7 @@ export default function LocalAirportCabsSection() {
                     value={pickupAddress}
                     placeholder="Search for pickup address..."
                     onChange={handlePickupChange}
-                    restrictToHyderabad={true}
+                    restrictToHyderabad={selectedCity !== 'bangalore'}
                     onError={setAreaValidationError}
                   />
                 )}
@@ -602,14 +612,14 @@ export default function LocalAirportCabsSection() {
                       value={dropAddress}
                       placeholder="Search for drop address..."
                       onChange={handleDropChange}
-                      restrictToHyderabad={true}
+                      restrictToHyderabad={selectedCity !== 'bangalore'}
                       onError={setAreaValidationError}
                     />
                   ) : (
                     <>
                       <Label className="text-sm font-semibold text-[#013220]">✈ Destination</Label>
                       <div className="flex items-center gap-2 px-3 h-10 rounded-xl border border-[#e2e8f0] bg-muted/50 text-sm text-muted-foreground font-medium">
-                        ✈ {dropAddress || "Rajiv Gandhi International Airport (HYD)"}
+                        ✈ {dropAddress || getCityAirport().name}
                       </div>
                     </>
                   )

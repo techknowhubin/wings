@@ -666,8 +666,13 @@ const Auth = () => {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (currentUser) {
         await Promise.all([
-          supabase.from('profiles').update({ full_name: waPostOtpName.trim() }).eq('id', currentUser.id),
-          supabase.auth.updateUser({ email: waPostOtpEmail.trim(), data: { full_name: waPostOtpName.trim(), email: waPostOtpEmail.trim() } }),
+          supabase.from('profiles').update({
+            full_name: waPostOtpName.trim(),
+            email: waPostOtpEmail.trim(),
+          }).eq('id', currentUser.id),
+          supabase.auth.updateUser({
+            data: { full_name: waPostOtpName.trim(), email: waPostOtpEmail.trim() },
+          }),
         ]);
       }
     } catch { /* ignore, proceed */ }
@@ -1637,7 +1642,7 @@ const Auth = () => {
       <Dialog open={showWaPostOtp} onOpenChange={() => {}}>
         <DialogContent className="max-w-[420px] border-none bg-white/95 backdrop-blur-[40px] rounded-[2rem] p-8 shadow-2xl [&>button]:hidden">
           <DialogHeader>
-            <div className="mx-auto w-14 h-14 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
+            <div className="mx-auto w-14 h-14 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
               <User className="w-7 h-7" />
             </div>
             <DialogTitle className="text-xl font-extrabold text-center text-gray-900">Complete Your Profile</DialogTitle>
@@ -1680,7 +1685,7 @@ const Auth = () => {
       <Dialog open={showGooglePostSignup} onOpenChange={() => {}}>
         <DialogContent className="max-w-[420px] border-none bg-white/95 backdrop-blur-[40px] rounded-[2rem] p-8 shadow-2xl [&>button]:hidden">
           <DialogHeader>
-            <div className="mx-auto w-14 h-14 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
+            <div className="mx-auto w-14 h-14 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4">
               <User className="w-7 h-7" />
             </div>
             <DialogTitle className="text-xl font-extrabold text-center text-gray-900">Almost there!</DialogTitle>
@@ -1737,7 +1742,7 @@ const Auth = () => {
           {referralPopupType === 'referred' ? (
             <>
               <DialogHeader>
-                <div className="mx-auto w-14 h-14 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
+                <div className="mx-auto w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4">
                   <Gift className="w-7 h-7" />
                 </div>
                 <DialogTitle className="text-xl font-extrabold text-center text-gray-900">Welcome!</DialogTitle>
@@ -1752,7 +1757,7 @@ const Auth = () => {
           ) : (
             <>
               <DialogHeader>
-                <div className="mx-auto w-14 h-14 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
+                <div className="mx-auto w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4">
                   <Gift className="w-7 h-7" />
                 </div>
                 <DialogTitle className="text-xl font-extrabold text-center text-gray-900">Have a Referral Code?</DialogTitle>

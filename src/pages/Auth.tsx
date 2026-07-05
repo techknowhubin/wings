@@ -182,6 +182,8 @@ const Auth = () => {
   const location = useLocation();
   // Guard: only route once per login event, ignore subsequent flickers
   const hasRoutedRef = useRef(false);
+  // Guard: block auto-routing while the post-OTP name/email form or referral popup is open
+  const inWaCustomFlowRef = useRef(false);
 
   // 2FA State
   const [checking2FA, setChecking2FA] = useState(false);
@@ -250,6 +252,14 @@ const Auth = () => {
   const [waPostOtpLoading, setWaPostOtpLoading] = useState(false);
   const [waPostOtpErrors, setWaPostOtpErrors] = useState<{ name?: string; email?: string }>({});
   const [pendingNewUserRole, setPendingNewUserRole] = useState<string | null>(null);
+
+  // Google post-signup name/phone step
+  const [showGooglePostSignup, setShowGooglePostSignup] = useState(false);
+  const [googlePostName, setGooglePostName] = useState("");
+  const [googlePostPhone, setGooglePostPhone] = useState("");
+  const [googlePostEmail, setGooglePostEmail] = useState("");
+  const [googlePostLoading, setGooglePostLoading] = useState(false);
+  const [googlePostErrors, setGooglePostErrors] = useState<{ name?: string; phone?: string }>({});
 
   // Referral popup
   const [showReferralPopup, setShowReferralPopup] = useState(false);
@@ -342,7 +352,10 @@ const Auth = () => {
       hasRoutedRef.current = false;
       return;
     }
-    
+
+    // Don't auto-route while the post-OTP name/email step or referral popup is active
+    if (inWaCustomFlowRef.current) return;
+
     // Only route once — ignore subsequent re-renders during auth initialization
     if (hasRoutedRef.current) return;
     if (verificationPending && !user) return;
@@ -423,6 +436,24 @@ const Auth = () => {
         await handleGoogleLoginCheck();
       } else {
         localStorage.removeItem("google_auth_mode");
+
+        if (googleMode === "signup") {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('full_name, phone')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (!profileData?.full_name || !profileData?.phone) {
+            inWaCustomFlowRef.current = true;
+            setGooglePostEmail(user.email || '');
+            const savedRole = localStorage.getItem("pending_role") || 'user';
+            setPendingNewUserRole(savedRole);
+            setShowGooglePostSignup(true);
+            return;
+          }
+        }
+
         handleSuccessRoleRouting(user);
       }
     };
@@ -528,6 +559,7 @@ const Auth = () => {
         } else {
           setPendingNewUserRole('user');
         }
+        inWaCustomFlowRef.current = true; // block auto-routing
         setShowWaPostOtp(true);
       }
       // Returning users are routed by the useEffect watching `user` state
@@ -580,6 +612,7 @@ const Auth = () => {
   };
 
   const handleReferralPopupDone = () => {
+    inWaCustomFlowRef.current = false; // allow routing again
     setShowReferralPopup(false);
     clearUserReferral();
     if (pendingNavigatePath) navigate(pendingNavigatePath);
@@ -622,6 +655,30 @@ const Auth = () => {
     } catch { /* ignore, proceed */ }
     setWaPostOtpLoading(false);
     setShowWaPostOtp(false);
+    const savedRole = pendingNewUserRole;
+    const navPath = savedRole === 'host' ? '/host/onboarding' : '/onboarding/user';
+    await openReferralPopupThenNavigate(navPath);
+  };
+
+  /* ─── Google post-signup: collect name & phone ─── */
+  const handleGooglePostSignupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const errors: { name?: string; phone?: string } = {};
+    if (!googlePostName.trim() || googlePostName.trim().length < 2)
+      errors.name = "Full name must be at least 2 characters";
+    if (!/^[0-9]{10}$/.test(googlePostPhone.trim()))
+      errors.phone = "Enter a valid 10-digit mobile number";
+    if (Object.keys(errors).length) { setGooglePostErrors(errors); return; }
+    setGooglePostErrors({});
+    setGooglePostLoading(true);
+    try {
+      await supabase.from('profiles').update({
+        full_name: googlePostName.trim(),
+        phone: googlePostPhone.trim(),
+      }).eq('id', user!.id);
+    } catch { /* ignore, proceed */ }
+    setGooglePostLoading(false);
+    setShowGooglePostSignup(false);
     const savedRole = pendingNewUserRole;
     const navPath = savedRole === 'host' ? '/host/onboarding' : '/onboarding/user';
     await openReferralPopupThenNavigate(navPath);
@@ -1596,6 +1653,61 @@ const Auth = () => {
             </div>
             <button type="submit" disabled={waPostOtpLoading} className="auth-btn auth-btn-primary mt-2">
               {waPostOtpLoading ? "Saving…" : "Continue"}
+            </button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Google Post-Signup: Collect Name & Phone */}
+      <Dialog open={showGooglePostSignup} onOpenChange={() => {}}>
+        <DialogContent className="max-w-[420px] border-none bg-white/95 backdrop-blur-[40px] rounded-[2rem] p-8 shadow-2xl [&>button]:hidden">
+          <DialogHeader>
+            <div className="mx-auto w-14 h-14 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
+              <User className="w-7 h-7" />
+            </div>
+            <DialogTitle className="text-xl font-extrabold text-center text-gray-900">Almost there!</DialogTitle>
+            <DialogDescription className="text-center text-gray-500 text-[13px] leading-relaxed pt-1">
+              Complete your profile to start exploring.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleGooglePostSignupSubmit} className="mt-5 space-y-4">
+            <div className="space-y-1">
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Full Name *"
+                  value={googlePostName}
+                  onChange={e => { setGooglePostName(e.target.value); setGooglePostErrors(p => ({ ...p, name: undefined })); }}
+                  className="auth-input"
+                />
+              </div>
+              {googlePostErrors.name && <p className="text-xs text-red-500 pl-1">{googlePostErrors.name}</p>}
+            </div>
+            <div className="space-y-1">
+              <div className="relative">
+                <PhoneCall className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                <input
+                  type="tel"
+                  placeholder="Mobile Number * (10 digits)"
+                  value={googlePostPhone}
+                  onChange={e => { setGooglePostPhone(e.target.value.replace(/\D/g, '').slice(0, 10)); setGooglePostErrors(p => ({ ...p, phone: undefined })); }}
+                  className="auth-input"
+                />
+              </div>
+              {googlePostErrors.phone && <p className="text-xs text-red-500 pl-1">{googlePostErrors.phone}</p>}
+            </div>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <input
+                type="email"
+                value={googlePostEmail}
+                readOnly
+                className="auth-input opacity-60 cursor-default"
+              />
+            </div>
+            <button type="submit" disabled={googlePostLoading} className="auth-btn auth-btn-primary mt-2">
+              {googlePostLoading ? "Saving…" : "Continue"}
             </button>
           </form>
         </DialogContent>

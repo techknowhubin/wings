@@ -2,11 +2,10 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { WalletSection } from "@/components/dashboard/WalletSection";
-import DocumentManagement from "@/components/profile/DocumentManagement";
 import {
   User, Calendar, ShieldCheck, Lock, Bell, HelpCircle, LogOut,
   Camera, Edit2, Save, Check, Clock, Upload, X, Eye, EyeOff,
-  FileText, ChevronRight, ExternalLink, MessageSquare, Loader2, Ticket, Wallet, FileBadge,
+  FileText, ChevronRight, ExternalLink, MessageSquare, Loader2, Ticket, Wallet,
   Gift, Copy, Share2, Link
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -56,9 +55,8 @@ const navItems: { icon: typeof User; label: string; section: Section }[] = [
   { icon: Wallet, label: "Wing Credits", section: "wallet" },
   { icon: Gift, label: "Refer & Earn", section: "referral" },
   { icon: Calendar, label: "Booking History", section: "bookings" },
-  { icon: FileBadge, label: "Travel Documents", section: "documents" },
   { icon: Ticket, label: "My Coupons", section: "coupons" },
-  { icon: ShieldCheck, label: "KYC Details", section: "kyc" },
+  { icon: ShieldCheck, label: "KYC Review", section: "kyc" },
   { icon: Lock, label: "Security & Password", section: "security" },
   { icon: Bell, label: "Notifications", section: "notifications" },
   { icon: HelpCircle, label: "Help & Support", section: "help" },
@@ -1266,10 +1264,10 @@ export default function UserProfile() {
               </div>
             )}
 
-            {/* ====== KYC Details ====== */}
-            {activeSection === "kyc" && (
+            {/* ====== KYC Review ====== */}
+            {(activeSection === "kyc" || activeSection === "documents") && (
               <div className="space-y-6">
-                <h1 className="text-2xl font-bold text-foreground">KYC Details</h1>
+                <h1 className="text-2xl font-bold text-foreground">KYC Review</h1>
 
                 {/* Overall status */}
                 <Card>
@@ -1368,6 +1366,7 @@ export default function UserProfile() {
                     ))
                   )}
                 </div>
+
               </div>
             )}
 
@@ -1749,17 +1748,6 @@ export default function UserProfile() {
             </motion.div>
           )}
 
-          {/* ====== Travel Documents ====== */}
-          {activeSection === "documents" && (
-            <motion.div
-              key="documents"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <DocumentManagement />
-            </motion.div>
-          )}
         </main>
       </div>
     </div>

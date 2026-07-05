@@ -57,6 +57,7 @@ import CabsBookingPage from "./pages/CabsBookingPage";
 import WhatsAppButton from "./components/WhatsAppButton";
 import PartnerDashboard from "./pages/PartnerDashboard";
 import Contact from "./pages/Contact";
+import KYCQRForm from "./pages/KYCQRForm";
 import BecomeHost from "./pages/BecomeHost";
 import AirportCabs from "./pages/AirportCabs";
 import SEOLandingPage from "./pages/SEOLandingPage";
@@ -206,6 +207,7 @@ const App = () =>
             <Route path="/airport-cabs" element={<AirportCabs />} />
             <Route path="/packages" element={<Navigate to="/experiences" replace />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/kyc/verify/:token" element={<KYCQRForm />} />
             <Route path="/become-host" element={<BecomeHost />} />
 
             {/* Specific SEO Location Pages */}

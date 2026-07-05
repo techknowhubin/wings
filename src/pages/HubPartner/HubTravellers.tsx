@@ -6,14 +6,37 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   Search, Loader2, MapPin, History, Phone, Mail, Calendar,
-  TrendingUp, Car, MoreHorizontal, IndianRupee, Send, User, Tag, ArrowUpDown, Plus
+  TrendingUp, Car, MoreHorizontal, IndianRupee, Send, User, Tag, ArrowUpDown, Plus,
+  QrCode, RefreshCw, ShieldCheck, Copy, Check
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useToast } from "@/components/ui/use-toast";
+import { QRCodeSVG } from "qrcode.react";
+
+/* ── masking helpers (hosts never see raw sensitive data) ── */
+function maskPhone(phone: string | null | undefined): string {
+  if (!phone) return 'N/A';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 4) return 'XXXXXX';
+  return 'XXXXXXXX' + digits.slice(-4);
+}
+
+function maskEmail(email: string | null | undefined): string {
+  if (!email) return 'N/A';
+  const [local, domain] = email.split('@');
+  if (!domain) return '***';
+  return local.slice(0, 2) + '*'.repeat(Math.max(3, local.length - 2)) + '@' + domain;
+}
+
+function maskGovId(id: string | null | undefined): string {
+  if (!id) return 'N/A';
+  if (id.length <= 4) return '****';
+  return 'X'.repeat(id.length - 4) + id.slice(-4);
+}
 
 type Traveller = any;
 
@@ -28,6 +51,14 @@ export default function HubTravellers() {
   const [createForm, setCreateForm] = useState({ fullName: '', phone: '', email: '', password: '' });
   const [creating, setCreating] = useState(false);
   const { toast } = useToast();
+
+  // QR code state
+  const [qrTraveller, setQrTraveller] = useState<Traveller | null>(null);
+  const [qrToken, setQrToken] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrHasExisting, setQrHasExisting] = useState(false);
+  const [requestingNewQr, setRequestingNewQr] = useState(false);
+  const [qrCopied, setQrCopied] = useState(false);
 
   const { data: travellers, isLoading } = useQuery({
     queryKey: ['hub-travellers'],
@@ -68,6 +99,71 @@ export default function HubTravellers() {
     t.email?.toLowerCase().includes(search.toLowerCase()) ||
     t.wing_id?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleOpenQr = async (t: Traveller) => {
+    setQrTraveller(t);
+    setQrToken(null);
+    setQrHasExisting(false);
+    setQrLoading(true);
+    // Check for existing QR
+    const { data } = await supabase
+      .from('kyc_qr_codes')
+      .select('token, status')
+      .eq('user_id', t.id)
+      .eq('status', 'active')
+      .maybeSingle();
+    if (data?.token) {
+      setQrToken(data.token);
+      setQrHasExisting(true);
+    }
+    setQrLoading(false);
+  };
+
+  const handleGenerateQr = async () => {
+    if (!qrTraveller || !profile?.id) return;
+    setQrLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('generate_traveller_qr', {
+        p_traveller_id: qrTraveller.id,
+        p_host_id: profile.id,
+      });
+      if (error) throw error;
+      setQrToken(data as string);
+      setQrHasExisting(true);
+      toast({ title: "QR Generated", description: "Share this QR with the traveller for KYC." });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Error", description: err.message });
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const handleRequestNewQr = async () => {
+    if (!qrTraveller || !profile?.id) return;
+    setRequestingNewQr(true);
+    try {
+      const { error } = await supabase.from('kyc_qr_requests').insert({
+        traveller_id: qrTraveller.id,
+        requested_by: profile.id,
+        status: 'pending',
+      });
+      if (error) throw error;
+      toast({ title: "Request Sent", description: "Admin has been notified to approve a new QR code." });
+      setQrTraveller(null);
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Error", description: err.message });
+    } finally {
+      setRequestingNewQr(false);
+    }
+  };
+
+  const qrUrl = qrToken ? `${window.location.origin}/kyc/verify/${qrToken}` : '';
+
+  const handleCopyQrLink = () => {
+    navigator.clipboard.writeText(qrUrl);
+    setQrCopied(true);
+    setTimeout(() => setQrCopied(false), 2000);
+  };
 
   const handleCreateTraveller = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,8 +281,8 @@ export default function HubTravellers() {
                         <p className="font-semibold text-sm">{t.full_name || 'Unknown'}</p>
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs">{t.phone || 'N/A'}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate">{t.email || 'N/A'}</TableCell>
+                    <TableCell className="text-xs font-mono">{maskPhone(t.phone)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate">{maskEmail(t.email)}</TableCell>
                     <TableCell className="text-xs font-medium">{t.wing_id || 'N/A'}</TableCell>
                     <TableCell className="text-xs">{t.city || t.state || 'N/A'}</TableCell>
                     <TableCell className="text-xs font-semibold">{t.total_trips || 0}</TableCell>
@@ -209,6 +305,9 @@ export default function HubTravellers() {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => handleViewTraveller(t)}>
                             <History className="h-4 w-4 mr-2" />View Booking History
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenQr(t)}>
+                            <QrCode className="h-4 w-4 mr-2 text-primary" />KYC QR Code
                           </DropdownMenuItem>
                           {t.phone && (
                             <>
@@ -248,11 +347,11 @@ export default function HubTravellers() {
           </DialogHeader>
           {viewTraveller && (
             <div className="space-y-5 py-2">
-              {/* Profile Grid */}
+              {/* Profile Grid — sensitive fields are masked for hosts */}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {[
-                  ['Mobile', viewTraveller.phone],
-                  ['Email', viewTraveller.email],
+                  ['Mobile', maskPhone(viewTraveller.phone)],
+                  ['Email', maskEmail(viewTraveller.email)],
                   ['Wing ID', viewTraveller.wing_id],
                   ['City', viewTraveller.city || viewTraveller.state || 'N/A'],
                   ['KYC Status', viewTraveller.kyc_status?.replace('_', ' ') || 'Not Started'],
@@ -312,6 +411,57 @@ export default function HubTravellers() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* KYC QR Code Dialog */}
+      <Dialog open={!!qrTraveller} onOpenChange={(open) => { if (!open) setQrTraveller(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" /> KYC QR Code
+            </DialogTitle>
+            <DialogDescription>
+              {qrTraveller?.full_name} — Share this QR for secure KYC submission
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 flex flex-col items-center gap-4">
+            {qrLoading ? (
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            ) : qrToken ? (
+              <>
+                <div className="p-4 bg-white rounded-2xl border border-border shadow-sm">
+                  <QRCodeSVG value={qrUrl} size={180} level="H" />
+                </div>
+                <p className="text-xs text-muted-foreground text-center break-all px-2">{qrUrl}</p>
+                <div className="flex gap-2 w-full">
+                  <Button variant="outline" size="sm" className="flex-1 rounded-xl" onClick={handleCopyQrLink}>
+                    {qrCopied ? <><Check className="h-3.5 w-3.5 mr-1.5 text-green-500" /> Copied!</> : <><Copy className="h-3.5 w-3.5 mr-1.5" /> Copy Link</>}
+                  </Button>
+                  {qrHasExisting && (
+                    <Button variant="outline" size="sm" className="flex-1 rounded-xl text-amber-600 border-amber-200" onClick={handleRequestNewQr} disabled={requestingNewQr}>
+                      {requestingNewQr ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+                      Request New QR
+                    </Button>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground text-center">
+                  To replace the QR, send a request to Super Admin via "Request New QR".
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="h-32 w-32 rounded-2xl bg-muted/30 flex items-center justify-center">
+                  <QrCode className="h-12 w-12 text-muted-foreground/40" />
+                </div>
+                <p className="text-sm text-muted-foreground text-center">No QR code yet for this traveller.</p>
+                <Button onClick={handleGenerateQr} disabled={qrLoading} className="w-full rounded-xl">
+                  {qrLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <QrCode className="h-4 w-4 mr-2" />}
+                  Generate QR
+                </Button>
+              </>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

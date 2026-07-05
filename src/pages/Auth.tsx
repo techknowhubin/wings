@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PasswordStrengthMeter } from "@/components/PasswordStrengthMeter";
+import { getUserReferralCode, clearUserReferral } from "@/lib/referral";
 
 /* ─── validation ─── */
 const passwordRules = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
@@ -241,6 +242,23 @@ const Auth = () => {
 
   const [referralCode, setReferralCode] = useState("");
   const [referralError, setReferralError] = useState("");
+
+  // WhatsApp post-OTP name/email step
+  const [showWaPostOtp, setShowWaPostOtp] = useState(false);
+  const [waPostOtpName, setWaPostOtpName] = useState("");
+  const [waPostOtpEmail, setWaPostOtpEmail] = useState("");
+  const [waPostOtpLoading, setWaPostOtpLoading] = useState(false);
+  const [waPostOtpErrors, setWaPostOtpErrors] = useState<{ name?: string; email?: string }>({});
+  const [pendingNewUserRole, setPendingNewUserRole] = useState<string | null>(null);
+
+  // Referral popup
+  const [showReferralPopup, setShowReferralPopup] = useState(false);
+  const [referralPopupType, setReferralPopupType] = useState<"referred" | "ask">("ask");
+  const [referrerName, setReferrerName] = useState("");
+  const [manualRefCode, setManualRefCode] = useState("");
+  const [manualRefError, setManualRefError] = useState("");
+  const [applyingRef, setApplyingRef] = useState(false);
+  const [pendingNavigatePath, setPendingNavigatePath] = useState("");
 
   useEffect(() => {
     setSelectedRole(targetRole === 'host' ? 'host' : 'user');
@@ -506,10 +524,11 @@ const Auth = () => {
         const savedRole = localStorage.getItem("pending_role");
         if (targetRole === 'host' || savedRole === 'host') {
           localStorage.removeItem("pending_role");
-          navigate("/host/onboarding");
+          setPendingNewUserRole('host');
         } else {
-          navigate("/onboarding/user");
+          setPendingNewUserRole('user');
         }
+        setShowWaPostOtp(true);
       }
       // Returning users are routed by the useEffect watching `user` state
     }
@@ -534,6 +553,79 @@ const Auth = () => {
     const id = setInterval(() => setResendCountdown((c) => c - 1), 1000);
     return () => clearInterval(id);
   }, [resendCountdown]);
+
+  /* ─── referral popup helper ─── */
+  const openReferralPopupThenNavigate = async (navPath: string) => {
+    setPendingNavigatePath(navPath);
+    const code = getUserReferralCode();
+    if (code) {
+      // Fetch referrer name
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('full_name, display_name')
+          .eq('referral_code', code)
+          .maybeSingle();
+        if (data) {
+          setReferrerName(data.display_name || data.full_name || 'a friend');
+          setReferralPopupType('referred');
+          setShowReferralPopup(true);
+          return;
+        }
+      } catch { /* ignore */ }
+    }
+    // No referral — show "Have a Referral Code?" popup
+    setReferralPopupType('ask');
+    setShowReferralPopup(true);
+  };
+
+  const handleReferralPopupDone = () => {
+    setShowReferralPopup(false);
+    clearUserReferral();
+    if (pendingNavigatePath) navigate(pendingNavigatePath);
+  };
+
+  const handleApplyManualRef = async () => {
+    const code = manualRefCode.trim().toUpperCase();
+    if (!/^WING[A-Z0-9]{6,}$/.test(code)) {
+      setManualRefError('Invalid referral code format');
+      return;
+    }
+    setApplyingRef(true);
+    setManualRefError('');
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        await supabase.rpc('apply_pending_referral', { p_user_id: currentUser.id, p_referral_code: code });
+      }
+    } catch { /* ignore */ }
+    setApplyingRef(false);
+    handleReferralPopupDone();
+  };
+
+  /* ─── WhatsApp post-OTP submit ─── */
+  const handleWaPostOtpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const errors: { name?: string; email?: string } = {};
+    if (!waPostOtpName.trim() || waPostOtpName.trim().length < 2) errors.name = 'Full name is required (min 2 characters)';
+    if (!waPostOtpEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(waPostOtpEmail.trim())) errors.email = 'Valid email address is required';
+    if (Object.keys(errors).length) { setWaPostOtpErrors(errors); return; }
+    setWaPostOtpLoading(true);
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        await Promise.all([
+          supabase.from('profiles').update({ full_name: waPostOtpName.trim() }).eq('id', currentUser.id),
+          supabase.auth.updateUser({ email: waPostOtpEmail.trim(), data: { full_name: waPostOtpName.trim(), email: waPostOtpEmail.trim() } }),
+        ]);
+      }
+    } catch { /* ignore, proceed */ }
+    setWaPostOtpLoading(false);
+    setShowWaPostOtp(false);
+    const savedRole = pendingNewUserRole;
+    const navPath = savedRole === 'host' ? '/host/onboarding' : '/onboarding/user';
+    await openReferralPopupThenNavigate(navPath);
+  };
 
   /* ─── Google ─── */
   const handleGoogleSignIn = async () => {
@@ -1463,6 +1555,99 @@ const Auth = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="mt-6">{renderWhatsAppInput()}</div>
+        </DialogContent>
+      </Dialog>
+
+      {/* WhatsApp Post-OTP: Collect Name & Email */}
+      <Dialog open={showWaPostOtp} onOpenChange={() => {}}>
+        <DialogContent className="max-w-[420px] border-none bg-white/95 backdrop-blur-[40px] rounded-[2rem] p-8 shadow-2xl [&>button]:hidden">
+          <DialogHeader>
+            <div className="mx-auto w-14 h-14 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
+              <User className="w-7 h-7" />
+            </div>
+            <DialogTitle className="text-xl font-extrabold text-center text-gray-900">Complete Your Profile</DialogTitle>
+            <DialogDescription className="text-center text-gray-500 text-[13px] leading-relaxed pt-1">
+              Just a couple more details to set up your account.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleWaPostOtpSubmit} className="mt-5 space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-gray-600 block mb-1">Full Name <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                value={waPostOtpName}
+                onChange={e => { setWaPostOtpName(e.target.value); setWaPostOtpErrors(p => ({ ...p, name: undefined })); }}
+                placeholder="Enter your full name"
+                className="auth-input"
+                autoFocus
+              />
+              {waPostOtpErrors.name && <p className="text-xs text-red-500 mt-1">{waPostOtpErrors.name}</p>}
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 block mb-1">Email Address <span className="text-red-500">*</span></label>
+              <input
+                type="email"
+                value={waPostOtpEmail}
+                onChange={e => { setWaPostOtpEmail(e.target.value); setWaPostOtpErrors(p => ({ ...p, email: undefined })); }}
+                placeholder="Enter your email"
+                className="auth-input"
+              />
+              {waPostOtpErrors.email && <p className="text-xs text-red-500 mt-1">{waPostOtpErrors.email}</p>}
+            </div>
+            <button type="submit" disabled={waPostOtpLoading} className="auth-btn auth-btn-primary mt-2">
+              {waPostOtpLoading ? "Saving…" : "Continue"}
+            </button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Referral Popup */}
+      <Dialog open={showReferralPopup} onOpenChange={() => {}}>
+        <DialogContent className="max-w-[400px] border-none bg-white/95 backdrop-blur-[40px] rounded-[2rem] p-8 shadow-2xl [&>button]:hidden">
+          {referralPopupType === 'referred' ? (
+            <>
+              <DialogHeader>
+                <div className="mx-auto w-14 h-14 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
+                  <Gift className="w-7 h-7" />
+                </div>
+                <DialogTitle className="text-xl font-extrabold text-center text-gray-900">Welcome!</DialogTitle>
+                <DialogDescription className="text-center text-gray-700 text-[14px] leading-relaxed pt-2">
+                  Referred by <strong className="text-gray-900">{referrerName}</strong>
+                </DialogDescription>
+              </DialogHeader>
+              <button onClick={handleReferralPopupDone} className="auth-btn auth-btn-primary mt-6">
+                Get Started
+              </button>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <div className="mx-auto w-14 h-14 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
+                  <Gift className="w-7 h-7" />
+                </div>
+                <DialogTitle className="text-xl font-extrabold text-center text-gray-900">Have a Referral Code?</DialogTitle>
+                <DialogDescription className="text-center text-gray-500 text-[13px] leading-relaxed pt-1">
+                  You can enter a referral code now to receive applicable benefits.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="mt-5 space-y-3">
+                <input
+                  type="text"
+                  value={manualRefCode}
+                  onChange={e => { setManualRefCode(e.target.value.toUpperCase()); setManualRefError(''); }}
+                  placeholder="Enter referral code (e.g. WING123456)"
+                  className="auth-input"
+                />
+                {manualRefError && <p className="text-xs text-red-500">{manualRefError}</p>}
+                <button onClick={handleApplyManualRef} disabled={applyingRef || !manualRefCode.trim()} className="auth-btn auth-btn-primary">
+                  {applyingRef ? "Applying…" : "Apply Referral Code"}
+                </button>
+                <button onClick={handleReferralPopupDone} className="w-full text-sm text-gray-400 hover:text-gray-600 font-medium py-2 transition-colors">
+                  Skip
+                </button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </>

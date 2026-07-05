@@ -438,6 +438,7 @@ const Auth = () => {
         localStorage.removeItem("google_auth_mode");
 
         if (googleMode === "signup") {
+          // Google signup — collect name & phone if missing
           const { data: profileData } = await supabase
             .from('profiles')
             .select('full_name, phone')
@@ -450,6 +451,21 @@ const Auth = () => {
             const savedRole = localStorage.getItem("pending_role") || 'user';
             setPendingNewUserRole(savedRole);
             setShowGooglePostSignup(true);
+            return;
+          }
+        } else if (user.email?.endsWith('@wa.xplorwing.com')) {
+          // WhatsApp user — show name/email form if profile is incomplete
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (!profileData?.full_name) {
+            inWaCustomFlowRef.current = true;
+            const savedRole = localStorage.getItem("pending_role") || 'user';
+            setPendingNewUserRole(savedRole);
+            setShowWaPostOtp(true);
             return;
           }
         }
@@ -546,11 +562,13 @@ const Auth = () => {
       setLoading(false);
       toast({ variant: "destructive", title: "Verification Failed", description: error.message });
     } else {
+      setLoading(false);
       toast({ title: "Success!", description: "WhatsApp number verified." });
       if (showWaModal) {
         setShowWaModal(false);
       }
-      // Route immediately based on server-provided flag — don't wait for useEffect
+      // For new users, set the flag immediately to pre-empt the routing useEffect.
+      // runAuthFlow also has a fallback check by email domain for reliability.
       if ((data as any)?.is_new_user) {
         const savedRole = localStorage.getItem("pending_role");
         if (targetRole === 'host' || savedRole === 'host') {
@@ -559,7 +577,7 @@ const Auth = () => {
         } else {
           setPendingNewUserRole('user');
         }
-        inWaCustomFlowRef.current = true; // block auto-routing
+        inWaCustomFlowRef.current = true;
         setShowWaPostOtp(true);
       }
       // Returning users are routed by the useEffect watching `user` state

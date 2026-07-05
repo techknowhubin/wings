@@ -25,6 +25,7 @@ import HostEditListing from "./HostEditListing";
 import HostNotifications from "./HostNotifications";
 import HostCabs from "./HostCabs";
 import HostAddCab from "./HostAddCab";
+import HostKYCPage from "./HostKYCPage";
 
 export default function HostSection() {
   const { section } = useParams();
@@ -119,6 +120,8 @@ export default function HostSection() {
       return <HostLinkInBio />;
     case "coupons":
       return <HostCoupons />;
+    case "kyc":
+      return <HostKYCPage />;
     case "settings":
       return <HostSettings />;
     // Blog Posts moved to Admin Dashboard — redirect if someone hits old URL

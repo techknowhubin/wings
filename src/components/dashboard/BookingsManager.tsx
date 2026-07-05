@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
+  AlertCircle,
   Calendar,
   Search,
   CheckCircle,
@@ -10,6 +11,7 @@ import {
   MessageSquare,
   Phone,
   User,
+  FileText,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,8 +34,6 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { generateInvoicePDF } from '@/lib/invoice';
-import { FileText } from 'lucide-react';
 
 const statusConfig: Record<BookingStatus, { label: string; color: string; icon: React.ElementType }> = {
   pending:   { label: 'Pending',   color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Clock },
@@ -45,11 +45,11 @@ const statusConfig: Record<BookingStatus, { label: string; color: string; icon: 
 export function BookingsManager() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<string>('all');
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
 
   // Fetch only this host's bookings (filtered server-side by host_id)
-  const { data: bookings = [], isLoading } = useHostBookings(user?.id);
+  const { data: bookings = [], isLoading, isError } = useHostBookings(user?.id);
   const updateStatus = useUpdateBookingStatus();
 
   // Real-time subscription: invalidate on any bookings change for this host
@@ -63,7 +63,7 @@ export function BookingsManager() {
         table: 'bookings',
         filter: `host_id=eq.${user.id}`,
       }, () => {
-        queryClient.invalidateQueries({ queryKey: ['host', 'bookings', user.id] });
+        queryClient.invalidateQueries({ queryKey: ['bookings', 'host', user.id] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -221,7 +221,7 @@ export function BookingsManager() {
         </TabsList>
 
         <TabsContent value={activeTab} className="mt-6">
-          {isLoading ? (
+          {(authLoading || isLoading) ? (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
                 <Card key={i} className="animate-pulse">
@@ -232,6 +232,14 @@ export function BookingsManager() {
                 </Card>
               ))}
             </div>
+          ) : isError ? (
+            <Card className="py-16">
+              <div className="text-center">
+                <AlertCircle className="h-16 w-16 mx-auto mb-4 text-destructive/50" />
+                <h3 className="text-lg font-semibold mb-2">Could not load bookings</h3>
+                <p className="text-muted-foreground">There was an error fetching your bookings. Please refresh the page.</p>
+              </div>
+            </Card>
           ) : filteredBookings.length === 0 ? (
             <Card className="py-16">
               <div className="text-center">
@@ -239,7 +247,7 @@ export function BookingsManager() {
                 <h3 className="text-lg font-semibold mb-2">No bookings found</h3>
                 <p className="text-muted-foreground">
                   {activeTab === 'all'
-                    ? "You haven't received any bookings yet"
+                    ? "You haven't received any bookings yet. Bookings appear here when travellers book your listings."
                     : `No ${activeTab} bookings`}
                 </p>
               </div>
@@ -247,7 +255,7 @@ export function BookingsManager() {
           ) : (
             <div className="space-y-4">
               {filteredBookings.map((booking) => {
-                const status = statusConfig[booking.booking_status || 'pending'];
+                const status = statusConfig[booking.booking_status as BookingStatus] ?? statusConfig.pending;
                 const StatusIcon = status.icon;
                 const duration = differenceInDays(
                   new Date(booking.end_date),
@@ -335,7 +343,14 @@ export function BookingsManager() {
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => generateInvoicePDF(booking)}>
+                                <DropdownMenuItem onClick={async () => {
+                                  try {
+                                    const { generateInvoicePDF } = await import('@/lib/invoice');
+                                    await generateInvoicePDF(booking);
+                                  } catch {
+                                    toast.error('Failed to generate invoice');
+                                  }
+                                }}>
                                   <FileText className="h-4 w-4 mr-2" />
                                   Download Invoice
                                 </DropdownMenuItem>

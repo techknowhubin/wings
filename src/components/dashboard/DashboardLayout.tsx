@@ -34,6 +34,7 @@ import {
   Clock,
   CheckCircle2,
   Send,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -81,6 +82,7 @@ const generalMenuItems = [
   { icon: DollarSign, label: 'Financials', path: '/host/earnings' },
   { icon: Link2, label: 'Link-in-Bio', path: '/host/link' },
   { icon: TicketPercent, label: 'Coupon Codes', path: '/host/coupons' },
+  { icon: ShieldCheck, label: 'KYC Review', path: '/host/kyc' },
   { icon: Settings, label: 'Settings', path: '/host/settings' },
   { icon: HelpCircle, label: 'Help', path: '/help' },
 ];

@@ -95,6 +95,8 @@ import SEODashboard from "./pages/Admin/SEODashboard";
 import AdminGSTSettings from "./pages/Admin/AdminGSTSettings";
 import AdminCoupons from "./pages/Admin/AdminCoupons";
 import AdminFeatureRequests from "./pages/Admin/FeatureRequests";
+import AdminQRRequests from "./pages/Admin/AdminQRRequests";
+import AdminTravellerKYC from "./pages/Admin/AdminTravellerKYC";
 import CreatePackage from "./pages/Admin/Packages/CreatePackage";
 import EditPackage from "./pages/Admin/Packages/EditPackage";
 import PackageList from "./pages/Admin/Packages/PackageList";
@@ -306,7 +308,9 @@ const App = () =>
               <Route path="coupons" element={<AdminCoupons />} />
               <Route path="settings" element={<AdminSettings />} />
               <Route path="feature-requests" element={<AdminFeatureRequests />} />
-              
+              <Route path="qr-requests" element={<AdminQRRequests />} />
+              <Route path="traveller-kyc" element={<AdminTravellerKYC />} />
+
               <Route path="experiences" element={<PackageList />} />
               <Route path="experiences/create" element={<CreatePackage />} />
               <Route path="experiences/edit/:id" element={<EditPackage />} />

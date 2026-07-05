@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { PasswordStrengthMeter } from "@/components/PasswordStrengthMeter";
 import { getUserReferralCode, clearUserReferral } from "@/lib/referral";
+import { updateProfile } from "@/lib/supabase-helpers";
 
 /* ─── validation ─── */
 const passwordRules = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
@@ -665,17 +666,17 @@ const Auth = () => {
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (currentUser) {
-        await Promise.all([
-          supabase.from('profiles').update({
-            full_name: waPostOtpName.trim(),
-            email: waPostOtpEmail.trim(),
-          }).eq('id', currentUser.id),
-          supabase.auth.updateUser({
-            data: { full_name: waPostOtpName.trim(), email: waPostOtpEmail.trim() },
-          }),
-        ]);
+        await updateProfile(currentUser.id, {
+          full_name: waPostOtpName.trim(),
+          email: waPostOtpEmail.trim(),
+        });
+        await supabase.auth.updateUser({
+          data: { full_name: waPostOtpName.trim(), email: waPostOtpEmail.trim() },
+        });
       }
-    } catch { /* ignore, proceed */ }
+    } catch (err) {
+      console.error('[WA post-OTP] profile update failed:', err);
+    }
     setWaPostOtpLoading(false);
     setShowWaPostOtp(false);
     const savedRole = pendingNewUserRole;
@@ -695,11 +696,13 @@ const Auth = () => {
     setGooglePostErrors({});
     setGooglePostLoading(true);
     try {
-      await supabase.from('profiles').update({
+      await updateProfile(user!.id, {
         full_name: googlePostName.trim(),
         phone: googlePostPhone.trim(),
-      }).eq('id', user!.id);
-    } catch { /* ignore, proceed */ }
+      });
+    } catch (err) {
+      console.error('[Google post-signup] profile update failed:', err);
+    }
     setGooglePostLoading(false);
     setShowGooglePostSignup(false);
     const savedRole = pendingNewUserRole;

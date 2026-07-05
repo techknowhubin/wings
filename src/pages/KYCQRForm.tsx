@@ -38,31 +38,38 @@ export default function KYCQRForm() {
   useEffect(() => {
     if (!token) { setTokenValid(false); return; }
 
-    // Check new host_qr_codes table first, then fall back to legacy kyc_qr_codes
-    (supabase as any)
-      .from('host_qr_codes')
-      .select('id, host_id, qr_status')
-      .eq('token', token)
-      .eq('is_active', true)
-      .maybeSingle()
-      .then(({ data: hostQR }: { data: HostQRRecord | null }) => {
-        if (hostQR && hostQR.qr_status === 'active') {
-          setQrRecord(hostQR);
+    const validateToken = async () => {
+      // 1. Check new host_qr_codes table
+      const { data: hostQR, error: hostErr } = await (supabase as any)
+        .from('host_qr_codes')
+        .select('id, host_id, qr_status')
+        .eq('token', token)
+        .maybeSingle();
+
+      if (!hostErr && hostQR) {
+        if (hostQR.qr_status === 'active') {
+          setQrRecord(hostQR as HostQRRecord);
           setTokenValid(true);
-          return;
+        } else {
+          // QR exists but revoked/inactive
+          setTokenValid(false);
         }
-        // Legacy fallback
-        return supabase
-          .from('kyc_qr_codes')
-          .select('id, status, expires_at')
-          .eq('token', token)
-          .maybeSingle()
-          .then(({ data }) => {
-            if (!data || data.status !== 'active') { setTokenValid(false); return; }
-            if (data.expires_at && new Date(data.expires_at) < new Date()) { setTokenValid(false); return; }
-            setTokenValid(true);
-          });
-      });
+        return;
+      }
+
+      // 2. Legacy fallback (kyc_qr_codes table)
+      const { data: legacyQR } = await supabase
+        .from('kyc_qr_codes')
+        .select('id, status, expires_at')
+        .eq('token', token)
+        .maybeSingle();
+
+      if (!legacyQR || legacyQR.status !== 'active') { setTokenValid(false); return; }
+      if (legacyQR.expires_at && new Date(legacyQR.expires_at) < new Date()) { setTokenValid(false); return; }
+      setTokenValid(true);
+    };
+
+    validateToken();
   }, [token]);
 
   const set = (k: keyof typeof form, v: string) => {

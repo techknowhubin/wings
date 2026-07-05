@@ -391,3 +391,11 @@ $$;
 
 REVOKE ALL ON FUNCTION public.admin_update_traveller_kyc_status(UUID, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.admin_update_traveller_kyc_status(UUID, TEXT) TO authenticated;
+
+-- ─────────────────────────────────────────────
+-- Explicit table grants (ensures anon/authenticated can access regardless of
+-- Supabase default privilege setup — RLS still enforces row-level restrictions)
+-- ─────────────────────────────────────────────
+GRANT SELECT ON public.host_qr_codes    TO anon, authenticated;
+GRANT SELECT, INSERT ON public.traveller_kyc   TO anon, authenticated;
+GRANT SELECT, INSERT ON public.qr_regen_requests TO authenticated;

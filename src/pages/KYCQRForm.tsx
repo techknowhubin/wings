@@ -39,25 +39,23 @@ export default function KYCQRForm() {
     if (!token) { setTokenValid(false); return; }
 
     const validateToken = async () => {
-      // 1. Check new host_qr_codes table
-      const { data: hostQR, error: hostErr } = await (supabase as any)
-        .from('host_qr_codes')
-        .select('id, host_id, qr_status')
-        .eq('token', token)
-        .maybeSingle();
+      // 1. Use SECURITY DEFINER RPC — works for anon AND authenticated travellers,
+      //    bypassing the RLS policies that only allow hosts/admins to read the table.
+      const { data: result } = await (supabase as any).rpc('validate_host_qr_token', { p_token: token });
 
-      if (!hostErr && hostQR) {
-        if (hostQR.qr_status === 'active') {
-          setQrRecord(hostQR as HostQRRecord);
-          setTokenValid(true);
-        } else {
-          // QR exists but revoked/inactive
-          setTokenValid(false);
-        }
+      if (result && result.valid === true) {
+        setQrRecord({ id: result.id, host_id: result.host_id, qr_status: result.qr_status });
+        setTokenValid(true);
         return;
       }
 
-      // 2. Legacy fallback (kyc_qr_codes table)
+      if (result && result.valid === false) {
+        // QR exists but was revoked
+        setTokenValid(false);
+        return;
+      }
+
+      // 2. Legacy fallback — old kyc_qr_codes table (still used by earlier QR links)
       const { data: legacyQR } = await supabase
         .from('kyc_qr_codes')
         .select('id, status, expires_at')

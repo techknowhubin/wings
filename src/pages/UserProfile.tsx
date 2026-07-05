@@ -671,25 +671,10 @@ export default function UserProfile() {
           </Card>
         </aside>
 
-        {/* Mobile bottom nav */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50 flex justify-around py-2 px-1">
-          {navItems.slice(0, 5).map((item) => (
-            <button
-              key={item.section}
-              onClick={() => navigateSection(item.section)}
-              className={cn(
-                "flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg text-[10px]",
-                activeSection === item.section ? "text-primary font-medium" : "text-muted-foreground"
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label.split(" ")[0]}
-            </button>
-          ))}
-        </div>
+        {/* Mobile bottom nav — hidden */}
 
         {/* Main Content */}
-        <main className="flex-1 pb-20 lg:pb-0">
+        <main className="flex-1">
           <motion.div
             key={activeSection}
             initial={{ opacity: 0, y: 10 }}

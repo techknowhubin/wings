@@ -58,38 +58,38 @@ export function CitySelectionModal() {
         >
           {/* Pin icon */}
           <div
-            className="flex items-center justify-center mb-5"
+            className="flex items-center justify-center mb-3"
             style={{
-              width: 72, height: 72,
-              borderRadius: 20,
+              width: 54, height: 54,
+              borderRadius: 16,
               background: 'rgba(255,228,236,0.92)',
             }}
           >
-            <MapPin size={32} color={ROSE} strokeWidth={2} />
+            <MapPin size={22} color={ROSE} strokeWidth={2} />
           </div>
 
           {/* Heading */}
           <h2
-            className="font-extrabold text-white text-center mb-3"
-            style={{ fontSize: 'clamp(2rem, 5vw, 2.75rem)', lineHeight: 1.15 }}
+            className="font-extrabold text-white text-center mb-2"
+            style={{ fontSize: 'clamp(1.4rem, 5vw, 2.2rem)', lineHeight: 1.15 }}
           >
             Choose Your City
           </h2>
 
           {/* Subtitle */}
           <p
-            className="text-center mb-10"
-            style={{ fontSize: 15, color: 'rgba(255,255,255,0.62)', maxWidth: '36ch', lineHeight: 1.6 }}
+            className="text-center mb-6"
+            style={{ fontSize: 13, color: 'rgba(255,255,255,0.62)', maxWidth: '34ch', lineHeight: 1.5 }}
           >
             We'll personalise cab services, routes, and destinations based on your city.
           </p>
 
-          {/* City circles */}
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-10 sm:gap-16 mb-10">
+          {/* City circles — always side by side including mobile */}
+          <div className="flex flex-row justify-center items-start gap-5 sm:gap-14 mb-6 w-full">
             {CITIES.map((city) => {
               const isSel = selected === city.id;
               return (
-                <div key={city.id} className="flex flex-col items-center gap-4">
+                <div key={city.id} className="flex flex-col items-center gap-3">
 
                   <motion.button
                     onClick={() => pick(city.id)}
@@ -99,7 +99,8 @@ export function CitySelectionModal() {
                     aria-label={`Select ${city.label}`}
                     className="relative cursor-pointer focus-visible:outline-none"
                     style={{
-                      width: 210, height: 210,
+                      width: 'clamp(110px, 28vw, 175px)',
+                      height: 'clamp(110px, 28vw, 175px)',
                       borderRadius: '50%',
                       overflow: 'hidden',
                       flexShrink: 0,
@@ -157,8 +158,8 @@ export function CitySelectionModal() {
 
                   {/* Label */}
                   <div className="text-center">
-                    <p style={{ fontSize: 18, fontWeight: 700, color: '#ffffff' }}>{city.label}</p>
-                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>{city.sub}</p>
+                    <p style={{ fontSize: 'clamp(14px, 4vw, 18px)', fontWeight: 700, color: '#ffffff' }}>{city.label}</p>
+                    <p style={{ fontSize: 'clamp(11px, 3vw, 13px)', color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>{city.sub}</p>
                   </div>
 
                 </div>

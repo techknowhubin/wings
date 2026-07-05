@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   useKycSubmissions, useLockKycSubmission,
   useApproveKyc, useRejectKyc, useRequestReupload,
@@ -15,12 +16,248 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { formatDistanceToNow } from 'date-fns';
-import { ShieldCheck, AlertTriangle, Clock, ZoomIn, CheckCircle2, XCircle, RefreshCw, User } from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
+import { ShieldCheck, AlertTriangle, Clock, ZoomIn, CheckCircle2, XCircle, RefreshCw, User, QrCode, ShieldX } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { presignGet } from '@/lib/r2';
 
 type KycSubmission = any;
+
+// ─── Traveller QR KYC types & hooks ───────────────────────────────────────────
+type TravellerKYCRecord = {
+  id: string; host_id: string; full_name: string; mobile: string;
+  email: string | null; aadhaar: string | null; pan: string | null;
+  driving_licence: string | null; address: string | null;
+  emergency_contact: Record<string, string>;
+  uploaded_documents: { type: string; path: string }[] | null;
+  verification_status: 'pending' | 'verified' | 'rejected'; created_at: string;
+  host_name?: string;
+};
+
+const DOC_TYPE_LABEL: Record<string, string> = {
+  aadhaar: 'Aadhaar Card',
+  pan: 'PAN Card',
+  driving_licence: 'Driving Licence',
+};
+
+function DocPhotoViewer({ doc }: { doc: { type: string; path: string } }) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.storage.from('traveller-kyc-docs').createSignedUrl(doc.path, 3600)
+      .then(({ data }) => { if (data) setUrl(data.signedUrl); });
+  }, [doc.path]);
+
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground mb-1">{DOC_TYPE_LABEL[doc.type] ?? doc.type}</p>
+      {url ? (
+        <a href={url} target="_blank" rel="noopener noreferrer">
+          <img src={url} alt={doc.type} className="w-full rounded-lg border object-cover max-h-48 hover:opacity-90 transition-opacity cursor-zoom-in" />
+        </a>
+      ) : (
+        <div className="h-24 rounded-lg border border-dashed flex items-center justify-center text-xs text-muted-foreground">
+          Loading…
+        </div>
+      )}
+    </div>
+  );
+}
+
+const QR_STATUS_BADGE: Record<string, { label: string; cls: string; icon: React.ElementType }> = {
+  pending:  { label: 'Pending',  cls: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Clock },
+  verified: { label: 'Verified', cls: 'bg-green-100  text-green-800  border-green-200',  icon: ShieldCheck },
+  rejected: { label: 'Rejected', cls: 'bg-red-100    text-red-800    border-red-200',    icon: ShieldX },
+};
+
+function useTravellerQRKYC() {
+  return useQuery({
+    queryKey: ['admin-traveller-qr-kyc'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc('get_host_traveller_kyc');
+      if (error) throw error;
+      const records = (data ?? []) as TravellerKYCRecord[];
+      const hostIds = [...new Set(records.map(r => r.host_id))];
+      let hostMap: Record<string, string> = {};
+      if (hostIds.length) {
+        const { data: profiles } = await (supabase as any).from('profiles').select('id, full_name').in('id', hostIds);
+        (profiles ?? []).forEach((p: any) => { hostMap[p.id] = p.full_name; });
+      }
+      return records.map(r => ({ ...r, host_name: hostMap[r.host_id] ?? '—' }));
+    },
+    staleTime: 30_000,
+  });
+}
+
+function TravellerQRKYCTab() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [selected, setSelected] = useState<TravellerKYCRecord | null>(null);
+  const { data: records = [], isLoading } = useTravellerQRKYC();
+
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await (supabase as any).rpc('admin_update_traveller_kyc_status', { p_kyc_id: id, p_status: status });
+      if (error) throw error;
+    },
+    onSuccess: (_, { status }) => {
+      toast({ title: `KYC marked as ${status}.` });
+      queryClient.invalidateQueries({ queryKey: ['admin-traveller-qr-kyc'] });
+      setSelected(prev => prev ? { ...prev, verification_status: status as any } : null);
+    },
+    onError: (e: any) => toast({ variant: 'destructive', title: e.message ?? 'Update failed' }),
+  });
+
+  if (isLoading) return <div className="p-6 space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>;
+
+  return (
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Traveller</TableHead>
+            <TableHead>Host</TableHead>
+            <TableHead>Mobile</TableHead>
+            <TableHead>Aadhaar</TableHead>
+            <TableHead>PAN</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Submitted</TableHead>
+            <TableHead></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {records.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                <QrCode className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                No QR KYC submissions yet.
+              </TableCell>
+            </TableRow>
+          )}
+          {records.map((kyc) => {
+            const badge = QR_STATUS_BADGE[kyc.verification_status];
+            const Icon = badge?.icon ?? Clock;
+            return (
+              <TableRow key={kyc.id} className="cursor-pointer" onClick={() => setSelected(kyc)}>
+                <TableCell>
+                  <p className="text-sm font-semibold">{kyc.full_name}</p>
+                  <p className="text-xs text-muted-foreground">{kyc.email || '—'}</p>
+                </TableCell>
+                <TableCell className="text-sm">{kyc.host_name}</TableCell>
+                <TableCell className="font-mono text-sm">{kyc.mobile}</TableCell>
+                <TableCell className="font-mono text-xs">{kyc.aadhaar || '—'}</TableCell>
+                <TableCell className="font-mono text-xs">{kyc.pan || '—'}</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className={`${badge?.cls} gap-1 text-[10px]`}>
+                    <Icon className="h-3 w-3" />{badge?.label}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                  {formatDistanceToNow(new Date(kyc.created_at), { addSuffix: true })}
+                </TableCell>
+                <TableCell>
+                  <Button size="sm" variant="outline" className="h-7 text-xs rounded-lg">Review</Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+
+      {/* Detail Sheet */}
+      <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5" />{selected?.full_name}
+            </SheetTitle>
+          </SheetHeader>
+          {selected && (
+            <div className="mt-6 space-y-5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium">Status:</span>
+                {(['pending', 'verified', 'rejected'] as const).map((s) => {
+                  const b = QR_STATUS_BADGE[s];
+                  return (
+                    <Button key={s} size="sm"
+                      variant={selected.verification_status === s ? 'default' : 'outline'}
+                      className={`h-7 text-xs rounded-lg ${selected.verification_status === s ? '' : b.cls}`}
+                      disabled={updateStatus.isPending}
+                      onClick={() => updateStatus.mutate({ id: selected.id, status: s })}>
+                      {b.label}
+                    </Button>
+                  );
+                })}
+              </div>
+              <div className="rounded-xl border bg-muted/20 p-4 space-y-3">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Personal Information</p>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  {[
+                    { label: 'Full Name', value: selected.full_name },
+                    { label: 'Mobile', value: selected.mobile },
+                    { label: 'Email', value: selected.email },
+                    { label: 'Host', value: selected.host_name },
+                    { label: 'Address', value: selected.address, full: true },
+                  ].map(({ label, value, full }) => (
+                    <div key={label} className={full ? 'col-span-2' : ''}>
+                      <p className="text-xs text-muted-foreground">{label}</p>
+                      <p className="font-medium">{value || '—'}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-xl border bg-muted/20 p-4 space-y-3">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Identity Documents</p>
+                <div className="grid grid-cols-1 gap-3 text-sm">
+                  {[
+                    { label: 'Aadhaar Number', value: selected.aadhaar },
+                    { label: 'PAN Number', value: selected.pan },
+                    { label: 'Driving Licence', value: selected.driving_licence },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">{label}</p>
+                      <p className="font-mono font-medium text-sm">{value || '—'}</p>
+                    </div>
+                  ))}
+                </div>
+                {/* Document photos */}
+                {selected.uploaded_documents && selected.uploaded_documents.length > 0 && (
+                  <div className="pt-2 space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Uploaded Photos</p>
+                    <div className="grid grid-cols-1 gap-3">
+                      {selected.uploaded_documents.map((doc) => (
+                        <DocPhotoViewer key={doc.path} doc={doc} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {selected.emergency_contact && Object.keys(selected.emergency_contact).length > 0 && (
+                <div className="rounded-xl border bg-muted/20 p-4 space-y-3">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Emergency Contact</p>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {Object.entries(selected.emergency_contact).map(([k, v]) => (
+                      <div key={k}>
+                        <p className="text-xs text-muted-foreground capitalize">{k.replace(/_/g, ' ')}</p>
+                        <p className="font-medium">{String(v)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="rounded-xl border bg-muted/20 p-4 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Submitted</span>
+                  <span className="font-medium">{format(new Date(selected.created_at), 'dd MMM yyyy, hh:mm a')}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+}
 
 const DOC_LABELS: Record<string, string> = {
   aadhaar: 'Aadhaar Card',
@@ -69,6 +306,7 @@ export default function KYCReview() {
   const { toast } = useToast();
 
   const [tab, setTab] = useState('pending');
+  const [section, setSection] = useState<'document' | 'qr'>('document');
   const [selected, setSelected] = useState<any | null>(null);
   const [activeDoc, setActiveDoc] = useState<any | null>(null);
   const [zoomSrc, setZoomSrc] = useState<string | null>(null);
@@ -260,7 +498,35 @@ export default function KYCReview() {
         <p className="text-muted-foreground text-sm mt-1">Review and approve traveler identity documents.</p>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
+      {/* Section switcher */}
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          variant={section === 'document' ? 'default' : 'outline'}
+          className="rounded-xl gap-2"
+          onClick={() => setSection('document')}
+        >
+          <ShieldCheck className="h-4 w-4" /> Document KYC
+        </Button>
+        <Button
+          size="sm"
+          variant={section === 'qr' ? 'default' : 'outline'}
+          className="rounded-xl gap-2"
+          onClick={() => setSection('qr')}
+        >
+          <QrCode className="h-4 w-4" /> Traveller QR KYC
+        </Button>
+      </div>
+
+      {section === 'qr' && (
+        <Card>
+          <CardContent className="p-0">
+            <TravellerQRKYCTab />
+          </CardContent>
+        </Card>
+      )}
+
+      {section === 'document' && <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="pending">Pending ({counts.pending})</TabsTrigger>
           <TabsTrigger value="under_review">Under Review ({counts.under_review})</TabsTrigger>
@@ -352,7 +618,7 @@ export default function KYCReview() {
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
+      </Tabs>}
 
       {/* Review Drawer */}
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>

@@ -127,9 +127,9 @@ export default function AdminTravellerKYC() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total', value: records.length, icon: Shield, color: 'text-primary' },
-          { label: 'Pending', value: counts.pending, icon: Clock, color: 'text-yellow-600' },
-          { label: 'Verified', value: counts.verified, icon: ShieldCheck, color: 'text-green-600' },
+          { label: 'Total', value: records.length, icon: Shield, color: 'text-muted-foreground' },
+          { label: 'Pending', value: counts.pending, icon: Clock, color: 'text-yellow-500' },
+          { label: 'Verified', value: counts.verified, icon: ShieldCheck, color: 'text-green-500' },
           { label: 'Rejected', value: counts.rejected, icon: ShieldX, color: 'text-red-500' },
         ].map(({ label, value, icon: Icon, color }) => (
           <Card key={label} className="p-4">
@@ -138,7 +138,7 @@ export default function AdminTravellerKYC() {
                 <p className="text-xs text-muted-foreground">{label}</p>
                 <p className="text-2xl font-black mt-0.5">{value}</p>
               </div>
-              <Icon className={`h-8 w-8 opacity-20 ${color}`} />
+              <Icon className={`h-8 w-8 opacity-50 ${color}`} />
             </div>
           </Card>
         ))}

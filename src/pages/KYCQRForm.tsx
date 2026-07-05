@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,9 +7,58 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { DynamicLogo } from "@/components/DynamicLogo";
-import { ShieldCheck, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { ShieldCheck, Loader2, CheckCircle2, AlertCircle, Upload, X, ImageIcon } from "lucide-react";
 
 type HostQRRecord = { id: string; host_id: string; qr_status: string };
+
+type DocKey = "aadhaar_photo" | "pan_photo" | "dl_photo";
+
+function DocUpload({
+  label, file, onFile,
+}: { label: string; file: File | null; onFile: (f: File | null) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const preview = file ? URL.createObjectURL(file) : null;
+
+  return (
+    <div className="mt-2">
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*,application/pdf"
+        className="hidden"
+        onChange={e => onFile(e.target.files?.[0] ?? null)}
+      />
+      {file ? (
+        <div className="relative rounded-xl border border-border overflow-hidden">
+          {file.type.startsWith("image/") ? (
+            <img src={preview!} alt={label} className="w-full h-32 object-cover" />
+          ) : (
+            <div className="h-32 flex items-center justify-center bg-muted/30 gap-2 text-sm text-muted-foreground">
+              <ImageIcon className="h-5 w-5" />
+              {file.name}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => { onFile(null); if (ref.current) ref.current.value = ""; }}
+            className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 hover:bg-black/80"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => ref.current?.click()}
+          className="w-full h-20 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors"
+        >
+          <Upload className="h-4 w-4" />
+          <span className="text-xs">Upload {label} photo</span>
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function KYCQRForm() {
   const { token } = useParams<{ token: string }>();
@@ -34,13 +83,16 @@ export default function KYCQRForm() {
     emergency_contact_relation: "",
   });
   const [errors, setErrors] = useState<Partial<Record<keyof typeof form, string>>>({});
+  const [docFiles, setDocFiles] = useState<Record<DocKey, File | null>>({
+    aadhaar_photo: null,
+    pan_photo: null,
+    dl_photo: null,
+  });
 
   useEffect(() => {
     if (!token) { setTokenValid(false); return; }
 
     const validateToken = async () => {
-      // 1. Use SECURITY DEFINER RPC — works for anon AND authenticated travellers,
-      //    bypassing the RLS policies that only allow hosts/admins to read the table.
       const { data: result } = await (supabase as any).rpc('validate_host_qr_token', { p_token: token });
 
       if (result && result.valid === true) {
@@ -50,12 +102,11 @@ export default function KYCQRForm() {
       }
 
       if (result && result.valid === false) {
-        // QR exists but was revoked
         setTokenValid(false);
         return;
       }
 
-      // 2. Legacy fallback — old kyc_qr_codes table (still used by earlier QR links)
+      // Legacy fallback
       const { data: legacyQR } = await supabase
         .from('kyc_qr_codes')
         .select('id, status, expires_at')
@@ -75,6 +126,8 @@ export default function KYCQRForm() {
     setErrors(p => ({ ...p, [k]: undefined }));
   };
 
+  const setDocFile = (k: DocKey, f: File | null) => setDocFiles(p => ({ ...p, [k]: f }));
+
   const validate = () => {
     const e: Partial<Record<keyof typeof form, string>> = {};
     if (!form.full_name.trim()) e.full_name = "Required";
@@ -87,13 +140,40 @@ export default function KYCQRForm() {
     return Object.keys(e).length === 0;
   };
 
+  const uploadDocFile = async (file: File, docType: string): Promise<string | null> => {
+    const ext = file.name.split('.').pop() ?? 'jpg';
+    const path = `${docType}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const { data, error } = await supabase.storage
+      .from('traveller-kyc-docs')
+      .upload(path, file, { contentType: file.type, upsert: false });
+    if (error) {
+      console.error(`Upload failed for ${docType}:`, error.message);
+      return null;
+    }
+    return data.path;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setSubmitting(true);
     try {
+      // Upload document photos
+      const uploadedDocs: { type: string; path: string }[] = [];
+      if (docFiles.aadhaar_photo && form.aadhaar) {
+        const path = await uploadDocFile(docFiles.aadhaar_photo, 'aadhaar');
+        if (path) uploadedDocs.push({ type: 'aadhaar', path });
+      }
+      if (docFiles.pan_photo && form.pan) {
+        const path = await uploadDocFile(docFiles.pan_photo, 'pan');
+        if (path) uploadedDocs.push({ type: 'pan', path });
+      }
+      if (docFiles.dl_photo && form.driving_licence) {
+        const path = await uploadDocFile(docFiles.dl_photo, 'driving_licence');
+        if (path) uploadedDocs.push({ type: 'driving_licence', path });
+      }
+
       if (qrRecord) {
-        // New system: write to traveller_kyc linked to host
         const { error } = await (supabase as any).from('traveller_kyc').insert({
           host_id: qrRecord.host_id,
           qr_id: qrRecord.id,
@@ -109,6 +189,7 @@ export default function KYCQRForm() {
             phone: form.emergency_contact_phone,
             relation: form.emergency_contact_relation,
           },
+          uploaded_documents: uploadedDocs,
         });
         if (error) throw error;
       } else {
@@ -209,12 +290,17 @@ export default function KYCQRForm() {
           </div>
 
           {/* Identity Documents */}
-          <div className="bg-card rounded-2xl border border-border p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Identity Documents</h2>
-            <p className="text-xs text-muted-foreground">Fill in the document numbers you have. At least one is recommended.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="bg-card rounded-2xl border border-border p-5 space-y-5">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Identity Documents</h2>
+              <p className="text-xs text-muted-foreground mt-1">Fill in any document numbers you have and upload a clear photo of each.</p>
+            </div>
+
+            {/* Aadhaar */}
+            <div className="rounded-xl border border-border/60 p-4 space-y-3">
+              <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Aadhaar Card</p>
               <div>
-                <Label>Aadhaar Number</Label>
+                <Label className="text-xs">Aadhaar Number</Label>
                 <Input
                   value={form.aadhaar}
                   onChange={e => set("aadhaar", e.target.value.replace(/\D/g, "").slice(0, 12))}
@@ -223,8 +309,23 @@ export default function KYCQRForm() {
                   inputMode="numeric"
                 />
               </div>
+              {form.aadhaar.length > 0 && (
+                <div>
+                  <Label className="text-xs">Aadhaar Photo <span className="text-muted-foreground font-normal">(front side)</span></Label>
+                  <DocUpload
+                    label="Aadhaar"
+                    file={docFiles.aadhaar_photo}
+                    onFile={f => setDocFile("aadhaar_photo", f)}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* PAN */}
+            <div className="rounded-xl border border-border/60 p-4 space-y-3">
+              <p className="text-xs font-semibold text-foreground uppercase tracking-wider">PAN Card</p>
               <div>
-                <Label>PAN Number</Label>
+                <Label className="text-xs">PAN Number</Label>
                 <Input
                   value={form.pan}
                   onChange={e => set("pan", e.target.value.toUpperCase().slice(0, 10))}
@@ -232,8 +333,23 @@ export default function KYCQRForm() {
                   className="mt-1 font-mono"
                 />
               </div>
-              <div className="sm:col-span-2">
-                <Label>Driving Licence Number</Label>
+              {form.pan.length > 0 && (
+                <div>
+                  <Label className="text-xs">PAN Photo</Label>
+                  <DocUpload
+                    label="PAN"
+                    file={docFiles.pan_photo}
+                    onFile={f => setDocFile("pan_photo", f)}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Driving Licence */}
+            <div className="rounded-xl border border-border/60 p-4 space-y-3">
+              <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Driving Licence</p>
+              <div>
+                <Label className="text-xs">Licence Number</Label>
                 <Input
                   value={form.driving_licence}
                   onChange={e => set("driving_licence", e.target.value.toUpperCase())}
@@ -241,6 +357,16 @@ export default function KYCQRForm() {
                   className="mt-1 font-mono"
                 />
               </div>
+              {form.driving_licence.length > 0 && (
+                <div>
+                  <Label className="text-xs">Driving Licence Photo <span className="text-muted-foreground font-normal">(front side)</span></Label>
+                  <DocUpload
+                    label="Driving Licence"
+                    file={docFiles.dl_photo}
+                    onFile={f => setDocFile("dl_photo", f)}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -266,8 +392,8 @@ export default function KYCQRForm() {
           </div>
 
           <div className="bg-muted/30 rounded-xl p-4 text-xs text-muted-foreground flex gap-2">
-            <ShieldCheck className="h-4 w-4 shrink-0 text-primary mt-0.5" />
-            <span>Your data is stored securely. Only the Super Admin can view complete KYC details. Hosts only see masked information (last 4 digits).</span>
+            <ShieldCheck className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+            <span>Your data and document photos are stored securely. Only the Super Admin can view complete KYC details. Hosts only see masked information (last 4 digits).</span>
           </div>
 
           <Button type="submit" disabled={submitting} className="w-full rounded-xl h-12 text-base font-semibold" variant="gradient">

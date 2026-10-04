@@ -151,6 +151,19 @@ const Header = () => {
                 )}
               </Button>
 
+              {location.pathname === '/' && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden rounded-full text-[#013220] dark:text-[#E5F76E]"
+                  onClick={() => setShowCityPicker(true)}
+                  aria-label="Change city"
+                  title="Change city"
+                >
+                  <MapPin className="h-5 w-5" />
+                </Button>
+              )}
+
               <Button
                 variant="ghost"
                 size="icon"

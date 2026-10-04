@@ -32,6 +32,7 @@ import arakuImg from "@/assets/destinations/araku.jpg";
 import nagarjunasagarImg from "@/assets/destinations/nagarjunasagar.jpg";
 import coorgImg from "@/assets/destinations/coorg.jpg";
 import wayanadImg from "@/assets/destinations/wayanad.jpg";
+import bangaloreImg from "@/assets/destinations/bangalore.jpg";
 
 interface CabFareCardProps {
   fromCode: string;
@@ -54,6 +55,7 @@ interface CabFareCardProps {
   variant?: "previous" | "ticket";
   oneWayBufferKm?: number;
   roundTripBufferKm?: number;
+  placeType?: string;
 }
 
 // Map destination codes to high-quality images for the ticket layout
@@ -74,7 +76,8 @@ const destinationImages: Record<string, string> = {
   KDP: tirupatiImg,
   RJM: visakhapatnamImg,
   KNL: tirupatiImg,
-  BLR: coorgImg,
+  HYD: hyderabadImg,
+  BLR: bangaloreImg,
   MYS: coorgImg,
   HBL: coorgImg,
   BGM: coorgImg,
@@ -135,6 +138,7 @@ const CabFareCard = ({
   variant = "previous",
   oneWayBufferKm,
   roundTripBufferKm,
+  placeType,
 }: CabFareCardProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -711,6 +715,22 @@ const CabFareCard = ({
             <div className="flex-1 p-1 md:p-5 flex flex-col items-center justify-center text-center min-w-[60px] md:min-w-[110px]">
               <p className="text-sm md:text-2xl font-bold text-foreground leading-tight">{toCode}</p>
               <p className="text-[9px] md:text-sm text-muted-foreground leading-tight mt-0.5">{toCity}</p>
+              {placeType && (
+                <span style={{ 
+                  fontSize: '9px', 
+                  backgroundColor: '#E5F76D', 
+                  color: '#1A3C34', 
+                  padding: '2px 6px', 
+                  borderRadius: '99px',
+                  textTransform: 'uppercase', 
+                  marginTop: '4px', 
+                  fontWeight: 'bold',
+                  display: 'inline-block',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {placeType}
+                </span>
+              )}
             </div>
 
             {/* Price and Book Now — fixed width so all cards are identical height */}
@@ -773,6 +793,22 @@ const CabFareCard = ({
             <div className="dest-label">
               <div className="dest-code">{toCode}</div>
               <div className="dest-city">{toCity}</div>
+              {placeType && (
+                <div className="dest-type" style={{ 
+                  fontSize: '9px', 
+                  backgroundColor: '#E5F76D', 
+                  color: '#1A3C34', 
+                  padding: '2px 8px', 
+                  borderRadius: '99px',
+                  textTransform: 'uppercase', 
+                  marginTop: '6px', 
+                  fontWeight: '800',
+                  display: 'inline-block',
+                  letterSpacing: '0.05em'
+                }}>
+                  {placeType}
+                </div>
+              )}
             </div>
           </div>
 

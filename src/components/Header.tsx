@@ -9,6 +9,7 @@ import MegaMenu from "./MegaMenu";
 import { DynamicLogo } from "./DynamicLogo";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useListings";
+import { useCity } from "@/contexts/CityContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,6 +39,7 @@ const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, signOut, getUserRole } = useAuth();
   const { data: profile } = useProfile(user?.id);
+  const { selectedCity, setShowCityPicker } = useCity();
   const [role, setRole] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -123,12 +125,6 @@ const Header = () => {
                 className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-2 2xl:px-3 py-2 rounded-lg nav-link-hover whitespace-nowrap"
               >
                 Car Rentals
-              </Link>
-              <Link
-                to="/outstation-cabs"
-                className="text-sm font-medium text-foreground hover:text-primary-text transition-colors px-2 2xl:px-3 py-2 rounded-lg nav-link-hover whitespace-nowrap"
-              >
-                Outstation Cabs
               </Link>
               <Link
                 to="/experiences"
@@ -235,6 +231,20 @@ const Header = () => {
                     </Link>
                   </div>
                 </>
+              )}
+
+              {location.pathname === '/' && (
+                <Button
+                  variant="ghost"
+                  className="hidden md:flex items-center gap-1.5 rounded-full px-3 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all group"
+                  onClick={() => setShowCityPicker(true)}
+                  title="Click to change city"
+                >
+                  <MapPin className="h-4 w-4" />
+                  <span className="text-sm font-medium capitalize truncate max-w-[120px]">
+                    {selectedCity || "Select City"}
+                  </span>
+                </Button>
               )}
 
               <Button

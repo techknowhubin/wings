@@ -31,6 +31,7 @@ import mussoorieImg from "@/assets/destinations/mussoorie.jpg";
 import nainitalImg from "@/assets/destinations/nainital.jpg";
 import auliImg from "@/assets/destinations/auli.jpg";
 import coorgImg from "@/assets/destinations/coorg.jpg";
+import bangaloreImg from "@/assets/destinations/bangalore.jpg";
 import hampiImg from "@/assets/destinations/hampi.jpg";
 import gokarnaImg from "@/assets/destinations/gokarna.jpg";
 import srinagarImg from "@/assets/destinations/srinagar.jpg";
@@ -83,6 +84,7 @@ const allDestinations = [
   { image: nainitalImg, title: "Nainital", subtitle: "Lake district of India", rating: 4.6, priceRange: "Starting ₹900/night", state: "Uttarakhand", link: "/stays" },
   { image: auliImg, title: "Auli", subtitle: "Skiing paradise", rating: 4.7, priceRange: "Starting ₹1,500/night", state: "Uttarakhand", link: "/stays" },
   // Karnataka
+  { image: bangaloreImg, title: "Bangalore", subtitle: "Garden City & Silicon Valley", rating: 4.8, priceRange: "Starting ₹1,200/night", state: "Karnataka", link: "/stays" },
   { image: coorgImg, title: "Coorg", subtitle: "Scotland of India", rating: 4.7, priceRange: "Starting ₹1,300/night", state: "Karnataka", link: "/stays" },
   { image: hampiImg, title: "Hampi", subtitle: "Ancient ruins & boulders", rating: 4.6, priceRange: "Starting ₹600/night", state: "Karnataka", link: "/stays" },
   { image: gokarnaImg, title: "Gokarna", subtitle: "Pristine beaches & temples", rating: 4.5, priceRange: "Starting ₹800/night", state: "Karnataka", link: "/stays" },

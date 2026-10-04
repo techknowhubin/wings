@@ -4,7 +4,8 @@ import CabFareCard from "./CabFareCard";
 import CabFareKPIs from "./CabFareKPIs";
 import { useCity } from "@/contexts/CityContext";
 
-type State = "telangana" | "andhra" | "karnataka";
+export type OriginCity = "hyderabad" | "bangalore";
+export type DestinationState = "karnataka" | "andhra" | "telangana" | "tamilnadu" | "goa_maharashtra" | "telangana_andhra" | "kerala";
 
 interface FareData {
   fromCode: string;
@@ -25,20 +26,48 @@ interface FareData {
   imageUrl?: string;
   oneWayBufferKm?: number;
   roundTripBufferKm?: number;
+  placeType?: string;
 }
 
-const emptyFares: Record<State, FareData[]> = { telangana: [], andhra: [], karnataka: [] };
-
-const stateLabels: Record<State, string> = {
-  telangana: "Telangana",
-  andhra: "Andhra Pradesh",
-  karnataka: "Karnataka",
+const emptyCityFares: Record<OriginCity, Record<DestinationState, FareData[]>> = {
+  hyderabad: { telangana: [], andhra: [], karnataka: [], tamilnadu: [], goa_maharashtra: [], telangana_andhra: [], kerala: [] },
+  bangalore: { karnataka: [], tamilnadu: [], goa_maharashtra: [], andhra: [], telangana: [], telangana_andhra: [], kerala: [] },
 };
 
-const sheetUrls: Record<State, string> = {
-  telangana: "https://docs.google.com/spreadsheets/d/1V8IvrFbXqy4y1z3Lj1jLTqSGevQFKlut5w8aHsZbWT8/edit?usp=sharing",
-  andhra: "https://docs.google.com/spreadsheets/d/1z8eXpn_WqChYEx-ZbWWQiPRaYZ3NhkmHYio_d5RF1UA/edit?usp=sharing",
-  karnataka: "https://docs.google.com/spreadsheets/d/19QHm9BcPK_DHs6t2bd2znn84TjOv4UtrfUFgQbnHUfc/edit?usp=sharing",
+const stateLabels: Record<DestinationState, string> = {
+  karnataka: "Karnataka",
+  tamilnadu: "Tamil Nadu",
+  goa_maharashtra: "Goa / Maharashtra",
+  andhra: "Andhra Pradesh",
+  telangana: "Telangana",
+  telangana_andhra: "Telangana / Andhra",
+  kerala: "Kerala",
+};
+
+const cityStateOrder: Record<OriginCity, DestinationState[]> = {
+  hyderabad: ["telangana", "andhra", "karnataka", "tamilnadu", "goa_maharashtra", "kerala"],
+  bangalore: ["karnataka", "telangana_andhra", "tamilnadu", "kerala", "goa_maharashtra"],
+};
+
+const sheetUrls: Record<OriginCity, Record<DestinationState, string>> = {
+  hyderabad: {
+    telangana: (import.meta.env.VITE_SHEET_HYD_TELANGANA || "https://docs.google.com/spreadsheets/d/1V8IvrFbXqy4y1z3Lj1jLTqSGevQFKlut5w8aHsZbWT8/edit?usp=sharing").trim(),
+    andhra: (import.meta.env.VITE_SHEET_HYD_ANDHRA || "https://docs.google.com/spreadsheets/d/1z8eXpn_WqChYEx-ZbWWQiPRaYZ3NhkmHYio_d5RF1UA/edit?usp=sharing").trim(),
+    karnataka: (import.meta.env.VITE_SHEET_HYD_KARNATAKA || "https://docs.google.com/spreadsheets/d/19QHm9BcPK_DHs6t2bd2znn84TjOv4UtrfUFgQbnHUfc/edit?usp=sharing").trim(),
+    tamilnadu: (import.meta.env.VITE_SHEET_HYD_TAMILNADU || "").trim(),
+    goa_maharashtra: (import.meta.env.VITE_SHEET_HYD_GOA_MAH || "").trim(),
+    telangana_andhra: "",
+    kerala: "",
+  },
+  bangalore: {
+    karnataka: (import.meta.env.VITE_SHEET_BLR_KARNATAKA || "https://docs.google.com/spreadsheets/d/1brBmhw1XHe7AXNzkMCBEgkpzVrG4u1T6aYLmyhcOODk/edit?usp=sharing").trim(),
+    tamilnadu: (import.meta.env.VITE_SHEET_BLR_TAMILNADU || "https://docs.google.com/spreadsheets/d/1Mkptv-TXuk-aMrGoFDEOMx4i5hER0YyvOYsoQDwC7-Y/edit?usp=sharing").trim(),
+    goa_maharashtra: (import.meta.env.VITE_SHEET_BLR_GOA_MAH || "https://docs.google.com/spreadsheets/d/1mApjh8etcYKDqGfn_mlcpSN2BzyPv6KZzOxS7CsQFxg/edit?usp=sharing").trim(),
+    telangana_andhra: (import.meta.env.VITE_SHEET_BLR_TS_AP || "https://docs.google.com/spreadsheets/d/1xzSTaWfswYBRfD8ZpPPTljz6tidaEehkcVBoZat20KA/edit?usp=sharing").trim(),
+    andhra: "",
+    telangana: "",
+    kerala: (import.meta.env.VITE_SHEET_BLR_KERALA || "https://docs.google.com/spreadsheets/d/1opNdPMKSkTCgFjCCrmC_tpQCfCHCdG1KLjMwJPzezQg/edit?usp=sharing").trim(),
+  },
 };
 
 const normalizeHeader = (value: string) =>
@@ -262,6 +291,7 @@ const mapRowToFare = (row: Record<string, string>): FareData => {
   const oneWaySuvDiscountedPrice = toPrice(pick(row, ["onewaysuvdiscount", "onewaysuvdiscounted", "onewaysuvdi", "owsuvdiscount"]));
   const imageUrl = pick(row, ["imageurl", "image", "imgurl", "photo", "photourl", "imagelink"]);
   const bufferRaw = String(pick(row, ["owrtbufferkm", "bufferkm", "buffer", "owrtbuffer"])).trim();
+  const placeType = pick(row, ["placetype", "type", "place"]);
   
   let oneWayBufferKm = 0;
   let roundTripBufferKm = 0;
@@ -296,6 +326,7 @@ const mapRowToFare = (row: Record<string, string>): FareData => {
     imageUrl,
     oneWayBufferKm,
     roundTripBufferKm,
+    placeType,
   });
 };
 
@@ -528,69 +559,80 @@ interface CabFareSectionProps {
 
 const CabFareSection = ({ variant = "previous", withContainer = false }: CabFareSectionProps) => {
   const { selectedCity } = useCity();
-  const defaultState: State = selectedCity === 'bangalore' ? 'karnataka' : 'telangana';
-  const [selectedState, setSelectedState] = useState<State>(defaultState);
-  const [cabFares, setCabFares] = useState<Record<State, FareData[]>>(emptyFares);
+  const currentCity: OriginCity = selectedCity === 'bangalore' ? 'bangalore' : 'hyderabad';
+  const defaultState: DestinationState = currentCity === 'bangalore' ? 'karnataka' : 'telangana';
+
+  const [selectedState, setSelectedState] = useState<DestinationState>(defaultState);
+  const [cabFares, setCabFares] = useState<Record<OriginCity, Record<DestinationState, FareData[]>>>(emptyCityFares);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setSelectedState(selectedCity === 'bangalore' ? 'karnataka' : 'telangana');
-  }, [selectedCity]);
+    setSelectedState(currentCity === 'bangalore' ? 'karnataka' : 'telangana');
+  }, [currentCity]);
 
   useEffect(() => {
     const loadSheetFares = async () => {
-      const entries = await Promise.all(
-        (Object.keys(sheetUrls) as State[]).map(async (state) => {
-          const exportUrl = toCsvExportUrl(sheetUrls[state]);
-          const gvizUrl = toGvizUrl(sheetUrls[state]);
-          if (!exportUrl && !gvizUrl) return [state, [] as FareData[]] as const;
-
-          try {
-            let parsed: FareData[] = [];
-
-            const jsonpPayload = await loadGvizWithJsonp(sheetUrls[state]);
-            if (jsonpPayload) {
-              parsed = parseGvizPayload(jsonpPayload);
-              console.log(`[CabFareSection] JSONP ${state}: ${parsed.length} rows`);
-            } else {
-              console.warn(`[CabFareSection] JSONP ${state}: no payload`);
-            }
-
-            if (parsed.length === 0 && gvizUrl) {
-              try {
-                const gvizRes = await fetch(`${gvizUrl}&_=${Date.now()}`, { cache: "no-store" });
-                if (gvizRes.ok) {
-                  parsed = parseGvizJson(await gvizRes.text());
-                  console.log(`[CabFareSection] gviz fetch ${state}: ${parsed.length} rows`);
-                }
-              } catch {
-                console.warn(`[CabFareSection] gviz fetch ${state}: CORS blocked`);
+      const cityEntries = await Promise.all(
+        (Object.keys(sheetUrls) as OriginCity[]).map(async (city) => {
+          const stateEntries = await Promise.all(
+            (Object.keys(sheetUrls[city]) as DestinationState[]).map(async (state) => {
+              const url = sheetUrls[city][state];
+              if (!url) {
+                return [state, [] as FareData[]] as const;
               }
-            }
 
-            if (parsed.length === 0 && exportUrl) {
+              const exportUrl = toCsvExportUrl(url);
+              const gvizUrl = toGvizUrl(url);
+              if (!exportUrl && !gvizUrl) return [state, [] as FareData[]] as const;
+
               try {
-                const csvRes = await fetch(`${exportUrl}&_=${Date.now()}`, { cache: "no-store" });
-                if (csvRes.ok) {
-                  parsed = parseFareCsv(await csvRes.text());
-                  console.log(`[CabFareSection] CSV ${state}: ${parsed.length} rows`);
-                }
-              } catch {
-                console.warn(`[CabFareSection] CSV ${state}: CORS blocked`);
-              }
-            }
+                let parsed: FareData[] = [];
 
-            return [state, parsed] as const;
-          } catch (error) {
-            console.error(`[CabFareSection] ${state} failed`, error);
-            return [state, [] as FareData[]] as const;
-          }
-        }),
+                const jsonpPayload = await loadGvizWithJsonp(url);
+                if (jsonpPayload) {
+                  parsed = parseGvizPayload(jsonpPayload);
+                  console.log(`[CabFareSection] JSONP ${city}-${state}: ${parsed.length} rows`);
+                }
+
+                if (parsed.length === 0 && gvizUrl) {
+                  try {
+                    const gvizRes = await fetch(`${gvizUrl}&_=${Date.now()}`, { cache: "no-store" });
+                    if (gvizRes.ok) {
+                      parsed = parseGvizJson(await gvizRes.text());
+                      console.log(`[CabFareSection] gviz fetch ${city}-${state}: ${parsed.length} rows`);
+                    }
+                  } catch {
+                    console.warn(`[CabFareSection] gviz fetch ${city}-${state}: CORS blocked`);
+                  }
+                }
+
+                if (parsed.length === 0 && exportUrl) {
+                  try {
+                    const csvRes = await fetch(`${exportUrl}&_=${Date.now()}`, { cache: "no-store" });
+                    if (csvRes.ok) {
+                      parsed = parseFareCsv(await csvRes.text());
+                      console.log(`[CabFareSection] CSV ${city}-${state}: ${parsed.length} rows`);
+                    }
+                  } catch {
+                    console.warn(`[CabFareSection] CSV ${city}-${state}: CORS blocked`);
+                  }
+                }
+
+                return [state, parsed] as const;
+              } catch (error) {
+                console.error(`[CabFareSection] ${city}-${state} failed`, error);
+                return [state, [] as FareData[]] as const;
+              }
+            })
+          );
+
+          return [city, Object.fromEntries(stateEntries) as Record<DestinationState, FareData[]>] as const;
+        })
       );
 
       setCabFares((current) => ({
         ...current,
-        ...(Object.fromEntries(entries) as Record<State, FareData[]>),
+        ...(Object.fromEntries(cityEntries) as Record<OriginCity, Record<DestinationState, FareData[]>>),
       }));
       setLoading(false);
     };
@@ -599,6 +641,11 @@ const CabFareSection = ({ variant = "previous", withContainer = false }: CabFare
     const interval = window.setInterval(loadSheetFares, 60_000);
     return () => window.clearInterval(interval);
   }, []);
+
+  const currentCityFares = cabFares[currentCity] || emptyCityFares[currentCity];
+  const activeStateFares = currentCityFares[selectedState] || [];
+  const hasSheetConfigured = Boolean(sheetUrls[currentCity]?.[selectedState]);
+  const originCityName = currentCity === 'bangalore' ? 'Bangalore' : 'Hyderabad';
 
   return (
     <section className="py-8 md:py-16 px-[5%] md:px-4 bg-muted/30">
@@ -610,7 +657,7 @@ const CabFareSection = ({ variant = "previous", withContainer = false }: CabFare
           className="text-center mb-8"
         >
           <h2 className="text-3xl font-bold text-foreground mb-4">
-            Premium Outstation Cabs at Unbeatable Rates
+            Premium Outstation Cabs from {originCityName}
           </h2>
           <p className="text-lg text-muted-foreground mb-8">
             Curated outstation rentals for the modern explorer. Don't just book a cab, Book an experience with our handpicked outstation rides.
@@ -619,7 +666,7 @@ const CabFareSection = ({ variant = "previous", withContainer = false }: CabFare
           <CabFareKPIs />
 
           <div className="flex flex-wrap justify-center gap-3">
-            {(Object.keys(stateLabels) as State[]).map((state) => (
+            {cityStateOrder[currentCity].map((state) => (
               <button
                 key={state}
                 onClick={() => setSelectedState(state)}
@@ -643,18 +690,26 @@ const CabFareSection = ({ variant = "previous", withContainer = false }: CabFare
           </div>
         )}
 
-        {!loading && cabFares[selectedState].length === 0 && (
+        {!loading && activeStateFares.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
-            <p className="text-lg font-medium mb-1">No fares available</p>
-            <p className="text-sm">Could not load fare data from the sheet. Please check the sheet is shared publicly.</p>
+            <p className="text-lg font-medium mb-1">
+              {hasSheetConfigured
+                ? "No fares available"
+                : `Fares from ${originCityName} to ${stateLabels[selectedState]} coming soon`}
+            </p>
+            <p className="text-sm">
+              {hasSheetConfigured
+                ? "Could not load fare data from the sheet. Please check the sheet is shared publicly."
+                : "The pricing sheet for this route will be connected shortly. Stay tuned!"}
+            </p>
           </div>
         )}
 
         <AnimatePresence mode="wait">
-          {!loading && cabFares[selectedState].length > 0 && variant === "ticket" ? (
+          {!loading && activeStateFares.length > 0 && variant === "ticket" ? (
             /* Two independent flex columns so opening one card doesn't shift the other column */
             <motion.div
-              key={selectedState}
+              key={`${currentCity}-${selectedState}`}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -663,11 +718,11 @@ const CabFareSection = ({ variant = "previous", withContainer = false }: CabFare
             >
               {/* Desktop: left column (even indices) */}
               <div className="hidden lg:flex flex-col gap-4 flex-1">
-                {cabFares[selectedState]
+                {activeStateFares
                   .filter((_, i) => i % 2 === 0)
                   .map((fare, index) => (
                     <CabFareCard
-                      key={`${selectedState}-${fare.toCode}`}
+                      key={`${currentCity}-${selectedState}-${fare.toCode}`}
                       {...fare}
                       delay={index * 0.05}
                       variant={variant}
@@ -676,11 +731,11 @@ const CabFareSection = ({ variant = "previous", withContainer = false }: CabFare
               </div>
               {/* Desktop: right column (odd indices) */}
               <div className="hidden lg:flex flex-col gap-4 flex-1">
-                {cabFares[selectedState]
+                {activeStateFares
                   .filter((_, i) => i % 2 !== 0)
                   .map((fare, index) => (
                     <CabFareCard
-                      key={`${selectedState}-${fare.toCode}`}
+                      key={`${currentCity}-${selectedState}-${fare.toCode}`}
                       {...fare}
                       delay={index * 0.05}
                       variant={variant}
@@ -689,9 +744,9 @@ const CabFareSection = ({ variant = "previous", withContainer = false }: CabFare
               </div>
               {/* Mobile: all cards in a single column */}
               <div className="flex flex-col gap-4 flex-1 lg:hidden">
-                {cabFares[selectedState].map((fare, index) => (
+                {activeStateFares.map((fare, index) => (
                   <CabFareCard
-                    key={`${selectedState}-${fare.toCode}-mobile`}
+                    key={`${currentCity}-${selectedState}-${fare.toCode}-mobile`}
                     {...fare}
                     delay={index * 0.05}
                     variant={variant}
@@ -699,18 +754,18 @@ const CabFareSection = ({ variant = "previous", withContainer = false }: CabFare
                 ))}
               </div>
             </motion.div>
-          ) : !loading && cabFares[selectedState].length > 0 ? (
+          ) : !loading && activeStateFares.length > 0 ? (
             <motion.div
-              key={selectedState}
+              key={`${currentCity}-${selectedState}`}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
               className="grid grid-cols-1 lg:grid-cols-2 lg:items-start gap-4"
             >
-              {cabFares[selectedState].map((fare, index) => (
+              {activeStateFares.map((fare, index) => (
                 <CabFareCard
-                  key={`${selectedState}-${fare.toCode}`}
+                  key={`${currentCity}-${selectedState}-${fare.toCode}`}
                   {...fare}
                   delay={index * 0.05}
                   variant={variant}

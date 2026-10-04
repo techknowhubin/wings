@@ -26,6 +26,7 @@ export const destinationCoordinates: Record<string, DestinationCoord> = {
   "Nainital": { lat: 29.3803, lng: 79.4636 },
   "Auli": { lat: 30.5276, lng: 79.5660 },
   "Coorg": { lat: 12.3375, lng: 75.8069 },
+  "Bangalore": { lat: 12.9716, lng: 77.5946 },
   "Hampi": { lat: 15.3350, lng: 76.4600 },
   "Gokarna": { lat: 14.5479, lng: 74.3188 },
   "Srinagar": { lat: 34.0837, lng: 74.7973 },

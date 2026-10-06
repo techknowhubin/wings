@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { loadGoogleMaps, isWithinHyderabad, HYDERABAD_BBOX } from "@/lib/googleMaps";
+import { loadGoogleMaps, isWithinCityArea, HYDERABAD_BBOX, BANGALORE_BBOX } from "@/lib/googleMaps";
 
 // Fix Leaflet default icon missing in bundled apps
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -26,7 +26,7 @@ interface LocationAutocompleteProps {
   value: string;
   onChange: (data: LocationData) => void;
   placeholder?: string;
-  restrictToHyderabad?: boolean;
+  restrictToCity?: string | null;
   onError?: (error: string | null) => void;
 }
 
@@ -38,8 +38,7 @@ interface PlacePrediction {
   lng?: number;
 }
 
-const SERVICE_AREA_ERROR =
-  "Airport transfers and Local transfers are available only within Hyderabad city limits.";
+const getServiceAreaError = (city: string | null | undefined) => `Airport transfers and Local transfers are available only within ${city === "bangalore" ? "Bangalore" : "Hyderabad"} city limits.`;
 const GEO_UNAVAILABLE_ERROR =
   "Unable to detect your current location. Please search manually.";
 
@@ -62,10 +61,10 @@ function formatPhotonLabel(props: any): string {
 // Free, no API key, built on OpenStreetMap POI data
 async function photonSearch(
   input: string,
-  biasToHyderabad: boolean
+  biasCity: string | null | undefined
 ): Promise<PlacePrediction[]> {
   const params = new URLSearchParams({ q: input, lang: "en", limit: "8" });
-  if (biasToHyderabad) {
+  if (biasCity === "bangalore") { params.set("lat", "12.9716"); params.set("lon", "77.5946"); } else if (biasCity) {
     params.set("lat", "17.3850");
     params.set("lon", "78.4867");
   }
@@ -90,7 +89,7 @@ async function photonSearch(
 // Nominatim address search — fallback when Photon is unavailable
 async function nominatimSearch(
   input: string,
-  biasToHyderabad: boolean
+  biasCity: string | null | undefined
 ): Promise<PlacePrediction[]> {
   const params = new URLSearchParams({
     format: "jsonv2",
@@ -120,7 +119,7 @@ async function nominatimSearch(
 // Primary search: Photon with Nominatim fallback
 async function openStreetMapSearch(
   input: string,
-  biasToHyderabad: boolean
+  biasCity: string | null | undefined
 ): Promise<PlacePrediction[]> {
   try {
     const results = await photonSearch(input, biasToHyderabad);
@@ -163,7 +162,7 @@ export default function LocationAutocomplete({
   value,
   onChange,
   placeholder = "Search location...",
-  restrictToHyderabad = false,
+  restrictToCity = null,
   onError,
 }: LocationAutocompleteProps) {
   const [query, setQuery] = useState(value);
@@ -188,8 +187,8 @@ export default function LocationAutocomplete({
   const onChangeRef = useRef(onChange);
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
-  const restrictToHyderabadRef = useRef(restrictToHyderabad);
-  useEffect(() => { restrictToHyderabadRef.current = restrictToHyderabad; }, [restrictToHyderabad]);
+  const restrictToCityRef = useRef(restrictToCity);
+  useEffect(() => { restrictToCityRef.current = restrictToCity; }, [restrictToCity]);
 
   const onErrorRef = useRef(onError);
   useEffect(() => { onErrorRef.current = onError; }, [onError]);
@@ -211,11 +210,11 @@ export default function LocationAutocomplete({
   // Validate location against Hyderabad boundary, commit to parent if valid
   const commitLocation = async (locData: LocationData): Promise<boolean> => {
     setGeoError(null); // clear any prior GPS error on new selection
-    if (restrictToHyderabadRef.current) {
-      const valid = await isWithinHyderabad(locData.lat, locData.lng);
+    if (restrictToCityRef.current) {
+      const valid = await isWithinCityArea(locData.lat, locData.lng, restrictToCityRef.current || "");
       if (!valid) {
-        setServiceAreaError(SERVICE_AREA_ERROR);
-        onErrorRef.current?.(SERVICE_AREA_ERROR);
+        const err = getServiceAreaError(restrictToCityRef.current); setServiceAreaError(err);
+        onErrorRef.current?.(err);
         return false;
       }
     }
@@ -314,7 +313,7 @@ export default function LocationAutocomplete({
       );
     } else {
       // No Google Maps API key — use Photon → Nominatim fallback
-      openStreetMapSearch(input, restrictToHyderabadRef.current)
+      openStreetMapSearch(input, restrictToCityRef.current)
         .then((results) => {
           setIsSearching(false);
           cacheRef.current[cacheKey] = results;
@@ -343,7 +342,7 @@ export default function LocationAutocomplete({
     try {
       const results = googleServiceRef.current
         ? [] // Google Places path handled via handleSelectPrediction
-        : await openStreetMapSearch(q, restrictToHyderabadRef.current);
+        : await openStreetMapSearch(q, restrictToCityRef.current);
       setIsSearching(false);
       if (results.length > 0) {
         await handleSelectPrediction(results[0]);
@@ -420,8 +419,10 @@ export default function LocationAutocomplete({
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    const lat = selectedLocation?.lat ?? 17.385;
-    const lng = selectedLocation?.lng ?? 78.4867;
+    const defaultLat = restrictToCity === 'bangalore' ? 12.9716 : 17.3850;
+    const defaultLng = restrictToCity === 'bangalore' ? 77.5946 : 78.4867;
+    const lat = selectedLocation?.lat ?? defaultLat;
+    const lng = selectedLocation?.lng ?? defaultLng;
     const googleLoaded = typeof window !== "undefined" && (window as any).google?.maps?.Map;
 
     if (googleLoaded) {
@@ -441,15 +442,7 @@ export default function LocationAutocomplete({
           streetViewControl: false,
           mapTypeControl: false,
           fullscreenControl: false,
-          restriction: restrictToHyderabadRef.current ? {
-            latLngBounds: {
-              north: HYDERABAD_BBOX.latMax,
-              south: HYDERABAD_BBOX.latMin,
-              east: HYDERABAD_BBOX.lngMax,
-              west: HYDERABAD_BBOX.lngMin,
-            },
-            strictBounds: true,
-          } : undefined,
+          restriction: restrictToCityRef.current ? { latLngBounds: restrictToCityRef.current === "bangalore" ? { north: BANGALORE_BBOX.latMax, south: BANGALORE_BBOX.latMin, east: BANGALORE_BBOX.lngMax, west: BANGALORE_BBOX.lngMin } : { north: HYDERABAD_BBOX.latMax, south: HYDERABAD_BBOX.latMin, east: HYDERABAD_BBOX.lngMax, west: HYDERABAD_BBOX.lngMin } } : undefined,
         });
 
         const marker = new (window as any).google.maps.Marker({
@@ -467,11 +460,11 @@ export default function LocationAutocomplete({
 
           const locData: LocationData = { address, lat: newLat, lng: newLng };
 
-          if (restrictToHyderabadRef.current) {
-            const valid = await isWithinHyderabad(newLat, newLng);
+          if (restrictToCityRef.current) {
+            const valid = await isWithinCityArea(newLat, newLng, restrictToCityRef.current || "");
             if (!valid) {
-              setServiceAreaError(SERVICE_AREA_ERROR);
-              onErrorRef.current?.(SERVICE_AREA_ERROR);
+              const err = getServiceAreaError(restrictToCityRef.current); setServiceAreaError(err);
+              onErrorRef.current?.(err);
               return;
             }
           }
@@ -515,10 +508,11 @@ export default function LocationAutocomplete({
         mapContainerRef.current.innerHTML = "";
 
         const mapOptions: L.MapOptions = { zoomControl: true };
-        if (restrictToHyderabadRef.current) {
+        if (restrictToCityRef.current) {
+          const bbox = restrictToCityRef.current === "bangalore" ? BANGALORE_BBOX : HYDERABAD_BBOX;
           mapOptions.maxBounds = [
-            [HYDERABAD_BBOX.latMin, HYDERABAD_BBOX.lngMin],
-            [HYDERABAD_BBOX.latMax, HYDERABAD_BBOX.lngMax]
+            [bbox.latMin, bbox.lngMin],
+            [bbox.latMax, bbox.lngMax]
           ];
           mapOptions.maxBoundsViscosity = 1.0;
         }
@@ -539,11 +533,11 @@ export default function LocationAutocomplete({
 
           const locData: LocationData = { address, lat: newLat, lng: newLng };
 
-          if (restrictToHyderabadRef.current) {
-            const valid = await isWithinHyderabad(newLat, newLng);
+          if (restrictToCityRef.current) {
+            const valid = await isWithinCityArea(newLat, newLng, restrictToCityRef.current || "");
             if (!valid) {
-              setServiceAreaError(SERVICE_AREA_ERROR);
-              onErrorRef.current?.(SERVICE_AREA_ERROR);
+              const err = getServiceAreaError(restrictToCityRef.current); setServiceAreaError(err);
+              onErrorRef.current?.(err);
               return;
             }
           }
@@ -577,7 +571,7 @@ export default function LocationAutocomplete({
         }
       }
     }
-  }, [selectedLocation]);
+  }, [selectedLocation, restrictToCity]);
 
   // Only service area failures drive red styling + block booking
   const hasServiceError = !!serviceAreaError;
@@ -586,8 +580,8 @@ export default function LocationAutocomplete({
     <div className="relative space-y-2">
       <div className="flex justify-between items-center">
         <Label className="text-sm font-semibold text-[#013220]">{label}</Label>
-        {restrictToHyderabad && (
-          <span className="text-[10px] font-bold text-white bg-[#013220] px-2 py-0.5 rounded-md">Service Area: Hyderabad Only</span>
+        {restrictToCity && (
+          <span className="text-[10px] font-bold text-white bg-[#013220] px-2 py-0.5 rounded-md">Service Area: {restrictToCity === "bangalore" ? "Bangalore" : "Hyderabad"} Only</span>
         )}
       </div>
 

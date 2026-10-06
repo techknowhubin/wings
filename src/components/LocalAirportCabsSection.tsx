@@ -597,7 +597,7 @@ export default function LocalAirportCabsSection() {
                     value={pickupAddress}
                     placeholder="Search for pickup address..."
                     onChange={handlePickupChange}
-                    restrictToHyderabad={selectedCity !== 'bangalore'}
+                    restrictToCity={selectedCity}
                     onError={setAreaValidationError}
                   />
                 )}
@@ -612,7 +612,7 @@ export default function LocalAirportCabsSection() {
                       value={dropAddress}
                       placeholder="Search for drop address..."
                       onChange={handleDropChange}
-                      restrictToHyderabad={selectedCity !== 'bangalore'}
+                      restrictToCity={selectedCity}
                       onError={setAreaValidationError}
                     />
                   ) : (

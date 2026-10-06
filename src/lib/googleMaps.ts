@@ -71,17 +71,19 @@ export const DEFAULT_AIRPORTS: AirportConfig[] = [
 
 // Approximate Hyderabad bounding box
 export const HYDERABAD_BBOX = { latMin: 17.15, latMax: 17.60, lngMin: 78.20, lngMax: 78.70 };
+export const BANGALORE_BBOX = { latMin: 12.60, latMax: 13.30, lngMin: 77.30, lngMax: 77.90 };
 
-function isWithinHyderabad_bbox(lat: number, lng: number): boolean {
+function isWithinCity_bbox(lat: number, lng: number, city: string): boolean {
+  const bbox = city === 'bangalore' ? BANGALORE_BBOX : HYDERABAD_BBOX;
   return (
-    lat >= HYDERABAD_BBOX.latMin && lat <= HYDERABAD_BBOX.latMax &&
-    lng >= HYDERABAD_BBOX.lngMin && lng <= HYDERABAD_BBOX.lngMax
+    lat >= bbox.latMin && lat <= bbox.latMax &&
+    lng >= bbox.lngMin && lng <= bbox.lngMax
   );
 }
 
-export async function isWithinHyderabad(lat: number, lng: number): Promise<boolean> {
+export async function isWithinCityArea(lat: number, lng: number, city: string): Promise<boolean> {
   // Strict check against the bounding box first
-  if (!isWithinHyderabad_bbox(lat, lng)) return false;
+  if (!isWithinCity_bbox(lat, lng, city)) return false;
 
   const GeocoderClass = typeof window !== "undefined" && (window as any).google?.maps?.Geocoder;
   // If Geocoder is not loaded (mock mode), rely purely on the bounding box
@@ -96,18 +98,29 @@ export async function isWithinHyderabad(lat: number, lng: number): Promise<boole
       for (const result of results) {
         for (const component of (result.address_components ?? [])) {
           const name = component.long_name.toLowerCase();
-          if (
-            name.includes("hyderabad") ||
-            name.includes("rangareddy") ||
-            name.includes("ranga reddy") ||
-            name.includes("medchal")
-          ) {
-            resolve(true);
-            return;
+          if (city === 'bangalore') {
+            if (
+              name.includes("bangalore") ||
+              name.includes("bengaluru") ||
+              name.includes("bbmp")
+            ) {
+              resolve(true);
+              return;
+            }
+          } else {
+            if (
+              name.includes("hyderabad") ||
+              name.includes("rangareddy") ||
+              name.includes("ranga reddy") ||
+              name.includes("medchal")
+            ) {
+              resolve(true);
+              return;
+            }
           }
         }
       }
-      resolve(false); // Valid address but not in Hyderabad/GHMC region
+      resolve(false); // Valid address but not in the selected city region
     });
   });
 }
